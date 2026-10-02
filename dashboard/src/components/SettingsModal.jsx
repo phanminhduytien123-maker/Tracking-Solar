@@ -15,7 +15,9 @@ export default function SettingsModal({
   refreshRate,
   setRefreshRate,
   latestTelemetry,
-  firebaseConnected
+  firebaseConnected,
+  onClearFirebase,
+  onSendTestPacket
 }) {
   const [activeTab, setActiveTab] = useState('config'); // 'config' | 'json' | 'esp32_trk' | 'esp32_fix'
   const [copiedTab, setCopiedTab] = useState(null);
@@ -369,7 +371,7 @@ void loop() {
                         value={firebaseConfig.apiKey || ''}
                         onChange={(e) => setFirebaseConfig({ ...firebaseConfig, apiKey: e.target.value })}
                         placeholder="AIzaSy..."
-                        className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-zinc-600 focus:outline-hidden focus:border-orange-400"
+                        className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-zinc-600 focus:outline-hidden focus:border-orange-400 font-mono text-xs"
                       />
                     </div>
                     <div>
@@ -379,9 +381,27 @@ void loop() {
                         value={firebaseConfig.projectId || ''}
                         onChange={(e) => setFirebaseConfig({ ...firebaseConfig, projectId: e.target.value })}
                         placeholder="tracking-solar-datn"
-                        className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-zinc-600 focus:outline-hidden focus:border-orange-400"
+                        className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-white placeholder-zinc-600 focus:outline-hidden focus:border-orange-400 font-mono text-xs"
                       />
                     </div>
+                  </div>
+
+                  {/* Actions for Firebase */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-orange-500/20">
+                    <button
+                      type="button"
+                      onClick={onSendTestPacket}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500/20 hover:bg-orange-500/30 text-orange-200 border border-orange-500/40 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      🚀 Gửi 1 gói mẫu thử nghiệm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClearFirebase}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      🧹 Xoá sạch dữ liệu trên Firebase (Reset)
+                    </button>
                   </div>
                 </div>
               )}

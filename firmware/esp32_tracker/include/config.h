@@ -10,8 +10,8 @@
 // =========================================================================
 // CẤU HÌNH FIREBASE REALTIME DATABASE (Lấy từ Firebase Console)
 // =========================================================================
-#define API_KEY "YOUR_FIREBASE_API_KEY"
-#define DATABASE_URL "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app/"
+#define API_KEY "AIzaSyD0i6DhiIncmRaEd6D3UZjLJ1EHNBzXces"
+#define DATABASE_URL "https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 // =========================================================================
 // ĐỊNH NGHĨA CHÂN CẢM BIẾN & NGOẠI VI CHO ESP32-S3

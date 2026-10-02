@@ -13,14 +13,14 @@ import {
   generateIntradayProfile 
 } from './services/mockDataService';
 import { ESP32CommunicationService } from './services/esp32Service';
-import { FirebaseSolarService } from './services/firebaseService';
+import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebaseService';
 import { fetchLiveWeather, getFallbackWeatherData } from './services/weatherService';
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles } from 'lucide-react';
 
 export default function App() {
   // Data Source: 'firebase' | 'mock' | 'esp32_ws'
   const [dataSource, setDataSource] = useState(() => {
-    return localStorage.getItem('solar_datasource') || 'mock';
+    return localStorage.getItem('solar_datasource') || 'firebase';
   });
 
   const [firebaseConfig, setFirebaseConfig] = useState(() => {
@@ -29,9 +29,9 @@ export default function App() {
       try { return JSON.parse(saved); } catch (e) {}
     }
     return {
-      databaseURL: '',
-      apiKey: '',
-      projectId: ''
+      databaseURL: 'https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      apiKey: 'AIzaSyD0i6DhiIncmRaEd6D3UZjLJ1EHNBzXces',
+      projectId: 'final-project---tracking-solar'
     };
   });
 
@@ -56,7 +56,9 @@ export default function App() {
   const firebaseServiceRef = useRef(new FirebaseSolarService());
 
   // Telemetry & Data States
-  const [telemetry, setTelemetry] = useState(() => mockEngineRef.current.getNextState());
+  const [telemetry, setTelemetry] = useState(() => {
+    return dataSource === 'firebase' ? getCleanZeroTelemetry() : mockEngineRef.current.getNextState();
+  });
   const [intradayData, setIntradayData] = useState(() => generateIntradayProfile());
   const [history30Days] = useState(() => generate30DaysHistory());
 
@@ -68,6 +70,16 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('solar_firebase_config', JSON.stringify(firebaseConfig));
   }, [firebaseConfig]);
+
+  // Handle data source change
+  const handleDataSourceChange = (newSource) => {
+    setDataSource(newSource);
+    if (newSource === 'firebase') {
+      setTelemetry(getCleanZeroTelemetry());
+    } else if (newSource === 'mock') {
+      setTelemetry(mockEngineRef.current.getNextState());
+    }
+  };
 
   // Fetch Live Weather for Saigon District 1 (Lat 10.7769, Lon 106.7009)
   const loadWeather = async () => {
@@ -133,27 +145,30 @@ export default function App() {
       if (firebaseConfig.databaseURL && firebaseConfig.apiKey) {
         firebaseServiceRef.current.init(firebaseConfig, {
           onTelemetry: (fbTelemetry) => {
-            setTelemetry((prev) => ({
-              ...prev,
-              ...fbTelemetry,
-              system: {
-                ...prev.system,
-                ...fbTelemetry.system,
-                online: true,
-                isMock: false
-              }
-            }));
+            setTelemetry(fbTelemetry);
+
+            // Update real-time intraday curve with live data
+            const now = new Date();
+            const currentHour = now.getHours();
+            if (currentHour >= 6 && currentHour <= 18) {
+              const timeSlot = `${currentHour.toString().padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
+              setIntradayData((prev) => {
+                return prev.map((item) => {
+                  if (item.time === timeSlot) {
+                    return {
+                      ...item,
+                      pTracking: fbTelemetry.ina219.tracking.power,
+                      pStatic: fbTelemetry.ina219.static.power,
+                      gain: fbTelemetry.ina219.comparison?.percentGain || 0
+                    };
+                  }
+                  return item;
+                });
+              });
+            }
           },
           onStatusChange: (status) => {
             setFirebaseConnected(status.connected);
-            setTelemetry((prev) => ({
-              ...prev,
-              system: {
-                ...prev.system,
-                online: status.connected,
-                isMock: false
-              }
-            }));
           },
           onError: (err) => {
             console.warn('[Firebase Client Error]', err);
@@ -167,7 +182,7 @@ export default function App() {
     }
   }, [dataSource, firebaseConfig]);
 
-  // Main Loop for Mock & Real-time Chart updates
+  // Main Loop for Mock mode
   useEffect(() => {
     const timer = setInterval(() => {
       if (dataSource === 'mock') {
@@ -199,6 +214,78 @@ export default function App() {
     return () => clearInterval(timer);
   }, [dataSource, refreshRate]);
 
+  // Action: Clear Firebase Data
+  const handleClearFirebase = async () => {
+    if (window.confirm('Bạn có chắc chắn muốn xoá sạch toàn bộ dữ liệu trên Firebase không?')) {
+      await firebaseServiceRef.current.clearAllData();
+      setTelemetry(getCleanZeroTelemetry());
+      alert('Đã xoá sạch dữ liệu trên Firebase!');
+    }
+  };
+
+  // Action: Send Single Test Packet to Firebase
+  const handleSendTestPacket = async () => {
+    const dbUrl = firebaseConfig.databaseURL;
+    if (!dbUrl) {
+      alert('Vui lòng điền Database URL trước!');
+      return;
+    }
+
+    const cleanUrl = dbUrl.endsWith('/') ? dbUrl : `${dbUrl}/`;
+    const payload = {
+      tracking: {
+        voltage: 19.45,
+        current: 2.580,
+        power: 50.18,
+        dailyEnergy: 0.285,
+        azimuthAngle: 165.2,
+        elevationAngle: 52.8,
+        targetAzimuth: 165.5,
+        targetElevation: 53.0,
+        ldrTop: 3150,
+        ldrBottom: 3120,
+        ldrLeft: 3200,
+        ldrRight: 3180,
+        mode: 'AUTO',
+        status: 'TRACKING_ACTIVE',
+        estop: false,
+        lastUpdate: Date.now()
+      },
+      static: {
+        voltage: 17.80,
+        current: 1.820,
+        power: 32.40,
+        dailyEnergy: 0.190,
+        fixedAzimuth: 180.0,
+        fixedElevation: 15.0,
+        lastUpdate: Date.now()
+      },
+      algorithm: {
+        name: 'Fuzzy-PID & PSO',
+        kp: 2.65,
+        ki: 0.08,
+        kd: 0.72,
+        psoBestFitness: 0.992,
+        psoIteration: 18
+      }
+    };
+
+    try {
+      const res = await fetch(`${cleanUrl}solar.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        alert('✅ Đã gửi thành công 1 gói Telemetry mẫu lên Firebase! Dashboard sẽ cập nhật ngay.');
+      } else {
+        alert(`❌ Lỗi gửi: ${res.status} ${res.statusText}`);
+      }
+    } catch (err) {
+      alert(`❌ Lỗi kết nối Firebase: ${err.message}`);
+    }
+  };
+
   // Command Handlers
   const handleSetMode = (mode) => {
     if (dataSource === 'mock') {
@@ -218,7 +305,8 @@ export default function App() {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
     } else if (dataSource === 'firebase') {
-      firebaseServiceRef.current.jogMotor(axis, step > 0 ? 'CW' : 'CCW', Math.abs(step));
+      const dir = step > 0 ? 'CW' : 'CCW';
+      firebaseServiceRef.current.jogMotor(axis, dir, Math.abs(step));
     } else {
       esp32ServiceRef.current?.jog(axis, step * 100, step);
     }
@@ -324,19 +412,18 @@ export default function App() {
       </main>
 
       {/* 3. MODALS */}
-      {/* Modal Chi Tiết Toàn Diện (Sensors, Fuzzy-PID, PSO, INA219, Encoders) */}
+      {/* Modal Chi Tiết Cảm Biến LDR & Thuật Toán Fuzzy-PID, PSO */}
       <DetailedTelemetryModal 
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         telemetry={telemetry}
-        onTriggerPso={handleTriggerPso}
       />
 
-      {/* Modal Bảng Điều Khiển Thủ Công (Jog, Chế độ, Calibrate, E-Stop) */}
+      {/* Modal Điều Khiển Thủ Công (Jog / Chuyển Chế Độ / E-Stop) */}
       <ManualControlModal 
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
-        mode={telemetry.system.mode}
+        system={telemetry.system}
         onSetMode={handleSetMode}
         onJog={handleJog}
         onCalibrate={handleCalibrate}
@@ -351,7 +438,7 @@ export default function App() {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         dataSource={dataSource}
-        setDataSource={setDataSource}
+        setDataSource={handleDataSourceChange}
         firebaseConfig={firebaseConfig}
         setFirebaseConfig={setFirebaseConfig}
         firebaseConnected={firebaseConnected}
@@ -362,6 +449,8 @@ export default function App() {
         refreshRate={refreshRate}
         setRefreshRate={setRefreshRate}
         latestTelemetry={telemetry}
+        onClearFirebase={handleClearFirebase}
+        onSendTestPacket={handleSendTestPacket}
       />
 
       {/* 4. FOOTER */}
