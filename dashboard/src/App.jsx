@@ -500,13 +500,13 @@ export default function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
 
-      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Right corner) */}
-      <div className="fixed bottom-20 sm:bottom-4 right-3 sm:right-4 z-40">
+      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Floating Switcher) */}
+      <div className="fixed bottom-18 sm:bottom-4 inset-x-2 sm:inset-x-auto sm:right-4 z-40 flex justify-center sm:justify-end pointer-events-none">
         {showWeatherSwitcher ? (
-          <div className="p-2 rounded-2xl bg-black/60 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="p-1.5 sm:p-2 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/25 shadow-2xl flex items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto scrollbar-none animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto">
             <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === null ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -515,7 +515,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === 'clear' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -524,7 +524,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType('clouds'); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === 'clouds' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -533,7 +533,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType('rain'); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === 'rain' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -542,7 +542,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType('thunderstorm'); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === 'thunderstorm' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -551,7 +551,7 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType('night'); setShowWeatherSwitcher(false); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === 'night' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -560,7 +560,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setShowWeatherSwitcher(false)}
-              className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 ml-1 text-xs cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-xs cursor-pointer shrink-0"
             >
               ✕
             </button>
@@ -568,7 +568,7 @@ export default function App() {
         ) : (
           <button
             onClick={() => setShowWeatherSwitcher(true)}
-            className="p-2.5 rounded-2xl bg-black/30 hover:bg-black/50 backdrop-blur-2xl border border-white/20 text-white/80 hover:text-white shadow-xl transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs"
+            className="p-2 sm:p-2.5 rounded-2xl bg-black/40 hover:bg-black/60 backdrop-blur-2xl border border-white/20 text-white/80 hover:text-white shadow-xl transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs pointer-events-auto ml-auto sm:ml-0"
             title="Đổi hiệu ứng nền thời tiết"
           >
             <Sparkles className="w-4 h-4 text-sky-300" />

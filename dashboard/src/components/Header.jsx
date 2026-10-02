@@ -47,18 +47,18 @@ export default function Header({
       <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 relative">
         
         {/* Left: Brand / Title */}
-        <div className="flex items-center shrink-0">
-          <h1 className="text-xl sm:text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase">
+        <div className="flex items-center shrink min-w-0">
+          <h1 className="text-base sm:text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
           </h1>
         </div>
 
         {/* Center (Desktop) / Right (Mobile): Ton Duc Thang University Logo */}
-        <div className="flex items-center justify-end sm:justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 shrink-0">
+        <div className="flex items-center justify-end sm:justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 shrink-0 max-w-[48%] sm:max-w-none">
           <img 
             src="/tdt_logo.png" 
             alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="h-9 sm:h-11 md:h-12 w-auto object-contain"
+            className="h-6 sm:h-10 md:h-11 w-auto max-w-full object-contain"
           />
         </div>
 
