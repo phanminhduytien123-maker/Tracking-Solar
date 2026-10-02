@@ -51,30 +51,10 @@ export default function Header({
       <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
         
         {/* Left: Brand / Title */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shadow-md shadow-amber-500/20 shrink-0">
-            <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-spin-slow" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-sm sm:text-xl font-extrabold tracking-tight text-white drop-shadow-md whitespace-nowrap">
-                TRACKING SOLAR
-              </h1>
-              {/* Mode badge on Mobile */}
-              <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[11px] font-black font-mono uppercase tracking-wider ${
-                mode === 'AUTO' 
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
-                  : mode === 'MANUAL'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-              }`}>
-                {mode}
-              </span>
-            </div>
-            <span className="hidden sm:block text-[11px] font-medium text-white/60">
-              Hệ thống định hướng pin mặt trời 2 trục (Fuzzy-PID & PSO)
-            </span>
-          </div>
+        <div className="flex items-center">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white drop-shadow-md">
+            TRACKING SOLAR
+          </h1>
         </div>
 
         {/* Right Status Badges & Quick Controls */}
