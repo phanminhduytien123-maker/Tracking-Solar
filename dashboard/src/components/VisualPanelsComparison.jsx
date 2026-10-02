@@ -234,7 +234,7 @@ export default function VisualPanelsComparison({
             </div>
 
             <div className="text-right font-mono text-xs text-zinc-300">
-              <span className="block text-xs text-zinc-400">Điện áp đo được</span>
+              <span className="block text-xs text-zinc-300 font-medium">Điện áp đo được</span>
               <span className="font-bold text-sm text-white">{stat.voltage.toFixed(2)} V</span>
             </div>
           </div>

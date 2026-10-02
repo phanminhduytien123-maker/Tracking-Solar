@@ -371,8 +371,30 @@ export default function App() {
     }));
   };
 
+  // Compute adaptive weather theme for frosted glass panels
+  const currentWeather = weatherData?.current || {};
+  const effectiveWeatherType = customWeatherType || currentWeather?.condition?.type || 'partly_cloudy';
+  const isDay = customWeatherType 
+    ? (!customWeatherType.includes('night')) 
+    : (currentWeather?.isDay ?? 1);
+  const timePhase = customWeatherType 
+    ? (customWeatherType === 'golden_hour' ? 'golden_hour' : isDay ? 'day' : 'night') 
+    : (currentWeather?.timePhase || (isDay ? 'day' : 'night'));
+
+  const isRainy = ['rain', 'drizzle', 'thunderstorm'].includes(effectiveWeatherType);
+  const weatherTheme = timePhase === 'golden_hour'
+    ? 'golden-hour'
+    : (isDay && !isRainy)
+      ? 'sunny-day'
+      : isRainy
+        ? 'rainy'
+        : 'night';
+
   return (
-    <div className="min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white relative font-sans overflow-x-hidden">
+    <div 
+      data-weather-theme={weatherTheme}
+      className={`min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white relative font-sans overflow-x-hidden theme-${weatherTheme}`}
+    >
       
       {/* 0. DYNAMIC ATMOSPHERIC WEATHER BACKGROUND (SAIGON DISTRICT 1 LIVE API) */}
       <WeatherBackground 
