@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,7 +12,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { BarChart3, TrendingUp } from 'lucide-react';
+import { BarChart3, TrendingUp, Maximize2, X } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -28,6 +28,20 @@ ChartJS.register(
 
 export default function ChartsSection({ intradayData, history30Days }) {
   const [historyRange, setHistoryRange] = useState(30); // 7, 14, 30
+  const [expandedChart, setExpandedChart] = useState(null); // 'intraday' | 'history' | null
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setExpandedChart(null);
+      }
+    };
+    if (expandedChart) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [expandedChart]);
 
   // Filter history based on selected range
   const filteredHistory = history30Days.slice(-historyRange);
@@ -54,7 +68,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         borderWidth: 3,
         tension: 0.38,
         fill: true,
-        pointRadius: 3,
+        pointRadius: 3.5,
         pointHoverRadius: 7,
         pointBackgroundColor: '#38bdf8',
         pointBorderColor: '#0c0d10',
@@ -75,7 +89,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         borderDash: [6, 4],
         tension: 0.38,
         fill: true,
-        pointRadius: 2.5,
+        pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#f59e0b',
         pointBorderColor: '#0c0d10',
@@ -141,7 +155,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         ticks: {
           color: '#cbd5e1',
           font: { family: 'Plus Jakarta Sans', size: 12, weight: '700' },
-          maxTicksLimit: 7, // Clean hourly intervals (06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00)
+          maxTicksLimit: 7,
           autoSkip: true,
           maxRotation: 0,
         }
@@ -164,7 +178,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
     }
   };
 
-  // 2. CHART 2 CONFIG: 30-DAY CUMULATIVE ENERGY (Bar Chart + % Gain Line)
+  // 2. CHART 2 CONFIG: 30-DAY CUMULATIVE ENERGY
   const historyLabels = filteredHistory.map(d => d.date);
   const historyTracking = filteredHistory.map(d => d.trackingKwh);
   const historyStatic = filteredHistory.map(d => d.staticKwh);
@@ -182,7 +196,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         borderWidth: 2.5,
         tension: 0.3,
         yAxisID: 'y1',
-        pointRadius: 2.5,
+        pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#10b981',
         order: 1
@@ -318,88 +332,233 @@ export default function ChartsSection({ intradayData, history30Days }) {
   const avgGain = totalStaKwh > 0 ? (((totalTrkKwh - totalStaKwh) / totalStaKwh) * 100).toFixed(1) : 0;
 
   return (
-    <div id="section-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4 scroll-mt-16">
-      
-      {/* 1. ĐỒ THỊ THỜI GIAN THỰC (REAL-TIME LINE CHART) */}
-      <div className="panel-card flex flex-col justify-between shadow-xl">
+    <>
+      <div id="section-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4 scroll-mt-16">
         
-        {/* Header */}
-        <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
-          <div className="flex items-center gap-2.5">
-            <TrendingUp className="w-5 h-5 text-sky-400" />
-            <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-              Công Suất Tức Thời Trong Ngày 
-            </span>
-          </div>
-          <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
-            06:00 - 18:00 (WATT)
-          </span>
-        </div>
-
-        {/* Chart Canvas */}
-        <div className="p-4 sm:p-5 h-[290px] sm:h-[330px] w-full">
-          <Line data={intradayChartData} options={intradayOptions} />
-        </div>
-
-        {/* Footer info */}
-        <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
-          <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
-          <div>
-            <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Tracking: 78.4W</span>
-            <span className="text-white/30 mx-2.5">|</span>
-            <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">Cố định: 52.1W</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. ĐỒ THỊ 30 NGÀY SO SÁNH SẢN LƯỢNG (30-DAY BAR CHART + GAIN LINE) */}
-      <div className="panel-card flex flex-col justify-between shadow-xl">
-        
-        {/* Header with Range Filter */}
-        <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
-          <div className="flex items-center gap-2.5">
-            <BarChart3 className="w-5 h-5 text-emerald-400" />
-            <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-              Sản Lượng Năng Lượng Tích Lũy ({historyRange} Ngày)
-            </span>
-          </div>
+        {/* 1. ĐỒ THỊ THỜI GIAN THỰC (REAL-TIME LINE CHART) */}
+        <div 
+          onClick={() => setExpandedChart('intraday')}
+          className="panel-card flex flex-col justify-between shadow-xl cursor-pointer hover:border-white/40 group transition-all"
+        >
           
-          {/* Range Switcher Buttons */}
-          <div className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md">
-            {[7, 14, 30].map(days => (
+          {/* Header */}
+          <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
+            <div className="flex items-center gap-2.5">
+              <TrendingUp className="w-5 h-5 text-sky-400" />
+              <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
+                Công Suất Tức Thời Trong Ngày 
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
+                06:00 - 18:00 (WATT)
+              </span>
               <button
-                key={days}
-                onClick={() => setHistoryRange(days)}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  historyRange === days
-                    ? 'bg-white text-zinc-950 shadow-md font-black'
-                    : 'text-zinc-300 hover:text-white hover:bg-white/10'
-                }`}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedChart('intraday');
+                }}
+                className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/15 border border-transparent hover:border-white/20 transition-all cursor-pointer"
+                title="Phóng to đồ thị"
               >
-                {days}N
+                <Maximize2 className="w-4 h-4" />
               </button>
-            ))}
+            </div>
+          </div>
+
+          {/* Chart Canvas */}
+          <div className="p-4 sm:p-5 h-[290px] sm:h-[330px] w-full">
+            <Line data={intradayChartData} options={intradayOptions} />
+          </div>
+
+          {/* Footer info */}
+          <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
+            <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
+            <div>
+              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Tracking: 78.4W</span>
+              <span className="text-white/30 mx-2.5">|</span>
+              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">Cố định: 52.1W</span>
+            </div>
           </div>
         </div>
 
-        {/* Chart Canvas */}
-        <div className="p-4 sm:p-5 h-[290px] sm:h-[330px] w-full">
-          <Bar data={historyChartData} options={historyOptions} />
-        </div>
+        {/* 2. ĐỒ THỊ 30 NGÀY SO SÁNH SẢN LƯỢNG (30-DAY BAR CHART + GAIN LINE) */}
+        <div 
+          onClick={() => setExpandedChart('history')}
+          className="panel-card flex flex-col justify-between shadow-xl cursor-pointer hover:border-white/40 group transition-all"
+        >
+          
+          {/* Header with Range Filter */}
+          <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
+            <div className="flex items-center gap-2.5">
+              <BarChart3 className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
+                Sản Lượng Năng Lượng Tích Lũy ({historyRange} Ngày)
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Range Switcher Buttons */}
+              <div 
+                className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {[7, 14, 30].map(days => (
+                  <button
+                    key={days}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHistoryRange(days);
+                    }}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      historyRange === days
+                        ? 'bg-white text-zinc-950 shadow-md font-black'
+                        : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {days}N
+                  </button>
+                ))}
+              </div>
 
-        {/* Footer with Aggregate Metrics */}
-        <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
-          <span className="font-semibold text-zinc-300">Tổng {historyRange} ngày:</span>
-          <div>
-            <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
-            <span className="text-white/30 mx-2.5">|</span>
-            <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaKwh.toFixed(2)} kWh</span>
-            <span className="text-white/30 mx-2.5">|</span>
-            <span className="text-emerald-300 font-black font-mono text-sm sm:text-base">+{avgGain}%</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedChart('history');
+                }}
+                className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/15 border border-transparent hover:border-white/20 transition-all cursor-pointer"
+                title="Phóng to đồ thị"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Chart Canvas */}
+          <div className="p-4 sm:p-5 h-[290px] sm:h-[330px] w-full">
+            <Bar data={historyChartData} options={historyOptions} />
+          </div>
+
+          {/* Footer with Aggregate Metrics */}
+          <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
+            <span className="font-semibold text-zinc-300">Tổng {historyRange} ngày:</span>
+            <div>
+              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
+              <span className="text-white/30 mx-2.5">|</span>
+              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaKwh.toFixed(2)} kWh</span>
+              <span className="text-white/30 mx-2.5">|</span>
+              <span className="text-emerald-300 font-black font-mono text-sm sm:text-base">+{avgGain}%</span>
+            </div>
           </div>
         </div>
+
       </div>
 
-    </div>
+      {/* ENLARGED MODAL / LIGHTBOX VIEW */}
+      {expandedChart && (
+        <div 
+          onClick={() => setExpandedChart(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/80 backdrop-blur-2xl transition-all animate-fadeIn"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="panel-card w-full max-w-6xl max-h-[92vh] flex flex-col justify-between shadow-2xl border-white/30 overflow-hidden relative"
+          >
+            
+            {/* Modal Header */}
+            <div className="panel-header flex items-center justify-between py-4 px-5 sm:px-7">
+              <div className="flex items-center gap-3">
+                {expandedChart === 'intraday' ? (
+                  <TrendingUp className="w-6 h-6 text-sky-400" />
+                ) : (
+                  <BarChart3 className="w-6 h-6 text-emerald-400" />
+                )}
+                <div>
+                  <h2 className="text-base sm:text-xl font-black tracking-wide uppercase text-white">
+                    {expandedChart === 'intraday' 
+                      ? 'CÔNG SUẤT TỨC THỜI TRONG NGÀY (CHI TIẾT PHÓNG TO)'
+                      : `SẢN LƯỢNG NĂNG LƯỢNG TÍCH LŨY (${historyRange} NGÀY)`
+                    }
+                  </h2>
+                  <span className="text-xs text-zinc-300 font-medium hidden sm:inline-block">
+                    {expandedChart === 'intraday' 
+                      ? 'Dữ liệu đo đạc thực tế từ cảm biến INA219 (06:00 - 18:00)'
+                      : 'So sánh sản lượng điện tích luỹ kWh và tỉ lệ phần trăm cải thiện % Gain'
+                    }
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {expandedChart === 'history' && (
+                  <div className="flex items-center gap-1 bg-black/30 p-1.5 rounded-xl border border-white/20 backdrop-blur-md">
+                    {[7, 14, 30].map(days => (
+                      <button
+                        key={days}
+                        onClick={() => setHistoryRange(days)}
+                        className={`px-3.5 py-1 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer ${
+                          historyRange === days
+                            ? 'bg-white text-zinc-950 shadow-md font-black'
+                            : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {days}N
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setExpandedChart(null)}
+                  className="p-2 sm:p-2.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/15 border border-transparent hover:border-white/20 transition-all cursor-pointer"
+                  title="Đóng phóng to (Esc)"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Chart Canvas Area */}
+            <div className="p-4 sm:p-6 md:p-8 h-[55vh] sm:h-[62vh] min-h-[380px] w-full">
+              {expandedChart === 'intraday' ? (
+                <Line data={intradayChartData} options={intradayOptions} />
+              ) : (
+                <Bar data={historyChartData} options={historyOptions} />
+              )}
+            </div>
+
+            {/* Modal Footer info */}
+            <div className="panel-footer text-xs sm:text-base text-zinc-200 flex flex-wrap justify-between items-center gap-2 font-medium py-4 px-5 sm:px-7">
+              {expandedChart === 'intraday' ? (
+                <>
+                  <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: 78.4W</span>
+                    <span className="text-white/30">|</span>
+                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: 52.1W</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-zinc-300">Tổng năng lượng {historyRange} ngày:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: {totalTrkKwh.toFixed(2)} kWh</span>
+                    <span className="text-white/30">|</span>
+                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: {totalStaKwh.toFixed(2)} kWh</span>
+                    <span className="text-white/30">|</span>
+                    <span className="text-emerald-300 font-black font-mono text-sm sm:text-lg">Hiệu quả tăng: +{avgGain}%</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+    </>
   );
 }
