@@ -93,9 +93,6 @@ export default function VisualPanelsComparison({
                 Tấm Pin Tracking
               </h2>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-sky-500/20 text-sky-200 border border-sky-400/30">
-              2 TRỤC XOAY
-            </span>
           </div>
 
           {/* 3D VISUAL PANEL CONTAINER */}
@@ -204,9 +201,6 @@ export default function VisualPanelsComparison({
                 TẤM PIN CỐ ĐỊNH
               </h2>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">
-              HƯỚNG NAM 15°
-            </span>
           </div>
 
           {/* Static Solar Panel Image Container */}
