@@ -28,25 +28,25 @@ export default function ManualControlModal({
   const el = motors?.elevation || { currentAngle: 0, targetAngle: 0 };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md modal-sheet-container">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl modal-sheet-container">
       
       {/* Modal Dialog Card */}
-      <div className="panel-card w-full max-w-2xl overflow-hidden shadow-2xl border-zinc-700/80 flex flex-col bg-[#0e1118] modal-sheet-card">
+      <div className="panel-card w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-white/20">
         
         {/* Mobile Grab Handle */}
-        <div className="sm:hidden w-12 h-1.5 rounded-full bg-zinc-600 mx-auto mt-2.5 mb-1 shrink-0" />
+        <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between py-4 px-5 sm:px-6 border-b border-zinc-800 bg-[#121620]">
+        <div className="flex items-center justify-between py-4 px-5 sm:px-6 border-b border-white/10 bg-white/10 backdrop-blur-md">
           <div>
             <h2 className="text-base sm:text-lg font-bold tracking-tight uppercase text-white">
               BẢNG ĐIỀU KHIỂN ESP32-S3
             </h2>
-            <span className="text-xs text-zinc-400 font-medium">Trung tâm điều khiển chế độ & động cơ 2 trục</span>
+            <span className="text-xs text-zinc-300 font-medium">Trung tâm điều khiển chế độ & động cơ 2 trục</span>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent hover:border-white/10"
           >
             <X className="w-5 h-5" />
           </button>

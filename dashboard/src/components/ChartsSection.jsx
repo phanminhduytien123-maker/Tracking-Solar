@@ -321,7 +321,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
     <div id="section-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4 scroll-mt-16">
       
       {/* 1. ĐỒ THỊ THỜI GIAN THỰC (REAL-TIME LINE CHART) */}
-      <div className="panel-card flex flex-col justify-between shadow-lg">
+      <div className="panel-card flex flex-col justify-between shadow-xl">
         
         {/* Header */}
         <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
@@ -331,7 +331,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
               Công Suất Tức Thời Trong Ngày 
             </span>
           </div>
-          <span className="text-xs font-bold text-zinc-400 bg-[#181b24] px-2.5 py-1 rounded border border-[#262c3d]">
+          <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
             06:00 - 18:00 (WATT)
           </span>
         </div>
@@ -342,18 +342,18 @@ export default function ChartsSection({ intradayData, history30Days }) {
         </div>
 
         {/* Footer info */}
-        <div className="px-5 py-3 bg-[#0c0e14] border-t border-[#1b202c] text-xs sm:text-sm text-zinc-300 flex justify-between items-center font-medium">
-          <span className="font-semibold text-zinc-400">Công suất cực đại hôm nay:</span>
+        <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
+          <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
           <div>
-            <span className="text-sky-400 font-extrabold font-mono text-sm sm:text-base">Tracking: 78.4W</span>
-            <span className="text-zinc-600 mx-2.5">|</span>
-            <span className="text-amber-400 font-extrabold font-mono text-sm sm:text-base">Cố định: 52.1W</span>
+            <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Tracking: 78.4W</span>
+            <span className="text-white/30 mx-2.5">|</span>
+            <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">Cố định: 52.1W</span>
           </div>
         </div>
       </div>
 
       {/* 2. ĐỒ THỊ 30 NGÀY SO SÁNH SẢN LƯỢNG (30-DAY BAR CHART + GAIN LINE) */}
-      <div className="panel-card flex flex-col justify-between shadow-lg">
+      <div className="panel-card flex flex-col justify-between shadow-xl">
         
         {/* Header with Range Filter */}
         <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
@@ -365,15 +365,15 @@ export default function ChartsSection({ intradayData, history30Days }) {
           </div>
           
           {/* Range Switcher Buttons */}
-          <div className="flex items-center gap-1.5 bg-[#101217] p-1 rounded-lg border border-[#222838]">
+          <div className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md">
             {[7, 14, 30].map(days => (
               <button
                 key={days}
                 onClick={() => setHistoryRange(days)}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   historyRange === days
-                    ? 'bg-zinc-200 text-zinc-950 shadow-md font-black'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-white text-zinc-950 shadow-md font-black'
+                    : 'text-zinc-300 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {days}N
@@ -388,14 +388,14 @@ export default function ChartsSection({ intradayData, history30Days }) {
         </div>
 
         {/* Footer with Aggregate Metrics */}
-        <div className="px-5 py-3 bg-[#0c0e14] border-t border-[#1b202c] text-xs sm:text-sm text-zinc-300 flex justify-between items-center font-medium">
-          <span className="font-semibold text-zinc-400">Tổng {historyRange} ngày:</span>
+        <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
+          <span className="font-semibold text-zinc-300">Tổng {historyRange} ngày:</span>
           <div>
-            <span className="text-sky-400 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
-            <span className="text-zinc-600 mx-2.5">|</span>
-            <span className="text-amber-400 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaKwh.toFixed(2)} kWh</span>
-            <span className="text-zinc-600 mx-2.5">|</span>
-            <span className="text-emerald-400 font-black font-mono text-sm sm:text-base">+{avgGain}%</span>
+            <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
+            <span className="text-white/30 mx-2.5">|</span>
+            <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaKwh.toFixed(2)} kWh</span>
+            <span className="text-white/30 mx-2.5">|</span>
+            <span className="text-emerald-300 font-black font-mono text-sm sm:text-base">+{avgGain}%</span>
           </div>
         </div>
       </div>
