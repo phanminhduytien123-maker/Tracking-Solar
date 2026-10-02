@@ -457,11 +457,11 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10 hidden sm:block">
+      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10">
         <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-semibold text-white">ĐỒ ÁN TỐT NGHIỆP: HỆ THỐNG ĐIỀU HƯỚNG PIN MẶT TRỜI THÔNG MINH (FUZZY LOGIC & PSO)</span>
+            <span className="font-semibold text-white tracking-wide text-xs sm:text-sm">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2:  VÕ HỒNG PHÁT</span>
           </div>
           <div className="flex items-center gap-3 text-white/60 font-mono text-[11px]">
             <span>ESP32-S3 REAL-TIME TELEMETRY SYSTEM © 2026</span>
