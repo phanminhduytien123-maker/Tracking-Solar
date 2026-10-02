@@ -1,15 +1,10 @@
 import React from 'react';
-import { LayoutDashboard, Sliders, BarChart3, Activity, Settings, Flame, Database, Wifi } from 'lucide-react';
+import { LayoutDashboard, Sliders, BarChart3, Activity, Settings } from 'lucide-react';
 
 export default function MobileBottomNav({
-  activeTab = 'overview',
-  onSelectTab,
   onOpenManual,
   onOpenDetails,
-  onOpenSettings,
-  dataSource = 'firebase',
-  firebaseConnected = false,
-  systemMode = 'AUTO'
+  onOpenSettings
 }) {
   const scrollToCharts = () => {
     const chartEl = document.getElementById('section-charts');
@@ -25,66 +20,67 @@ export default function MobileBottomNav({
   return (
     <nav 
       aria-label="Mobile Navigation Bar" 
-      className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-[#090b12]/92 backdrop-blur-2xl border-t border-white/15 px-3 py-2 shadow-2xl safe-area-bottom"
+      className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-[#0e1118]/95 backdrop-blur-2xl border-t border-zinc-800 px-2 py-1.5 shadow-2xl safe-area-bottom"
     >
       <div className="flex items-center justify-around max-w-md mx-auto">
         
-        {/* 1. Tổng quan (Overview) */}
+        {/* 1. Tổng quan */}
         <button
           onClick={scrollToTop}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2.5 rounded-xl cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/15 text-sky-400">
-            <LayoutDashboard className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+            <LayoutDashboard className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-bold tracking-tight text-white">Tổng quan</span>
+          <span className="text-xs font-semibold tracking-tight text-zinc-200">Tổng quan</span>
         </button>
 
-        {/* 2. Điều khiển (Control) */}
+        {/* 2. Điều khiển */}
         <button
           onClick={onOpenManual}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2.5 rounded-xl cursor-pointer relative"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl bg-sky-500/20 flex items-center justify-center border border-sky-400/40 text-sky-300 shadow-md shadow-sky-500/20">
-            <Sliders className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+            <Sliders className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-bold tracking-tight text-sky-300">Điều khiển</span>
+          <span className="text-xs font-semibold tracking-tight text-zinc-200">Điều khiển</span>
         </button>
 
-        {/* 3. Biểu đồ (Charts) */}
+        {/* 3. Biểu đồ */}
         <button
           onClick={scrollToCharts}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2.5 rounded-xl cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/15 text-amber-400">
-            <BarChart3 className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+            <BarChart3 className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-bold tracking-tight text-white">Biểu đồ</span>
+          <span className="text-xs font-semibold tracking-tight text-zinc-200">Biểu đồ</span>
         </button>
 
-        {/* 4. Thông số / Thuật toán (Sensors) */}
+        {/* 4. Thông số */}
         <button
           onClick={onOpenDetails}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2.5 rounded-xl cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/15 text-emerald-400">
-            <Activity className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+            <Activity className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-bold tracking-tight text-white">Thông số</span>
+          <span className="text-xs font-semibold tracking-tight text-zinc-200">Thông số</span>
         </button>
 
-        {/* 5. Cài đặt (Settings) */}
+        {/* 5. Cài đặt */}
         <button
           onClick={onOpenSettings}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2.5 rounded-xl cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/15 text-purple-300">
-            <Settings className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+            <Settings className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-bold tracking-tight text-white">Cài đặt</span>
+          <span className="text-xs font-semibold tracking-tight text-zinc-200">Cấu hình</span>
         </button>
 
       </div>
     </nav>
   );
 }
+

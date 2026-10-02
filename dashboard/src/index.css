@@ -3,23 +3,23 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --bg-app: transparent;
-    --bg-panel: rgba(14, 26, 48, 0.42);
-    --bg-panel-header: rgba(255, 255, 255, 0.06);
-    --bg-subtle: rgba(0, 0, 0, 0.22);
-    --bg-input: rgba(8, 14, 26, 0.6);
-    --bg-hover: rgba(255, 255, 255, 0.12);
+    --bg-app: #080a10;
+    --bg-panel: rgba(15, 18, 26, 0.85);
+    --bg-panel-header: rgba(255, 255, 255, 0.03);
+    --bg-subtle: rgba(255, 255, 255, 0.04);
+    --bg-input: #0b0d14;
+    --bg-hover: rgba(255, 255, 255, 0.08);
 
-    --border-subtle: rgba(255, 255, 255, 0.12);
-    --border-card: rgba(255, 255, 255, 0.18);
-    --border-active: rgba(255, 255, 255, 0.4);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+    --border-card: rgba(255, 255, 255, 0.14);
+    --border-active: rgba(255, 255, 255, 0.35);
 
     --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.82);
-    --text-tertiary: rgba(255, 255, 255, 0.55);
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
 
-    --font-sans: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", monospace;
   }
 
   * {
@@ -29,7 +29,6 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Custom Modern Minimalist Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -40,24 +39,20 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 999px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #080b12;
+    background-color: #080a10;
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
-    touch-action: manipulation;
+    letter-spacing: -0.01em;
   }
 
   code, pre, .font-mono {
@@ -65,38 +60,36 @@
   }
 }
 
-/* Glassmorphic Panels */
+/* Industrial Clean SCADA Panels */
 .panel-card {
   background-color: var(--bg-panel);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-card);
-  border-radius: 20px;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
-  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.35);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .panel-card:hover {
   border-color: var(--border-active);
-  box-shadow: 0 14px 40px -4px rgba(0, 0, 0, 0.45);
 }
 
 .panel-header {
   background-color: var(--bg-panel-header);
   border-bottom: 1px solid var(--border-subtle);
-  padding: 12px 18px;
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
+  padding: 14px 20px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
 }
 
 .panel-subtle {
   background-color: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .safe-area-bottom {
-  padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0.6rem));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
 }
 
 /* Mobile Bottom Sheet Modal */
@@ -109,23 +102,21 @@
   .modal-sheet-card {
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
-    border-top-left-radius: 28px !important;
-    border-top-right-radius: 28px !important;
+    border-top-left-radius: 24px !important;
+    border-top-right-radius: 24px !important;
     max-height: 88vh !important;
     max-height: 88dvh !important;
     width: 100% !important;
     border-bottom: none !important;
-    animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: slideUpMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 
 @keyframes slideUpMobile {
   from {
     transform: translateY(100%);
-    opacity: 0.6;
   }
   to {
     transform: translateY(0);
-    opacity: 1;
   }
 }
