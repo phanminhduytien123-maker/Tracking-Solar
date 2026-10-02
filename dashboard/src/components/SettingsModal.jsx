@@ -208,27 +208,35 @@ void loop() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl border-white/20 flex flex-col max-h-[92vh] bg-[#0c0d12]/95 backdrop-blur-2xl rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md modal-sheet-container">
+      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl border-white/20 flex flex-col bg-[#0b0e17]/95 backdrop-blur-3xl modal-sheet-card">
         
+        {/* Mobile Grab Handle */}
+        <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-0.5 shrink-0" />
+
         {/* Header */}
-        <div className="panel-header flex items-center justify-between py-4 px-6 border-b border-white/10">
+        <div className="panel-header flex items-center justify-between py-3.5 px-5 sm:px-6 border-b border-white/10">
           <div className="flex items-center gap-2.5">
-            <Settings className="w-5 h-5 text-zinc-200" />
-            <h2 className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-              Cấu Hình Nguồn Dữ Liệu & Tích Hợp Firebase (2x ESP32-S3)
-            </h2>
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
+              <Settings className="w-4 h-4 text-purple-300" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
+                Cấu Hình Nguồn Dữ Liệu
+              </h2>
+              <span className="text-[10px] text-white/60 font-mono">Firebase RTDB & ESP32 Code</span>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-white/10 bg-black/30 px-6 pt-2 gap-2 text-xs sm:text-sm overflow-x-auto">
+        <div className="flex border-b border-white/10 bg-black/30 px-4 sm:px-6 pt-2 gap-2 text-xs sm:text-sm overflow-x-auto">
           <button
             onClick={() => setActiveTab('config')}
             className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer font-bold whitespace-nowrap ${
@@ -514,9 +522,9 @@ void loop() {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-black/40 border-t border-white/10 flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-3.5 bg-black/40 border-t border-white/10 flex items-center justify-between safe-area-bottom">
           <span className="text-[11px] text-zinc-400">
-            {dataSource === 'firebase' ? '🔥 Chế độ Firebase Cloud' : dataSource === 'mock' ? '⚡ Chế độ Giả lập' : '📡 Chế độ WebSocket'}
+            {dataSource === 'firebase' ? '🔥 Firebase Cloud' : dataSource === 'mock' ? '⚡ Giả lập' : '📡 WebSocket'}
           </span>
           <button
             onClick={onClose}

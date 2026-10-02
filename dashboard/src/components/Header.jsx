@@ -4,12 +4,17 @@ import {
   Settings, 
   AlertTriangle, 
   RotateCcw, 
-  Clock
+  Clock,
+  Sun,
+  Flame,
+  Wifi,
+  Database
 } from 'lucide-react';
 
 export default function Header({ 
-  system, 
-  mode, 
+  system = {}, 
+  mode = 'AUTO', 
+  dataSource = 'firebase',
   onOpenManualModal, 
   onOpenSettingsModal,
   onResetEstop
@@ -41,35 +46,63 @@ export default function Header({
     system?.estop;
 
   return (
-    <header className="border-b border-white/15 bg-black/20 backdrop-blur-2xl sticky top-0 z-40 shadow-sm transition-colors duration-500">
+    <header className="border-b border-white/15 bg-black/30 backdrop-blur-2xl sticky top-0 z-40 shadow-sm transition-colors duration-500">
       {/* Top Main Bar */}
-      <div className="max-w-[1720px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
         
         {/* Left: Brand / Title */}
-        <div className="flex items-center">
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white drop-shadow-md">
-            ĐỒ ÁN TỐT NGHIỆP: TRACKING SOLAR
-          </h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shadow-md shadow-amber-500/20 shrink-0">
+            <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-spin-slow" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm sm:text-xl font-extrabold tracking-tight text-white drop-shadow-md whitespace-nowrap">
+                TRACKING SOLAR
+              </h1>
+              {/* Mode badge on Mobile */}
+              <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[11px] font-black font-mono uppercase tracking-wider ${
+                mode === 'AUTO' 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                  : mode === 'MANUAL'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+              }`}>
+                {mode}
+              </span>
+            </div>
+            <span className="hidden sm:block text-[11px] font-medium text-white/60">
+              Hệ thống định hướng pin mặt trời 2 trục (Fuzzy-PID & PSO)
+            </span>
+          </div>
         </div>
 
         {/* Right Status Badges & Quick Controls */}
-        <div className="flex items-center flex-wrap gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           
-          {/* RTC Clock Badge */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/20 border border-white/15 text-xs text-white shadow-sm backdrop-blur-xl">
-            <Clock className="w-3.5 h-3.5 text-white/80" />
-            <span className="font-mono font-bold text-white">{formattedTime}</span>
-            <span className="text-white/40">|</span>
-            <span className="font-mono text-white/80 font-medium">{formattedDate}</span>
+          {/* Cloud / Source Badge */}
+          <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-xl bg-black/20 border border-white/15 text-[11px] text-white shadow-sm backdrop-blur-xl">
+            <span className={`w-2 h-2 rounded-full ${
+              system.online ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'
+            }`}></span>
+            <span className="font-bold text-[10px] sm:text-xs">
+              {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mock Mode' : 'Local WS'}
+            </span>
           </div>
 
+          {/* Clock Badge (Compact on mobile) */}
+          <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-xl bg-black/20 border border-white/15 text-[11px] text-white shadow-sm backdrop-blur-xl font-mono">
+            <Clock className="w-3 h-3 text-white/70" />
+            <span className="font-bold text-[11px] sm:text-xs text-white">{formattedTime}</span>
+            <span className="hidden md:inline text-white/40">|</span>
+            <span className="hidden md:inline text-white/70">{formattedDate}</span>
+          </div>
 
-
-          {/* Manual Control Modal Trigger Button */}
+          {/* Desktop Manual Control Button */}
           <button
             id="btn-open-manual-control"
             onClick={onOpenManualModal}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all cursor-pointer shadow-lg active:scale-95 backdrop-blur-xl"
+            className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all cursor-pointer shadow-lg active:scale-95 backdrop-blur-xl"
           >
             <Sliders className="w-3.5 h-3.5 text-white" />
             <span>Điều khiển</span>
@@ -79,8 +112,8 @@ export default function Header({
           <button
             id="btn-open-settings"
             onClick={onOpenSettingsModal}
-            className="p-2 rounded-xl text-white/80 hover:text-white bg-black/20 hover:bg-white/20 border border-white/20 transition-all cursor-pointer shadow-sm active:scale-95 backdrop-blur-xl"
-            title="Cài đặt kết nối ESP32"
+            className="p-1.5 sm:p-2 rounded-xl text-white/90 hover:text-white bg-black/20 hover:bg-white/20 border border-white/20 transition-all cursor-pointer shadow-sm active:scale-95 backdrop-blur-xl"
+            title="Cài đặt kết nối"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -89,21 +122,21 @@ export default function Header({
 
       {/* Quick Alert / Warning Banner if active */}
       {hasAlarm && (
-        <div className="bg-red-950/80 border-t border-b border-red-500/30 px-4 sm:px-6 py-1.5 text-xs text-red-100 font-mono flex items-center justify-between backdrop-blur-xl">
-          <div className="flex items-center gap-2">
+        <div className="bg-red-950/90 border-t border-b border-red-500/30 px-3 sm:px-6 py-1.5 text-xs text-red-100 font-mono flex items-center justify-between backdrop-blur-xl">
+          <div className="flex items-center gap-2 overflow-x-auto py-0.5">
             <AlertTriangle className="w-3.5 h-3.5 text-red-300 shrink-0" />
-            <span className="font-semibold uppercase tracking-wider">CẢNH BÁO HỆ THỐNG:</span>
-            <div className="flex items-center gap-3">
-              {system?.estop && <span className="font-bold text-red-200">[EMERGENCY STOP KÍCH HOẠT]</span>}
-              {system?.errors?.limitSwitchMinTriggered && <span>[CHẠM CÔNG TẮC HÀNH TRÌNH MIN]</span>}
-              {system?.errors?.limitSwitchMaxTriggered && <span>[CHẠM CÔNG TẮC HÀNH TRÌNH MAX]</span>}
-              {system?.errors?.sensorLost && <span>[MẤT TÍN HIỆU CẢM BIẾN]</span>}
+            <span className="font-bold uppercase tracking-wider text-[11px]">CẢNH BÁO:</span>
+            <div className="flex items-center gap-2 whitespace-nowrap text-[11px]">
+              {system?.estop && <span className="font-bold text-red-200">[EMERGENCY STOP]</span>}
+              {system?.errors?.limitSwitchMinTriggered && <span>[LIMIT MIN]</span>}
+              {system?.errors?.limitSwitchMaxTriggered && <span>[LIMIT MAX]</span>}
+              {system?.errors?.sensorLost && <span>[MẤT CẢM BIẾN]</span>}
             </div>
           </div>
           {system?.estop && (
             <button
               onClick={onResetEstop}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-900/60 hover:bg-red-900 border border-red-700 text-[11px] text-red-100 cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-900/80 hover:bg-red-900 border border-red-700 text-[10px] sm:text-[11px] text-red-100 cursor-pointer shrink-0 ml-2"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset E-STOP</span>

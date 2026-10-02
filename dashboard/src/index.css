@@ -26,6 +26,7 @@
     box-sizing: border-box;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Custom Modern Minimalist Scrollbar */
@@ -49,13 +50,14 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: #0d1e38;
+    background-color: #080b12;
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    touch-action: manipulation;
   }
 
   code, pre, .font-mono {
@@ -63,13 +65,13 @@
   }
 }
 
-/* Apple Weather-Style Glassmorphic Panels */
+/* Glassmorphic Panels */
 .panel-card {
   background-color: var(--bg-panel);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
   border: 1px solid var(--border-card);
-  border-radius: 18px;
+  border-radius: 20px;
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
   box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.35);
 }
@@ -83,35 +85,47 @@
   background-color: var(--bg-panel-header);
   border-bottom: 1px solid var(--border-subtle);
   padding: 12px 18px;
-  border-top-left-radius: 18px;
-  border-top-right-radius: 18px;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
 }
 
 .panel-subtle {
   background-color: var(--bg-subtle);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 14px;
 }
 
-.glow-dot {
-  box-shadow: 0 0 10px currentColor;
+.safe-area-bottom {
+  padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0.6rem));
 }
 
-/* Monochromatic Pulse Animation */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* Mobile Bottom Sheet Modal */
+@media (max-width: 639px) {
+  .modal-sheet-container {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal-sheet-card {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 28px !important;
+    border-top-right-radius: 28px !important;
+    max-height: 88vh !important;
+    max-height: 88dvh !important;
+    width: 100% !important;
+    border-bottom: none !important;
+    animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Compass & Crosshair Grid */
-.radar-grid {
-  background-image: 
-    radial-gradient(circle at center, rgba(255,255,255,0.08) 1px, transparent 1px),
-    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }

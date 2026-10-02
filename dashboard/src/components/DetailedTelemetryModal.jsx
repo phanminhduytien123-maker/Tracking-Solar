@@ -13,7 +13,7 @@ import {
 export default function DetailedTelemetryModal({ 
   isOpen, 
   onClose, 
-  telemetry, 
+  telemetry = {}, 
   onTriggerPso 
 }) {
   const [activeTab, setActiveTab] = useState('sensors'); // 'sensors' | 'fuzzy_pso' | 'electrical' | 'motors'
@@ -39,112 +39,135 @@ export default function DetailedTelemetryModal({
   const pso = telemetry?.pso || { gBestFitness: 0.9845, iteration: 12, maxIterations: 20, status: 'CONVERGED', bestAzimuth: 165, bestElevation: 48.5 };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md modal-sheet-container">
       
       {/* Modal Card */}
-      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl border-[#2a2f3e] flex flex-col max-h-[92vh]">
+      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl border-white/20 flex flex-col bg-[#0b0e17]/95 backdrop-blur-3xl modal-sheet-card">
         
+        {/* Mobile Grab Handle */}
+        <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-0.5 shrink-0" />
+
         {/* Header */}
-        <div className="panel-header flex items-center justify-between py-3.5 px-5">
+        <div className="panel-header flex items-center justify-between py-3.5 px-5 border-b border-white/10">
           <div className="flex items-center gap-2.5">
-            <Activity className="w-5 h-5 text-zinc-300" />
-            <h2 className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-              Thông Số Chi Tiết Hệ Thống Điều Hướng Pin Mặt Trời
-            </h2>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
+              <Activity className="w-4 h-4 text-emerald-300" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
+                Thông Số Chi Tiết Hệ Thống
+              </h2>
+              <span className="text-[10px] text-white/60 font-mono">Sensors, Fuzzy-PID & PSO Analytics</span>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#1e222d] transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-[#1c1f28] bg-[#0c0d10] px-4 pt-2 gap-2 text-xs sm:text-sm overflow-x-auto">
+        <div className="flex border-b border-white/10 bg-black/30 px-4 pt-2 gap-2 text-xs sm:text-sm overflow-x-auto">
           <button
+            type="button"
             onClick={() => setActiveTab('sensors')}
             className={`pb-2.5 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-bold ${
               activeTab === 'sensors'
-                ? 'border-zinc-200 text-white font-extrabold'
+                ? 'border-white text-white font-extrabold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Cảm Biến Quang TEMT6000
+            ☀️ Cảm Biến LDR
           </button>
           
           <button
+            type="button"
             onClick={() => setActiveTab('fuzzy_pso')}
             className={`pb-2.5 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-bold ${
               activeTab === 'fuzzy_pso'
-                ? 'border-zinc-200 text-white font-extrabold'
+                ? 'border-white text-white font-extrabold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Fuzzy-PID & PSO
+            🧠 Fuzzy-PID & PSO
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('electrical')}
             className={`pb-2.5 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-bold ${
               activeTab === 'electrical'
-                ? 'border-zinc-200 text-white font-extrabold'
+                ? 'border-white text-white font-extrabold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Điện Áp & Dòng Điện (INA219)
+            ⚡ INA219 Đo Năng Lượng
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('motors')}
             className={`pb-2.5 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-bold ${
               activeTab === 'motors'
-                ? 'border-zinc-200 text-white font-extrabold'
+                ? 'border-white text-white font-extrabold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Động Cơ NEMA 23 & Encoders
+            🎛️ Góc Động Cơ
           </button>
         </div>
 
-        {/* Body Content */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-sm">
+        {/* Tab Content Body */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 max-h-[72vh] sm:max-h-[68vh] text-xs sm:text-sm">
           
-          {/* TAB 1: CẢM BIẾN QUANG TEMT6000 */}
+          {/* TAB 1: SENSORS (4 LDRs) */}
           {activeTab === 'sensors' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="panel-subtle p-3.5 text-center">
-                  <span className="text-xs text-zinc-400 block font-bold">CẢM BIẾN TRÊN (TOP)</span>
-                  <span className="text-lg font-mono font-bold text-white block mt-1.5">{sTop.lux.toLocaleString()} <span className="text-xs text-zinc-400">lx</span></span>
-                  <span className="text-xs font-mono text-zinc-400 mt-0.5 block">ADC 12-bit: {sTop.adc}</span>
+              <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">
+                Ma trận 4 quang trở LDR (Top - Bottom - Left - Right)
+              </span>
+
+              {/* LDR Cross Visualizer */}
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-col items-center justify-center gap-2">
+                {/* TOP */}
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center w-32">
+                  <span className="text-[10px] text-amber-300 block font-bold">LDR TRÊN (Top)</span>
+                  <span className="font-mono font-black text-sm sm:text-base text-white">{sTop.adc}</span>
                 </div>
-                <div className="panel-subtle p-3.5 text-center">
-                  <span className="text-xs text-zinc-400 block font-bold">CẢM BIẾN DƯỚI (BOTTOM)</span>
-                  <span className="text-lg font-mono font-bold text-white block mt-1.5">{sBottom.lux.toLocaleString()} <span className="text-xs text-zinc-400">lx</span></span>
-                  <span className="text-xs font-mono text-zinc-400 mt-0.5 block">ADC 12-bit: {sBottom.adc}</span>
+
+                {/* LEFT & RIGHT */}
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center w-32">
+                    <span className="text-[10px] text-amber-300 block font-bold">LDR TRÁI (Left)</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-white">{sLeft.adc}</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                    <Sun className="w-4 h-4" />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center w-32">
+                    <span className="text-[10px] text-amber-300 block font-bold">LDR PHẢI (Right)</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-white">{sRight.adc}</span>
+                  </div>
                 </div>
-                <div className="panel-subtle p-3.5 text-center">
-                  <span className="text-xs text-zinc-400 block font-bold">CẢM BIẾN TRÁI (LEFT)</span>
-                  <span className="text-lg font-mono font-bold text-white block mt-1.5">{sLeft.lux.toLocaleString()} <span className="text-xs text-zinc-400">lx</span></span>
-                  <span className="text-xs font-mono text-zinc-400 mt-0.5 block">ADC 12-bit: {sLeft.adc}</span>
-                </div>
-                <div className="panel-subtle p-3.5 text-center">
-                  <span className="text-xs text-zinc-400 block font-bold">CẢM BIẾN PHẢI (RIGHT)</span>
-                  <span className="text-lg font-mono font-bold text-white block mt-1.5">{sRight.lux.toLocaleString()} <span className="text-xs text-zinc-400">lx</span></span>
-                  <span className="text-xs font-mono text-zinc-400 mt-0.5 block">ADC 12-bit: {sRight.adc}</span>
+
+                {/* BOTTOM */}
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center w-32">
+                  <span className="text-[10px] text-amber-300 block font-bold">LDR DƯỚI (Bottom)</span>
+                  <span className="font-mono font-black text-sm sm:text-base text-white">{sBottom.adc}</span>
                 </div>
               </div>
 
               {/* Differentials */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="panel-subtle p-3.5 flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Độ lệch quang trục ngang (ΔAz = Left - Right):</span>
-                  <span className="text-white font-mono font-bold">{sensors.diffAzimuth > 0 ? `+${sensors.diffAzimuth}` : sensors.diffAzimuth} lx</span>
+              <div className="grid grid-cols-2 gap-2 text-center font-mono">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-white/50 block">Độ lệch Trái - Phải (ΔAzimuth)</span>
+                  <span className="text-base font-black text-sky-300">{sensors.diffAzimuth || (sLeft.adc - sRight.adc)}</span>
                 </div>
-                <div className="panel-subtle p-3.5 flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Độ lệch quang trục đứng (ΔEl = Top - Bottom):</span>
-                  <span className="text-white font-mono font-bold">{sensors.diffElevation > 0 ? `+${sensors.diffElevation}` : sensors.diffElevation} lx</span>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-white/50 block">Độ lệch Trên - Dưới (ΔElevation)</span>
+                  <span className="text-base font-black text-sky-300">{sensors.diffElevation || (sTop.adc - sBottom.adc)}</span>
                 </div>
               </div>
             </div>
@@ -152,156 +175,122 @@ export default function DetailedTelemetryModal({
 
           {/* TAB 2: FUZZY-PID & PSO */}
           {activeTab === 'fuzzy_pso' && (
-            <div className="space-y-4">
-              {/* Fuzzy-PID Section */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3.5">
-                <div className="flex flex-wrap items-center justify-between pb-2.5 border-b border-[#1f222d] gap-2">
-                  <span className="text-sm font-extrabold uppercase text-white">Bộ Điều Khiển Mờ Fuzzy-PID Tự Thích Nghi</span>
-                  <span className="text-xs text-zinc-400 font-medium">Luật mờ: {fuzzy.activeRule}</span>
+            <div className="space-y-3.5">
+              <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">
+                Thuật toán điều khiển mờ lai bầy đàn (Fuzzy-PID & PSO)
+              </span>
+
+              <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-white/50 block font-sans">Hệ số Kp (Proportional)</span>
+                  <span className="text-base sm:text-lg font-black text-white">{fuzzy.kp}</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Sai số e(t):</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{fuzzy.errorAngle.toFixed(2)}°</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Tốc độ Δe(t):</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{fuzzy.errorRate > 0 ? `+${fuzzy.errorRate.toFixed(3)}` : fuzzy.errorRate.toFixed(3)}°/s</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Hệ số Kp:</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{fuzzy.kp.toFixed(2)}</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Hệ số Ki / Kd:</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{fuzzy.ki.toFixed(3)} / {fuzzy.kd.toFixed(2)}</span>
-                  </div>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-white/50 block font-sans">Hệ số Ki (Integral)</span>
+                  <span className="text-base sm:text-lg font-black text-white">{fuzzy.ki}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-[10px] text-white/50 block font-sans">Hệ số Kd (Derivative)</span>
+                  <span className="text-base sm:text-lg font-black text-white">{fuzzy.kd}</span>
                 </div>
               </div>
 
-              {/* PSO Section */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3.5">
-                <div className="flex items-center justify-between pb-2.5 border-b border-[#1f222d]">
-                  <span className="text-sm font-extrabold uppercase text-white">Thuật Toán Tối Ưu Bầy Đàn (PSO)</span>
-                  <button
-                    onClick={onTriggerPso}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#1c1f2a] hover:bg-[#252a39] text-zinc-200 border border-[#2b3142] cursor-pointer transition-colors shadow-sm"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Tối ưu lại</span>
-                  </button>
+              <div className="p-3 rounded-xl bg-black/40 border border-white/10 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60">Trạng thái PSO:</span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold font-mono text-xs">
+                    {pso.status}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Fitness Tối Ưu (Gbest):</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{pso.gBestFitness.toFixed(4)}</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Số vòng lặp (k):</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{pso.iteration} / {pso.maxIterations || 20}</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Góc tối ưu θ_az*:</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{pso.bestAzimuth.toFixed(1)}°</span>
-                  </div>
-                  <div className="bg-[#0e1014] p-3 rounded-lg border border-[#1c1f28]">
-                    <span className="text-xs text-zinc-400 block font-medium">Góc tối ưu θ_el*:</span>
-                    <span className="text-white font-mono font-bold text-base mt-1 block">{pso.bestElevation.toFixed(1)}°</span>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60">Độ thích nghi tối ưu (GBest Fitness):</span>
+                  <span className="font-mono font-black text-white">{pso.gBestFitness}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60">Số thế hệ lặp (Iterations):</span>
+                  <span className="font-mono font-black text-white">{pso.iteration} / {pso.maxIterations}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: ĐIỆN ÁP & DÒNG ĐIỆN (INA219) */}
+          {/* TAB 3: ELECTRICAL */}
           {activeTab === 'electrical' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              {/* Tracking INA219 */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3">
-                <span className="text-white font-bold block pb-2.5 border-b border-[#1c1f28] uppercase">
-                  Tấm Pin Tracking (INA219 #1)
-                </span>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Điện áp:</span>
-                  <span className="text-white font-mono font-bold">{trk.voltage.toFixed(2)} V</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Dòng điện:</span>
-                  <span className="text-white font-mono font-bold">{trk.current.toFixed(2)} A</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Công suất:</span>
-                  <span className="text-white font-mono font-bold">{trk.power.toFixed(2)} W</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Năng lượng tích lũy:</span>
-                  <span className="text-white font-mono font-bold">{trk.energyWh.toFixed(1)} Wh ({trk.energyKwh.toFixed(3)} kWh)</span>
-                </div>
-              </div>
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">
+                Bảng so sánh cảm biến điện INA219
+              </span>
 
-              {/* Static INA219 */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3">
-                <span className="text-white font-bold block pb-2.5 border-b border-[#1c1f28] uppercase">
-                  Tấm Pin Cố Định (INA219 #2)
-                </span>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Điện áp:</span>
-                  <span className="text-white font-mono font-bold">{sta.voltage.toFixed(2)} V</span>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Tấm xoay */}
+                <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/30 space-y-2">
+                  <span className="text-xs font-black text-sky-300 block uppercase">TẤM TRACKING</span>
+                  <div className="space-y-1 font-mono text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Điện áp:</span>
+                      <span className="font-bold text-white">{trk.voltage.toFixed(2)} V</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Dòng điện:</span>
+                      <span className="font-bold text-white">{trk.current.toFixed(3)} A</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Công suất:</span>
+                      <span className="font-bold text-sky-300 text-sm">{trk.power.toFixed(2)} W</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Năng lượng ngày:</span>
+                      <span className="font-bold text-white">{trk.energyKwh.toFixed(3)} kWh</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Dòng điện:</span>
-                  <span className="text-white font-mono font-bold">{sta.current.toFixed(2)} A</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Công suất:</span>
-                  <span className="text-white font-mono font-bold">{sta.power.toFixed(2)} W</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Năng lượng tích lũy:</span>
-                  <span className="text-white font-mono font-bold">{sta.energyWh.toFixed(1)} Wh ({sta.energyKwh.toFixed(3)} kWh)</span>
+
+                {/* Tấm cố định */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                  <span className="text-xs font-black text-amber-300 block uppercase">TẤM CỐ ĐỊNH</span>
+                  <div className="space-y-1 font-mono text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Điện áp:</span>
+                      <span className="font-bold text-white">{sta.voltage.toFixed(2)} V</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Dòng điện:</span>
+                      <span className="font-bold text-white">{sta.current.toFixed(3)} A</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Công suất:</span>
+                      <span className="font-bold text-amber-300 text-sm">{sta.power.toFixed(2)} W</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Năng lượng ngày:</span>
+                      <span className="font-bold text-white">{sta.energyKwh.toFixed(3)} kWh</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 4: ĐỘNG CƠ NEMA 23 & ENCODERS */}
+          {/* TAB 4: MOTORS */}
           {activeTab === 'motors' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              {/* Azimuth Motor */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3">
-                <span className="text-white font-bold block pb-2.5 border-b border-[#1c1f28] uppercase">
-                  Trục Ngang (Azimuth Motor NEMA 23)
-                </span>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Góc hiện tại / Mục tiêu:</span>
-                  <span className="text-white font-mono font-bold">{az.currentAngle.toFixed(1)}° / {az.targetAngle.toFixed(1)}°</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Xung Encoder:</span>
-                  <span className="text-white font-mono font-bold">{az.encoderPulses.toLocaleString()} pulses</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Công tắc hành trình:</span>
-                  <span className="text-zinc-300 font-semibold">MIN: {az.limitMin ? 'CHẠM' : 'OK'} | MAX: {az.limitMax ? 'CHẠM' : 'OK'}</span>
-                </div>
-              </div>
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">
+                Vị trí trục & xung Encoder
+              </span>
 
-              {/* Elevation Motor */}
-              <div className="panel-subtle p-4 sm:p-5 space-y-3">
-                <span className="text-white font-bold block pb-2.5 border-b border-[#1c1f28] uppercase">
-                  Trục Đứng (Elevation Motor NEMA 23)
-                </span>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Góc hiện tại / Mục tiêu:</span>
-                  <span className="text-white font-mono font-bold">{el.currentAngle.toFixed(1)}° / {el.targetAngle.toFixed(1)}°</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5 font-mono text-xs">
+                  <span className="text-xs font-bold text-sky-300 block font-sans">TRỤC AZIMUTH</span>
+                  <div className="flex justify-between"><span className="text-white/60">Góc hiện tại:</span><span className="font-bold text-white">{az.currentAngle.toFixed(1)}°</span></div>
+                  <div className="flex justify-between"><span className="text-white/60">Góc mục tiêu:</span><span className="font-bold text-white">{az.targetAngle.toFixed(1)}°</span></div>
+                  <div className="flex justify-between"><span className="text-white/60">Xung Encoder:</span><span className="font-bold text-white">{az.encoderPulses} pulses</span></div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Xung Encoder:</span>
-                  <span className="text-white font-mono font-bold">{el.encoderPulses.toLocaleString()} pulses</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400 font-medium">Công tắc hành trình:</span>
-                  <span className="text-zinc-300 font-semibold">MIN: {el.limitMin ? 'CHẠM' : 'OK'} | MAX: {el.limitMax ? 'CHẠM' : 'OK'}</span>
+
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5 font-mono text-xs">
+                  <span className="text-xs font-bold text-sky-300 block font-sans">TRỤC ELEVATION</span>
+                  <div className="flex justify-between"><span className="text-white/60">Góc hiện tại:</span><span className="font-bold text-white">{el.currentAngle.toFixed(1)}°</span></div>
+                  <div className="flex justify-between"><span className="text-white/60">Góc mục tiêu:</span><span className="font-bold text-white">{el.targetAngle.toFixed(1)}°</span></div>
+                  <div className="flex justify-between"><span className="text-white/60">Xung Encoder:</span><span className="font-bold text-white">{el.encoderPulses} pulses</span></div>
                 </div>
               </div>
             </div>
@@ -309,18 +298,18 @@ export default function DetailedTelemetryModal({
 
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3.5 bg-[#0d0e12] border-t border-[#191b22] flex justify-end">
+        {/* Modal Footer */}
+        <div className="px-5 py-3.5 bg-black/40 border-t border-white/10 flex justify-end safe-area-bottom">
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-md text-sm bg-zinc-200 hover:bg-white text-zinc-950 font-bold transition-all cursor-pointer shadow-md active:scale-95"
+            className="w-full sm:w-auto px-6 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-black hover:bg-zinc-200 transition-all cursor-pointer shadow-lg active:scale-95"
           >
             Đóng
           </button>
         </div>
 
       </div>
-
     </div>
   );
 }

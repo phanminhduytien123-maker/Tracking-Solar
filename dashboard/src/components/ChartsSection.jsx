@@ -318,7 +318,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
   const avgGain = totalStaKwh > 0 ? (((totalTrkKwh - totalStaKwh) / totalStaKwh) * 100).toFixed(1) : 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div id="section-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4 scroll-mt-16">
       
       {/* 1. ĐỒ THỊ THỜI GIAN THỰC (REAL-TIME LINE CHART) */}
       <div className="panel-card flex flex-col justify-between shadow-lg">

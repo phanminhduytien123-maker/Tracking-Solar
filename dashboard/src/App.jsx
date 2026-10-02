@@ -6,6 +6,7 @@ import DetailedTelemetryModal from './components/DetailedTelemetryModal';
 import ManualControlModal from './components/ManualControlModal';
 import SettingsModal from './components/SettingsModal';
 import WeatherBackground from './components/WeatherBackground';
+import MobileBottomNav from './components/MobileBottomNav';
 
 import { 
   MockTelemetryEngine, 
@@ -383,13 +384,14 @@ export default function App() {
       <Header 
         system={telemetry.system}
         mode={telemetry.system.mode}
+        dataSource={dataSource}
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onResetEstop={handleResetEstop}
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="max-w-[1720px] w-full mx-auto px-4 sm:px-6 py-5 space-y-5 flex-1 relative z-10">
+      <main className="max-w-[1720px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-3.5 sm:space-y-5 pb-24 sm:pb-8 flex-1 relative z-10">
         
         {/* HERO: TRỰC QUAN 2 TẤM PIN MẶT TRỜI + GÓC ĐỘNG CƠ + CÔNG SUẤT + % GAIN */}
         <section aria-label="So sánh trực quan 2 tấm pin mặt trời">
@@ -424,6 +426,7 @@ export default function App() {
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         system={telemetry.system}
+        mode={telemetry.system.mode}
         onSetMode={handleSetMode}
         onJog={handleJog}
         onCalibrate={handleCalibrate}
@@ -454,7 +457,7 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-white/10 bg-black/20 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10">
+      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10 hidden sm:block">
         <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -466,10 +469,20 @@ export default function App() {
         </div>
       </footer>
 
-      {/* 5. DISCRETE WEATHER PRESET DEMO PILL (Bottom Right corner) */}
-      <div className="fixed bottom-4 right-4 z-40">
+      {/* 5. MOBILE BOTTOM NAVIGATION BAR (Hiển thị cố định đáy màn hình điện thoại) */}
+      <MobileBottomNav 
+        dataSource={dataSource}
+        firebaseConnected={firebaseConnected}
+        systemMode={telemetry.system.mode}
+        onOpenManual={() => setIsManualModalOpen(true)}
+        onOpenDetails={() => setIsDetailsModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+      />
+
+      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Right corner) */}
+      <div className="fixed bottom-20 sm:bottom-4 right-3 sm:right-4 z-40">
         {showWeatherSwitcher ? (
-          <div className="p-2 rounded-2xl bg-black/50 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="p-2 rounded-2xl bg-black/60 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
             <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
