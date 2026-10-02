@@ -13,14 +13,32 @@ import {
   generateIntradayProfile 
 } from './services/mockDataService';
 import { ESP32CommunicationService } from './services/esp32Service';
+import { FirebaseSolarService } from './services/firebaseService';
 import { fetchLiveWeather, getFallbackWeatherData } from './services/weatherService';
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const [isMock, setIsMock] = useState(true);
+  // Data Source: 'firebase' | 'mock' | 'esp32_ws'
+  const [dataSource, setDataSource] = useState(() => {
+    return localStorage.getItem('solar_datasource') || 'mock';
+  });
+
+  const [firebaseConfig, setFirebaseConfig] = useState(() => {
+    const saved = localStorage.getItem('solar_firebase_config');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      databaseURL: '',
+      apiKey: '',
+      projectId: ''
+    };
+  });
+
   const [wsUrl, setWsUrl] = useState('ws://192.168.4.1/ws');
   const [restUrl, setRestUrl] = useState('http://192.168.4.1/api/telemetry');
-  const [refreshRate, setRefreshRate] = useState(800);
+  const [refreshRate, setRefreshRate] = useState(1000);
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
 
   // Modals state
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -35,11 +53,21 @@ export default function App() {
   // Engine instances
   const mockEngineRef = useRef(new MockTelemetryEngine());
   const esp32ServiceRef = useRef(null);
+  const firebaseServiceRef = useRef(new FirebaseSolarService());
 
   // Telemetry & Data States
   const [telemetry, setTelemetry] = useState(() => mockEngineRef.current.getNextState());
   const [intradayData, setIntradayData] = useState(() => generateIntradayProfile());
   const [history30Days] = useState(() => generate30DaysHistory());
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('solar_datasource', dataSource);
+  }, [dataSource]);
+
+  useEffect(() => {
+    localStorage.setItem('solar_firebase_config', JSON.stringify(firebaseConfig));
+  }, [firebaseConfig]);
 
   // Fetch Live Weather for Saigon District 1 (Lat 10.7769, Lon 106.7009)
   const loadWeather = async () => {
@@ -53,66 +81,96 @@ export default function App() {
     }
   };
 
-  // Weather fetch loop every 10 minutes
   useEffect(() => {
     loadWeather();
     const weatherTimer = setInterval(loadWeather, 600000);
     return () => clearInterval(weatherTimer);
   }, []);
 
-  // Initialize ESP32 Service
+  // Initialize ESP32 Local WebSocket Service
   useEffect(() => {
     esp32ServiceRef.current = new ESP32CommunicationService({
       wsUrl,
       restUrl,
-      useMock: isMock,
+      useMock: dataSource !== 'esp32_ws',
       onTelemetry: (liveData) => {
-        setTelemetry((prev) => ({
-          ...prev,
-          ...liveData,
-          system: {
-            ...prev.system,
-            ...liveData.system,
-            online: true,
-            isMock: false
-          }
-        }));
+        if (dataSource === 'esp32_ws') {
+          setTelemetry((prev) => ({
+            ...prev,
+            ...liveData,
+            system: {
+              ...prev.system,
+              ...liveData.system,
+              online: true,
+              isMock: false
+            }
+          }));
+        }
       },
       onStatusChange: (status) => {
-        setTelemetry((prev) => ({
-          ...prev,
-          system: {
-            ...prev.system,
-            online: isMock ? true : status.connected,
-            isMock: isMock,
-            pingMs: status.latency || prev.system.pingMs
-          }
-        }));
-      },
-      onError: (err) => {
-        console.warn('[ESP32 Client Error]', err);
+        if (dataSource === 'esp32_ws') {
+          setTelemetry((prev) => ({
+            ...prev,
+            system: {
+              ...prev.system,
+              online: status.connected,
+              isMock: false,
+              pingMs: status.latency || prev.system.pingMs
+            }
+          }));
+        }
       }
     });
 
     return () => {
-      if (esp32ServiceRef.current) {
-        esp32ServiceRef.current.disconnect();
-      }
+      esp32ServiceRef.current?.disconnect();
     };
   }, []);
 
-  // Sync WebSocket settings
+  // Sync Firebase Service connection
   useEffect(() => {
-    if (esp32ServiceRef.current) {
-      esp32ServiceRef.current.setWsUrl(wsUrl);
-      esp32ServiceRef.current.setUseMock(isMock);
+    if (dataSource === 'firebase') {
+      if (firebaseConfig.databaseURL && firebaseConfig.apiKey) {
+        firebaseServiceRef.current.init(firebaseConfig, {
+          onTelemetry: (fbTelemetry) => {
+            setTelemetry((prev) => ({
+              ...prev,
+              ...fbTelemetry,
+              system: {
+                ...prev.system,
+                ...fbTelemetry.system,
+                online: true,
+                isMock: false
+              }
+            }));
+          },
+          onStatusChange: (status) => {
+            setFirebaseConnected(status.connected);
+            setTelemetry((prev) => ({
+              ...prev,
+              system: {
+                ...prev.system,
+                online: status.connected,
+                isMock: false
+              }
+            }));
+          },
+          onError: (err) => {
+            console.warn('[Firebase Client Error]', err);
+            setFirebaseConnected(false);
+          }
+        });
+      }
+    } else {
+      firebaseServiceRef.current.disconnect();
+      setFirebaseConnected(false);
     }
-  }, [wsUrl, isMock]);
+  }, [dataSource, firebaseConfig]);
 
-  // Main Telemetry Loop
+  // Main Loop for Mock & Real-time Chart updates
   useEffect(() => {
     const timer = setInterval(() => {
-      if (isMock) {
+      if (dataSource === 'mock') {
         const nextState = mockEngineRef.current.getNextState();
         setTelemetry(nextState);
 
@@ -128,27 +186,25 @@ export default function App() {
                   ...item,
                   pTracking: nextState.ina219.tracking.power,
                   pStatic: nextState.ina219.static.power,
-                  gain: nextState.ina219.comparison.percentGain
+                  gain: nextState.ina219.comparison?.percentGain || 0
                 };
               }
               return item;
             });
           });
         }
-      } else {
-        if (esp32ServiceRef.current && !esp32ServiceRef.current.isConnected) {
-          esp32ServiceRef.current.fetchTelemetryHttp();
-        }
       }
     }, refreshRate);
 
     return () => clearInterval(timer);
-  }, [isMock, refreshRate]);
+  }, [dataSource, refreshRate]);
 
-  // Handlers
+  // Command Handlers
   const handleSetMode = (mode) => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.setMode(mode);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setMode(mode);
     } else {
       esp32ServiceRef.current?.setMode(mode);
     }
@@ -159,40 +215,50 @@ export default function App() {
   };
 
   const handleJog = (axis, step) => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.jogMotor(axis, step > 0 ? 'CW' : 'CCW', Math.abs(step));
     } else {
       esp32ServiceRef.current?.jog(axis, step * 100, step);
     }
   };
 
   const handleCalibrate = () => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.calibrate();
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.sendCommand({ cmd: 'calibrate' });
     } else {
       esp32ServiceRef.current?.calibrate();
     }
   };
 
   const handleTriggerPso = () => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.triggerPSO();
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.sendCommand({ cmd: 'trigger_pso' });
     } else {
       esp32ServiceRef.current?.triggerPSO();
     }
   };
 
   const handlePark = () => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.park();
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.sendCommand({ cmd: 'park' });
     } else {
       esp32ServiceRef.current?.park();
     }
   };
 
   const handleEstop = () => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.setEstop(true);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setEstop(true);
     } else {
       esp32ServiceRef.current?.setEstop(true);
     }
@@ -203,8 +269,10 @@ export default function App() {
   };
 
   const handleResetEstop = () => {
-    if (isMock) {
+    if (dataSource === 'mock') {
       mockEngineRef.current.setEstop(false);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setEstop(false);
     } else {
       esp32ServiceRef.current?.setEstop(false);
     }
@@ -282,8 +350,11 @@ export default function App() {
       <SettingsModal 
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        isMock={isMock}
-        setIsMock={setIsMock}
+        dataSource={dataSource}
+        setDataSource={setDataSource}
+        firebaseConfig={firebaseConfig}
+        setFirebaseConfig={setFirebaseConfig}
+        firebaseConnected={firebaseConnected}
         wsUrl={wsUrl}
         setWsUrl={setWsUrl}
         restUrl={restUrl}
