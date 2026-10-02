@@ -48,7 +48,7 @@ export default function Header({
         
         {/* Left: Brand / Title */}
         <div className="flex items-center shrink-0">
-          <h1 className="text-lg sm:text-2xl font-black tracking-tight text-zinc-950">
+          <h1 className="text-xl sm:text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase">
             TRACKING SOLAR
           </h1>
         </div>
