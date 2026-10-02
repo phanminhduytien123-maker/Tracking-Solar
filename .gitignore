@@ -30,3 +30,7 @@ Thumbs.db
 
 # Office temporary lock files
 ~$*
+
+# PlatformIO
+.pio/
+**/.pio/
