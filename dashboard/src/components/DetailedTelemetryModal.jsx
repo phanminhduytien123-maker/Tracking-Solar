@@ -209,7 +209,7 @@ export default function DetailedTelemetryModal({
                 {/* Tấm xoay */}
                 <div className="p-4 rounded-2xl bg-[#131722] border border-zinc-700/80 space-y-3">
                   <span className="text-xs font-bold text-white block uppercase tracking-wide pb-2 border-b border-zinc-800">
-                    TẤM TRACKING (XOAY 2 TRỤC)
+                    TẤM PIN TRACKING
                   </span>
                   <div className="space-y-2 font-mono text-sm">
                     <div className="flex justify-between">

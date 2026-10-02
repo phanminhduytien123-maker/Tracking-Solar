@@ -82,7 +82,7 @@ export default function VisualPanelsComparison({
           {/* Top Header Row */}
           <div className="pb-3 border-b border-zinc-800 flex items-center justify-between">
             <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
-              TẤM PIN TRACKING (XOAY 2 TRỤC)
+              TẤM PIN TRACKING
             </h2>
             <span className="text-xs font-mono text-zinc-400 font-medium">Fuzzy-PID & PSO</span>
           </div>
@@ -183,7 +183,7 @@ export default function VisualPanelsComparison({
           {/* Top Header Row */}
           <div className="pb-3 border-b border-zinc-800 flex items-center justify-between">
             <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
-              TẤM PIN CỐ ĐỊNH (CHUẨN SO SÁNH)
+              TẤM PIN CỐ ĐỊNH   
             </h2>
             <span className="text-xs font-mono text-zinc-400 font-medium">South 180° / 15°</span>
           </div>
