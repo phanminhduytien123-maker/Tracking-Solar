@@ -42,22 +42,31 @@ export default function Header({
     system?.estop;
 
   return (
-    <header className="border-b border-zinc-800 bg-[#0c0f16]/95 backdrop-blur-xl sticky top-0 z-40 shadow-sm">
+    <header className="border-b border-zinc-800 bg-[#0c0f16]/95 backdrop-blur-xl sticky top-0 z-40 shadow-sm relative">
       {/* Top Main Bar */}
-      <div className="max-w-[1720px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 relative">
         
         {/* Left: Brand / Title */}
-        <div className="flex items-center">
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+        <div className="flex items-center shrink-0">
+          <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white">
             TRACKING SOLAR
           </h1>
         </div>
 
+        {/* Center: Ton Duc Thang University Logo */}
+        <div className="flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-auto">
+          <img 
+            src="/tdt_logo.png" 
+            alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
+            className="h-8 sm:h-11 md:h-12 w-auto object-contain drop-shadow-md"
+          />
+        </div>
+
         {/* Right Status Badges & Quick Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
           {/* Cloud / Source Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
             <span className={`w-2 h-2 rounded-full ${
               system.online ? 'bg-emerald-400' : 'bg-zinc-600'
             }`}></span>
@@ -67,7 +76,7 @@ export default function Header({
           </div>
 
           {/* Clock Badge (Compact on mobile) */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 font-mono">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 font-mono">
             <Clock className="w-3.5 h-3.5 text-zinc-400" />
             <span className="font-bold text-xs text-white">{formattedTime}</span>
             <span className="hidden md:inline text-zinc-600">|</span>
