@@ -42,9 +42,9 @@ export default function Header({
     system?.estop;
 
   return (
-    <header className="border-b border-zinc-200 bg-white text-zinc-950 sticky top-0 z-40 shadow-sm relative">
+    <header className="border-b border-zinc-200 bg-white text-zinc-950 sticky top-0 z-40 shadow-xs relative">
       {/* Top Main Bar */}
-      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 relative">
+      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 relative">
         
         {/* Left: Brand / Title */}
         <div className="flex items-center shrink-0">
@@ -53,20 +53,20 @@ export default function Header({
           </h1>
         </div>
 
-        {/* Center: Ton Duc Thang University Logo */}
-        <div className="flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-auto">
+        {/* Center (Desktop) / Right (Mobile): Ton Duc Thang University Logo */}
+        <div className="flex items-center justify-end sm:justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 shrink-0">
           <img 
             src="/tdt_logo.png" 
             alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="h-8 sm:h-11 md:h-12 w-auto object-contain"
+            className="h-9 sm:h-11 md:h-12 w-auto object-contain"
           />
         </div>
 
-        {/* Right Status Badges & Quick Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Right Status Badges & Quick Controls (Desktop only - hidden on mobile) */}
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
           
           {/* Cloud / Source Badge */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800">
             <span className={`w-2 h-2 rounded-full ${
               system.online ? 'bg-emerald-600' : 'bg-zinc-400'
             }`}></span>
@@ -75,7 +75,7 @@ export default function Header({
             </span>
           </div>
 
-          {/* Clock Badge (Compact on mobile) */}
+          {/* Clock Badge */}
           <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-mono">
             <Clock className="w-3.5 h-3.5 text-zinc-600" />
             <span className="font-bold text-xs text-zinc-950">{formattedTime}</span>
@@ -87,7 +87,7 @@ export default function Header({
           <button
             id="btn-open-manual-control"
             onClick={onOpenManualModal}
-            className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-all cursor-pointer active:scale-95 shadow-xs"
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-all cursor-pointer active:scale-95 shadow-xs"
           >
             <Sliders className="w-3.5 h-3.5 text-zinc-200" />
             <span>Điều khiển</span>
