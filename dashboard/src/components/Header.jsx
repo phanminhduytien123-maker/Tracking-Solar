@@ -46,23 +46,38 @@ export default function Header({
       {/* Top Main Bar */}
       <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 relative">
         
-        {/* Left: Brand / Title */}
+        {/* Left: Mobile Title / Desktop Logo */}
         <div className="flex items-center shrink min-w-0">
-          <h1 className="text-base sm:text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
+          {/* Mobile Title */}
+          <h1 className="sm:hidden text-base font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
+            TRACKING SOLAR
+          </h1>
+
+          {/* Desktop Logo on Left */}
+          <img 
+            src="/tdt_logo.png" 
+            alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
+            className="hidden sm:block h-10 md:h-11 w-auto object-contain"
+          />
+        </div>
+
+        {/* Center (Desktop): Title TRACKING SOLAR Centered */}
+        <div className="hidden sm:flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
+          <h1 className="text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
           </h1>
         </div>
 
-        {/* Center (Desktop) / Right (Mobile): Ton Duc Thang University Logo */}
-        <div className="flex items-center justify-end sm:justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 shrink-0 max-w-[48%] sm:max-w-none">
+        {/* Mobile Right: Logo */}
+        <div className="sm:hidden flex items-center justify-end shrink-0 max-w-[48%]">
           <img 
             src="/tdt_logo.png" 
             alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="h-6 sm:h-10 md:h-11 w-auto max-w-full object-contain"
+            className="h-6 w-auto max-w-full object-contain"
           />
         </div>
 
-        {/* Right Status Badges & Quick Controls (Desktop only - hidden on mobile) */}
+        {/* Desktop Right: Status Badges & Quick Controls */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
           
           {/* Cloud / Source Badge */}
