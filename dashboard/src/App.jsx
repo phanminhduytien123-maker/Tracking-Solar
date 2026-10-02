@@ -482,7 +482,6 @@ export default function App() {
       <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10">
         <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="font-semibold text-white tracking-wide text-xs sm:text-sm">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2:  VÕ HỒNG PHÁT</span>
           </div>
           <div className="flex items-center gap-3 text-white/60 font-mono text-[11px]">
