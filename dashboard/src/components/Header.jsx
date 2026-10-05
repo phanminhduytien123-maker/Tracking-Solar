@@ -61,8 +61,8 @@ export default function Header({
       {/* Top Main Bar */}
       <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 relative">
         
-        {/* Left: Mobile Title / Desktop Logo */}
-        <div className="flex items-center shrink min-w-0">
+        {/* Left: Mobile Title / Desktop Logo + Weather Widget */}
+        <div className="flex items-center gap-3 shrink min-w-0">
           {/* Mobile Title */}
           <h1 className="sm:hidden text-base font-times font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
@@ -74,6 +74,20 @@ export default function Header({
             alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
             className="hidden sm:block h-10 md:h-11 w-auto object-contain"
           />
+
+          {/* Weather Widget right beside Logo */}
+          {weatherData && (
+            <div className="hidden sm:block">
+              <WeatherWidget 
+                weatherData={weatherData}
+                isLoading={isLoadingWeather}
+                onRefresh={onRefreshWeather}
+                customOverrideType={customOverrideType}
+                setCustomOverrideType={setCustomOverrideType}
+                onOpenMapModal={onOpenMapModal}
+              />
+            </div>
+          )}
         </div>
 
         {/* Center (Desktop): Title TRACKING SOLAR Centered */}
@@ -105,18 +119,6 @@ export default function Header({
                 {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
               </span>
             </div>
-          )}
-
-          {/* Weather Widget & Map Button */}
-          {weatherData && (
-            <WeatherWidget 
-              weatherData={weatherData}
-              isLoading={isLoadingWeather}
-              onRefresh={onRefreshWeather}
-              customOverrideType={customOverrideType}
-              setCustomOverrideType={setCustomOverrideType}
-              onOpenMapModal={onOpenMapModal}
-            />
           )}
 
           {/* Clock & Date Badge (Always visible for all users) */}

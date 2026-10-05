@@ -76,7 +76,7 @@ export default function WeatherWidget({
           id="btn-open-weather-modal"
           onClick={() => setIsOpenModal(true)}
           className="group flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer shadow-xs active:scale-95 text-left"
-          title="Xem chi tiết thời tiết & đổi tọa độ bản đồ"
+          title="Xem chi tiết thời tiết & điều khiển hiệu ứng nền"
         >
           {/* Weather Icon with subtle pulse */}
           <div className="shrink-0 group-hover:scale-110 transition-transform">
@@ -108,18 +108,6 @@ export default function WeatherWidget({
             </div>
           </div>
         </button>
-
-        {/* Map Location Quick Trigger Button */}
-        {onOpenMapModal && (
-          <button
-            onClick={onOpenMapModal}
-            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-800 text-xs font-semibold transition-all cursor-pointer active:scale-95"
-            title="Chọn tọa độ trên Google Map"
-          >
-            <MapPin className="w-3.5 h-3.5 text-amber-600" />
-            <span>Bản đồ</span>
-          </button>
-        )}
       </div>
 
       {/* 2. FULL DETAILED WEATHER MODAL & ATMOSPHERIC DASHBOARD */}
