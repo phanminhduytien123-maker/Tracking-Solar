@@ -9,6 +9,8 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
+import { checkUserLoginAllowed } from '../services/userService';
+
 export default function SignInPage({ onLoginSuccess }) {
 
   // Mode: 'form' | 'admin_pin'
@@ -63,6 +65,13 @@ export default function SignInPage({ onLoginSuccess }) {
 
     const cleanUser = email.trim().toLowerCase();
     const cleanPass = password.trim();
+
+    // Check if Account is Locked (1h or permanent)
+    const lockoutStatus = checkUserLoginAllowed(cleanUser);
+    if (!lockoutStatus.allowed) {
+      setFormError(lockoutStatus.reason);
+      return;
+    }
 
     // Check if Guest Account (khach123 / 123)
     const isGuest = (cleanUser === 'khach123' || cleanUser === 'khach123@gmail.com') && cleanPass === '123';

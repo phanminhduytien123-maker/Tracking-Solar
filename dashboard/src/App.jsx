@@ -492,6 +492,7 @@ export default function App() {
       <SettingsModal 
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        currentUser={authSession}
         dataSource={dataSource}
         setDataSource={handleDataSourceChange}
         firebaseConfig={firebaseConfig}
