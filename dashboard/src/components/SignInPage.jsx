@@ -277,7 +277,7 @@ export default function SignInPage({ onLoginSuccess }) {
                       autoCapitalize="none"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="khach123 hoặc email..."
+                      placeholder="Tên tài khoản hoặc email..."
                       className="w-full pl-11 pr-4 py-3 sm:py-3.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/25 transition-all font-sans"
                     />
                   </div>

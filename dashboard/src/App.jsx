@@ -522,6 +522,7 @@ export default function App() {
 
       {/* 5. MOBILE BOTTOM NAVIGATION BAR (Hiển thị cố định đáy màn hình điện thoại) */}
       <MobileBottomNav 
+        currentUser={authSession}
         dataSource={dataSource}
         firebaseConnected={firebaseConnected}
         systemMode={telemetry.system.mode}

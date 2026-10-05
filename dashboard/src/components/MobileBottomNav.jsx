@@ -2,11 +2,14 @@ import React from 'react';
 import { LayoutDashboard, Sliders, BarChart3, Activity, Settings, LogOut } from 'lucide-react';
 
 export default function MobileBottomNav({
+  currentUser,
   onOpenManual,
   onOpenDetails,
   onOpenSettings,
   onLogout
 }) {
+  const isAdmin = currentUser?.role === 'admin';
+
   const scrollToCharts = () => {
     const chartEl = document.getElementById('section-charts');
     if (chartEl) {
@@ -36,16 +39,18 @@ export default function MobileBottomNav({
           <span className="text-xs font-semibold tracking-tight text-zinc-200">Tổng quan</span>
         </button>
 
-        {/* 2. Điều khiển */}
-        <button
-          onClick={onOpenManual}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
-            <Sliders className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-semibold tracking-tight text-zinc-200">Điều khiển</span>
-        </button>
+        {/* 2. Điều khiển (Admin Only) */}
+        {isAdmin && (
+          <button
+            onClick={onOpenManual}
+            className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-semibold tracking-tight text-zinc-200">Điều khiển</span>
+          </button>
+        )}
 
         {/* 3. Biểu đồ */}
         <button

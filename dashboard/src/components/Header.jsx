@@ -40,6 +40,8 @@ export default function Header({
     year: 'numeric'
   });
 
+  const isAdmin = currentUser?.role === 'admin';
+
   const hasAlarm = system?.errors?.sensorLost || 
     system?.errors?.driverFault || 
     system?.errors?.limitSwitchMinTriggered || 
@@ -85,17 +87,19 @@ export default function Header({
         {/* Desktop Right: Status Badges & Quick Controls */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
           
-          {/* Cloud / Source Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800">
-            <span className={`w-2 h-2 rounded-full ${
-              system.online ? 'bg-emerald-600' : 'bg-zinc-400'
-            }`}></span>
-            <span className="font-bold text-xs text-zinc-900">
-              {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
-            </span>
-          </div>
+          {/* Cloud / Source Badge (Admin Only) */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800">
+              <span className={`w-2 h-2 rounded-full ${
+                system.online ? 'bg-emerald-600' : 'bg-zinc-400'
+              }`}></span>
+              <span className="font-bold text-xs text-zinc-900">
+                {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
+              </span>
+            </div>
+          )}
 
-          {/* Clock Badge */}
+          {/* Clock & Date Badge (Always visible for all users) */}
           <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-mono">
             <Clock className="w-3.5 h-3.5 text-zinc-600" />
             <span className="font-bold text-xs text-zinc-950">{formattedTime}</span>
@@ -103,25 +107,29 @@ export default function Header({
             <span className="hidden md:inline text-zinc-700 font-sans font-medium">{formattedDate}</span>
           </div>
 
-          {/* Desktop Manual Control Button */}
-          <button
-            id="btn-open-manual-control"
-            onClick={onOpenManualModal}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-all cursor-pointer active:scale-95 shadow-xs"
-          >
-            <Sliders className="w-3.5 h-3.5 text-zinc-200" />
-            <span>Điều khiển</span>
-          </button>
+          {/* Desktop Manual Control Button (Admin Only) */}
+          {isAdmin && (
+            <button
+              id="btn-open-manual-control"
+              onClick={onOpenManualModal}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-all cursor-pointer active:scale-95 shadow-xs"
+            >
+              <Sliders className="w-3.5 h-3.5 text-zinc-200" />
+              <span>Điều khiển</span>
+            </button>
+          )}
 
-          {/* Settings Modal Trigger Button */}
-          <button
-            id="btn-open-settings"
-            onClick={onOpenSettingsModal}
-            className="p-2 rounded-lg text-zinc-800 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer active:scale-95"
-            title="Cài đặt kết nối"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {/* Settings Modal Trigger Button (Admin Only) */}
+          {isAdmin && (
+            <button
+              id="btn-open-settings"
+              onClick={onOpenSettingsModal}
+              className="p-2 rounded-lg text-zinc-800 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer active:scale-95"
+              title="Cài đặt kết nối"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
 
           {/* User Badge & Logout Button */}
           <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-200">
