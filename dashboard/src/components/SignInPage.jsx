@@ -238,11 +238,12 @@ export default function SignInPage({ onLoginSuccess }) {
               </div>
 
               {/* 2. Divider */}
-              <div className="relative flex items-center justify-center my-4 sm:my-5">
-                <div className="w-full border-t border-white/20"></div>
-                <span className="absolute px-4 bg-white/[0.10] backdrop-blur-xl border border-white/15 rounded-full text-xs sm:text-sm uppercase tracking-wider text-zinc-200 font-bold font-sans shadow-sm py-0.5">
+              <div className="flex items-center gap-3.5 my-4 sm:my-5">
+                <div className="flex-1 border-t border-white/20"></div>
+                <span className="text-xs sm:text-sm uppercase tracking-wider text-zinc-300 font-semibold font-sans select-none">
                   Hoặc
                 </span>
+                <div className="flex-1 border-t border-white/20"></div>
               </div>
 
               {/* 3. Regular Login Form */}
@@ -346,12 +347,12 @@ export default function SignInPage({ onLoginSuccess }) {
                 </div>
 
                 {/* ========================================================= */}
-                {/* Standard Google reCAPTCHA v2 Widget Box */}
+                {/* Standard Google reCAPTCHA v2 Widget Box (Rectangular) */}
                 {/* ========================================================= */}
                 <div className="pt-1">
                   <div 
                     onClick={handleCaptchaBoxClick}
-                    className="w-full h-[74px] px-3.5 bg-white/95 hover:bg-white border border-white/40 rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none backdrop-blur-md"
+                    className="w-full h-[74px] px-3.5 bg-[#f9f9f9] hover:bg-[#fafafa] border border-[#d3d3d3] rounded-[3px] shadow-[0_0_4px_1px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none"
                     role="checkbox"
                     aria-checked={isCaptchaVerified}
                     tabIndex={0}
