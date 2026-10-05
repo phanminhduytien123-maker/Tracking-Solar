@@ -514,8 +514,9 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-white tracking-wide text-xs sm:text-sm">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2:  VÕ HỒNG PHÁT</span>
           </div>
-          <div className="flex items-center gap-3 text-white/60 font-mono text-[11px]">
-            <span>ESP32-S3 REAL-TIME TELEMETRY SYSTEM © 2026</span>
+          <div className="flex items-center gap-1.5 text-white/70 font-sans text-xs sm:text-[13px] select-none">
+            <span>Gateway:</span>
+            <span className="font-semibold text-zinc-100">ESP32-S3</span>
           </div>
         </div>
       </footer>
