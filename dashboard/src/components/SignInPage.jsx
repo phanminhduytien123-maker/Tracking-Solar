@@ -282,21 +282,12 @@ export default function SignInPage({ onLoginSuccess }) {
 
                 {/* Password Field */}
                 <div className="space-y-1.5 sm:space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label 
-                      htmlFor="signin-password" 
-                      className="block text-sm sm:text-base font-semibold text-zinc-100 tracking-wide drop-shadow-sm"
-                    >
-                      Mật khẩu
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) hoặc tài khoản khách: khach123 / Mật khẩu: 123.')}
-                      className="text-xs sm:text-sm text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer"
-                    >
-                      Quên mật khẩu?
-                    </button>
-                  </div>
+                  <label 
+                    htmlFor="signin-password" 
+                    className="block text-sm sm:text-base font-semibold text-zinc-100 tracking-wide drop-shadow-sm"
+                  >
+                    Mật khẩu
+                  </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                       <Lock className="w-5 h-5" />
