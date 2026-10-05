@@ -131,16 +131,16 @@ export default function Header({
             </button>
           )}
 
-          {/* User Badge & Logout Button */}
-          <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-200">
+          {/* User Badge & Logout Button (Màu nền cơ bản, trung tính, không neon/phát sáng) */}
+          <div className="flex items-center gap-2 pl-2 border-l border-zinc-300">
             {currentUser?.role === 'admin' ? (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-zinc-700" />
                 <span>Admin</span>
               </div>
             ) : (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-zinc-500"></span>
                 <span>Khách (khach123)</span>
               </div>
             )}
@@ -148,10 +148,10 @@ export default function Header({
               <button
                 id="btn-logout"
                 onClick={onLogout}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 hover:text-red-950 bg-red-50 hover:bg-red-100 border border-red-200 transition-all cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-800 hover:text-red-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer active:scale-95"
                 title="Đăng xuất khỏi hệ thống"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3.5 h-3.5 text-zinc-700" />
                 <span className="hidden xl:inline">Đăng xuất</span>
               </button>
             )}
