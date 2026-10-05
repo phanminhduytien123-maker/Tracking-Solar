@@ -1,9 +1,9 @@
 // =========================================================================
 // USER MANAGEMENT SERVICE - SOLAR TRACKING SYSTEM
-// Manages accounts, online/offline presence, and security lockouts
+// Manages accounts, presence, and security lockouts (Admin & khach123)
 // =========================================================================
 
-const STORAGE_KEY = 'solar_user_accounts';
+const STORAGE_KEY = 'solar_user_accounts_v3';
 
 export const DEFAULT_USERS = [
   {
@@ -23,44 +23,16 @@ export const DEFAULT_USERS = [
   {
     id: 'usr_khach123',
     username: 'khach123',
-    displayName: 'Tài khoản khách (Demo)',
+    displayName: 'Tài khoản khách (khach123)',
     role: 'guest',
     roleName: 'Khách tham quan',
     status: 'active',
     lockedUntil: null,
     lockedAt: null,
     isOnline: false,
-    lastActive: '12 phút trước',
+    lastActive: 'Vừa xong',
     ipAddress: '118.69.182.45 (TP. Hồ Chí Minh)',
     createdAt: '2026-03-01'
-  },
-  {
-    id: 'usr_kythuat01',
-    username: 'kythuat_01',
-    displayName: 'Kỹ thuật viên Trạm 01',
-    role: 'operator',
-    roleName: 'Vận hành viên',
-    status: 'active',
-    lockedUntil: null,
-    lockedAt: null,
-    isOnline: true,
-    lastActive: '3 phút trước',
-    ipAddress: '192.168.4.2 (Kết nối ESP32 Gateway)',
-    createdAt: '2026-02-10'
-  },
-  {
-    id: 'usr_giamsat02',
-    username: 'giamsat_02',
-    displayName: 'Cán bộ giám sát trạm',
-    role: 'viewer',
-    roleName: 'Giám sát viên',
-    status: 'active',
-    lockedUntil: null,
-    lockedAt: null,
-    isOnline: false,
-    lastActive: 'Hôm qua, 18:30',
-    ipAddress: '14.161.35.88 (Bình Dương)',
-    createdAt: '2026-02-25'
   }
 ];
 
@@ -72,17 +44,26 @@ export function getStoredUsers() {
       return DEFAULT_USERS;
     }
     const parsed = JSON.parse(data);
+    
+    // Ensure only valid accounts (admin & khach123) are retained
+    const validUsers = parsed.filter(u => u.username === 'admin' || u.username === 'khach123');
+    if (validUsers.length === 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
+      return DEFAULT_USERS;
+    }
+
     // Check if any 1h locked users have expired
     let updated = false;
     const now = Date.now();
-    const verified = parsed.map(user => {
+    const verified = validUsers.map(user => {
       if (user.status === 'locked_1h' && user.lockedUntil && now >= user.lockedUntil) {
         updated = true;
         return { ...user, status: 'active', lockedUntil: null, lockedAt: null };
       }
       return user;
     });
-    if (updated) {
+
+    if (updated || validUsers.length !== parsed.length) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(verified));
     }
     return verified;
