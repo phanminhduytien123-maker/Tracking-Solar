@@ -224,7 +224,7 @@ export default function SignInPage({ onLoginSuccess }) {
                   id="btn-continue-as-admin"
                   type="button"
                   onClick={() => setAuthMode('admin_pin')}
-                  className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/20 hover:border-white/30 text-white font-semibold text-base sm:text-lg transition-all duration-200 cursor-pointer shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_8px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl active:scale-[0.98] text-center flex items-center justify-center"
+                  className="w-full py-3.5 sm:py-4 px-4 rounded-none bg-white/[0.08] hover:bg-white/[0.14] border border-white/20 hover:border-white/30 text-white font-semibold text-base sm:text-lg transition-all duration-200 cursor-pointer shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_8px_20px_rgba(0,0,0,0.25)] backdrop-blur-xl active:scale-[0.98] text-center flex items-center justify-center"
                   aria-label="Tiếp tục với quyền admin"
                 >
                   <span>Tiếp tục với quyền admin</span>
