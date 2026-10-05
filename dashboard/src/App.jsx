@@ -5,6 +5,7 @@ import ChartsSection from './components/ChartsSection';
 import DetailedTelemetryModal from './components/DetailedTelemetryModal';
 import ManualControlModal from './components/ManualControlModal';
 import SettingsModal from './components/SettingsModal';
+import MapLocationModal from './components/MapLocationModal';
 import WeatherBackground from './components/WeatherBackground';
 import MobileBottomNav from './components/MobileBottomNav';
 import SignInPage from './components/SignInPage';
@@ -16,9 +17,9 @@ import {
 } from './services/mockDataService';
 import { ESP32CommunicationService } from './services/esp32Service';
 import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebaseService';
-import { fetchLiveWeather, getFallbackWeatherData } from './services/weatherService';
+import { fetchLiveWeather, getFallbackWeatherData, HCMC_COORDINATES } from './services/weatherService';
 import { checkUserLoginAllowedAsync } from './services/userService';
-import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles } from 'lucide-react';
+import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles, MapPin } from 'lucide-react';
 
 export default function App() {
   // Authentication State
@@ -90,11 +91,20 @@ export default function App() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
 
-  // Weather State for District 1, Ho Chi Minh City (Phường Sài Gòn)
-  const [weatherData, setWeatherData] = useState(() => getFallbackWeatherData());
+  // Weather Coordinates & State (Interactive Map / Live API)
+  const [selectedLocation, setSelectedLocation] = useState(() => {
+    const saved = localStorage.getItem('solar_custom_location');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return HCMC_COORDINATES;
+  });
+  const [weatherData, setWeatherData] = useState(() => getFallbackWeatherData(selectedLocation));
   const [customWeatherType, setCustomWeatherType] = useState(null);
   const [showWeatherSwitcher, setShowWeatherSwitcher] = useState(false);
+  const [isLoadingWeather, setIsLoadingWeather] = useState(false);
 
   // Engine instances
   const mockEngineRef = useRef(new MockTelemetryEngine());
@@ -127,23 +137,35 @@ export default function App() {
     }
   };
 
-  // Fetch Live Weather for Saigon District 1 (Lat 10.7769, Lon 106.7009)
-  const loadWeather = async () => {
+  // Fetch Live Weather for selected coordinates (Global Open-Meteo API)
+  const loadWeather = async (targetLoc = null) => {
+    const loc = targetLoc || selectedLocation;
+    setIsLoadingWeather(true);
     try {
-      const data = await fetchLiveWeather();
+      const data = await fetchLiveWeather(loc);
       if (data) {
         setWeatherData(data);
       }
     } catch (err) {
-      console.warn('[Weather API Silent Fetch]', err);
+      console.warn('[Weather API Fetch Error]', err);
+    } finally {
+      setIsLoadingWeather(false);
     }
   };
 
+  // Handle map coordinate selection
+  const handleSelectLocation = (newLoc) => {
+    setSelectedLocation(newLoc);
+    localStorage.setItem('solar_custom_location', JSON.stringify(newLoc));
+    setCustomWeatherType(null); // Switch back to live weather mode for this location
+    loadWeather(newLoc);
+  };
+
   useEffect(() => {
-    loadWeather();
-    const weatherTimer = setInterval(loadWeather, 600000);
+    loadWeather(selectedLocation);
+    const weatherTimer = setInterval(() => loadWeather(selectedLocation), 600000);
     return () => clearInterval(weatherTimer);
-  }, []);
+  }, [selectedLocation]);
 
   // Initialize ESP32 Local WebSocket Service
   useEffect(() => {
@@ -462,6 +484,12 @@ export default function App() {
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onResetEstop={handleResetEstop}
+        weatherData={weatherData}
+        isLoadingWeather={isLoadingWeather}
+        onRefreshWeather={() => loadWeather(selectedLocation)}
+        customOverrideType={customWeatherType}
+        setCustomOverrideType={setCustomWeatherType}
+        onOpenMapModal={() => setIsMapModalOpen(true)}
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
@@ -488,6 +516,14 @@ export default function App() {
       </main>
 
       {/* 3. MODALS */}
+      {/* Modal Chọn Tọa Độ Bản Đồ & Các Trạm Pin Mặt Trời */}
+      <MapLocationModal 
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        currentLocation={selectedLocation}
+        onSelectLocation={handleSelectLocation}
+      />
+
       {/* Modal Chi Tiết Cảm Biến LDR & Thuật Toán Fuzzy-PID, PSO */}
       <DetailedTelemetryModal 
         isOpen={isDetailsModalOpen}
@@ -561,13 +597,21 @@ export default function App() {
         {showWeatherSwitcher ? (
           <div className="p-1.5 sm:p-2 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/25 shadow-2xl flex items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto scrollbar-none animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto">
             <button
+              onClick={() => { setShowWeatherSwitcher(false); setIsMapModalOpen(true); }}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-amber-500/25 text-amber-300 border border-amber-400/50 hover:bg-amber-500/40"
+              title="Chọn tọa độ trên Google Maps / Bản đồ"
+            >
+              <MapPin className="w-3.5 h-3.5 text-amber-400" />
+              <span>Bản đồ Tọa độ</span>
+            </button>
+            <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
               className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                 customWeatherType === null ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-sky-300" />
-              <span>API Q1</span>
+              <span>API Thực tế</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
@@ -625,7 +669,7 @@ export default function App() {
           <button
             onClick={() => setShowWeatherSwitcher(true)}
             className="p-2 sm:p-2.5 rounded-2xl bg-black/40 hover:bg-black/60 backdrop-blur-2xl border border-white/20 text-white/80 hover:text-white shadow-xl transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs pointer-events-auto ml-auto sm:ml-0"
-            title="Đổi hiệu ứng nền thời tiết"
+            title="Đổi hiệu ứng nền thời tiết & chọn tọa độ bản đồ"
           >
             <Sparkles className="w-4 h-4 text-sky-300" />
           </button>

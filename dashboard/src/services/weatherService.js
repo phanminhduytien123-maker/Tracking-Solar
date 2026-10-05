@@ -1,6 +1,6 @@
 /**
- * Weather Service for District 1, Ho Chi Minh City (Phường Bến Nghé / Sài Gòn)
- * Location Coordinates: Lat 10.7769, Lon 106.7009
+ * Weather Service for Solar Tracking System
+ * Supports Dynamic Custom Coordinates (Google Maps / OpenStreetMap / GPS / Presets)
  * Source: Open-Meteo Free Global Weather API (High-accuracy ECMWF/GFS fusion)
  */
 
@@ -11,6 +11,81 @@ export const HCMC_COORDINATES = {
   ward: 'Phường Sài Gòn (Bến Nghé)',
   timezone: 'Asia/Ho_Chi_Minh',
 };
+
+export const DEFAULT_PRESET_LOCATIONS = [
+  {
+    id: 'tdtu_q7',
+    name: 'Đại học Tôn Đức Thắng (TDTU)',
+    ward: 'Phường Tân Phong, Quận 7, TP.HCM',
+    lat: 10.7324,
+    lon: 106.6992,
+    description: 'Trạm nghiên cứu Đồ án Tốt nghiệp Solar Tracking'
+  },
+  {
+    id: 'hcmc_q1',
+    name: 'Quận 1, TP. Hồ Chí Minh',
+    ward: 'Phường Sài Gòn (Bến Nghé)',
+    lat: 10.7769,
+    lon: 106.7009,
+    description: 'Trung tâm TP. Hồ Chí Minh'
+  },
+  {
+    id: 'ninh_thuan_solar',
+    name: 'Trạm ĐMT Thuận Nam (Ninh Thuận)',
+    ward: 'Thuận Nam, Ninh Thuận',
+    lat: 11.6835,
+    lon: 108.9950,
+    description: 'Thủ phủ năng lượng tái tạo & bức xạ mặt trời cao nhất VN'
+  },
+  {
+    id: 'binh_thuan_solar',
+    name: 'Trạm ĐMT Hàm Tân (Bình Thuận)',
+    ward: 'Hàm Tân, Bình Thuận',
+    lat: 11.0883,
+    lon: 108.2715,
+    description: 'Tiềm năng quang điện ven biển Nam Trung Bộ'
+  },
+  {
+    id: 'da_nang',
+    name: 'TP. Đà Nẵng',
+    ward: 'Quận Hải Châu, Đà Nẵng',
+    lat: 16.0544,
+    lon: 108.2022,
+    description: 'Duyên hải Miền Trung'
+  },
+  {
+    id: 'ha_noi',
+    name: 'Thủ đô Hà Nội',
+    ward: 'Quận Hoàn Kiếm, Hà Nội',
+    lat: 21.0285,
+    lon: 105.8542,
+    description: 'Đồng bằng Sông Hồng'
+  },
+  {
+    id: 'can_tho',
+    name: 'TP. Cần Thơ',
+    ward: 'Quận Ninh Kiều, Cần Thơ',
+    lat: 10.0452,
+    lon: 105.7469,
+    description: 'Đồng bằng Sông Cửu Long'
+  },
+  {
+    id: 'nha_trang',
+    name: 'TP. Nha Trang (Khánh Hòa)',
+    ward: 'Nha Trang, Khánh Hòa',
+    lat: 12.2388,
+    lon: 109.1967,
+    description: 'Bờ biển Nam Trung Bộ, nắng quanh năm'
+  },
+  {
+    id: 'da_lat',
+    name: 'TP. Đà Lạt (Lâm Đồng)',
+    ward: 'Đà Lạt, Lâm Đồng',
+    lat: 11.9404,
+    lon: 108.4583,
+    description: 'Cao nguyên Lâm Viên (Khí hậu sương mù mát mẻ)'
+  }
+];
 
 // Map WMO Weather Interpretation Codes to Vietnamese text, icon types, and background theme types
 export const WMO_WEATHER_MAP = {
@@ -68,10 +143,15 @@ export function getWeatherConditionInfo(code, isDay = 1) {
 }
 
 /**
- * Fetch live weather from Open-Meteo API
+ * Fetch live weather from Open-Meteo API for any custom coordinates
  */
-export async function fetchLiveWeather() {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${HCMC_COORDINATES.lat}&longitude=${HCMC_COORDINATES.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index,surface_pressure&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=Asia%2FHo_Chi_Minh`;
+export async function fetchLiveWeather(customCoords = null) {
+  const lat = customCoords?.lat ?? HCMC_COORDINATES.lat;
+  const lon = customCoords?.lon ?? HCMC_COORDINATES.lon;
+  const locationName = customCoords?.locationName || customCoords?.name || HCMC_COORDINATES.locationName;
+  const ward = customCoords?.ward || HCMC_COORDINATES.ward;
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index,surface_pressure&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&timezone=auto`;
 
   try {
     const response = await fetch(url);
@@ -79,17 +159,17 @@ export async function fetchLiveWeather() {
       throw new Error(`Weather API returned status ${response.status}`);
     }
     const data = await response.json();
-    return parseWeatherData(data);
+    return parseWeatherData(data, { lat, lon, locationName, ward });
   } catch (error) {
     console.warn('[Weather Service] API fetch error, using realistic fallback:', error);
-    return getFallbackWeatherData();
+    return getFallbackWeatherData({ lat, lon, locationName, ward });
   }
 }
 
 /**
  * Format and structure raw API response
  */
-function parseWeatherData(data) {
+function parseWeatherData(data, meta = {}) {
   const current = data.current || {};
   const daily = data.daily || {};
   const hourly = data.hourly || {};
@@ -98,8 +178,7 @@ function parseWeatherData(data) {
   const isDay = current.is_day ?? 1;
   const condition = getWeatherConditionInfo(weatherCode, isDay);
 
-  // Parse Hourly forecast for the next 24 hours
-  const nowIso = new Date().toISOString();
+  // Parse Hourly forecast for next 24 hours
   const next24Hours = [];
   if (hourly.time && hourly.time.length) {
     const currentHourIndex = hourly.time.findIndex(t => new Date(t) >= new Date(Date.now() - 3600000));
@@ -143,35 +222,27 @@ function parseWeatherData(data) {
     }
   }
 
-  // Determine time phase accurately based on Saigon solar hours (Sunset ~17:43)
   const now = new Date();
   const currentHour = now.getHours();
   const currentMin = now.getMinutes();
   const totalMinutes = currentHour * 60 + currentMin;
 
   let timePhase = 'day';
-  // Dawn: 05:30 -> 06:15 (330 -> 375 mins)
   if (totalMinutes >= 330 && totalMinutes < 375) {
     timePhase = 'dawn';
-  } 
-  // Full Daylight: 06:15 -> 17:25 (375 -> 1045 mins) - Bright blue sky
-  else if (totalMinutes >= 375 && totalMinutes < 1045) {
+  } else if (totalMinutes >= 375 && totalMinutes < 1045) {
     timePhase = 'day';
-  } 
-  // Sunset / Golden hour: 17:25 -> 18:10 (1045 -> 1090 mins)
-  else if (totalMinutes >= 1045 && totalMinutes < 1090) {
+  } else if (totalMinutes >= 1045 && totalMinutes < 1090) {
     timePhase = 'golden_hour';
-  } 
-  // Night: 18:10 -> 05:30
-  else {
+  } else {
     timePhase = 'night';
   }
 
   return {
-    location: HCMC_COORDINATES.locationName,
-    ward: HCMC_COORDINATES.ward,
-    lat: HCMC_COORDINATES.lat,
-    lon: HCMC_COORDINATES.lon,
+    location: meta.locationName || HCMC_COORDINATES.locationName,
+    ward: meta.ward || HCMC_COORDINATES.ward,
+    lat: meta.lat ?? HCMC_COORDINATES.lat,
+    lon: meta.lon ?? HCMC_COORDINATES.lon,
     lastUpdated: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     current: {
       temp: Math.round((current.temperature_2m ?? 29) * 10) / 10,
@@ -196,9 +267,9 @@ function parseWeatherData(data) {
 }
 
 /**
- * Realistic Fallback data for Saigon District 1
+ * Fallback data
  */
-export function getFallbackWeatherData() {
+export function getFallbackWeatherData(meta = {}) {
   const now = new Date();
   const hour = now.getHours();
   const isDay = hour >= 6 && hour < 18;
@@ -209,10 +280,10 @@ export function getFallbackWeatherData() {
   const timePhase = (totalMinutes >= 375 && totalMinutes < 1045) ? 'day' : (totalMinutes >= 1045 && totalMinutes < 1090 ? 'golden_hour' : 'night');
 
   return {
-    location: HCMC_COORDINATES.locationName,
-    ward: HCMC_COORDINATES.ward,
-    lat: HCMC_COORDINATES.lat,
-    lon: HCMC_COORDINATES.lon,
+    location: meta.locationName || HCMC_COORDINATES.locationName,
+    ward: meta.ward || HCMC_COORDINATES.ward,
+    lat: meta.lat ?? HCMC_COORDINATES.lat,
+    lon: meta.lon ?? HCMC_COORDINATES.lon,
     lastUpdated: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     current: {
       temp: isDay ? 31.5 : 26.2,

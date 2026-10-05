@@ -50,70 +50,76 @@ export default function WeatherWidget({
   onRefresh, 
   isLoading, 
   customOverrideType, 
-  setCustomOverrideType 
+  setCustomOverrideType,
+  onOpenMapModal
 }) {
   const [isOpenModal, setIsOpenModal] = useState(false);
   const current = weatherData?.current || {};
   const condition = current.condition || { label: 'Đang tải...', icon: 'CloudSun' };
 
   const weatherPresets = [
-    { id: null, label: 'API Thời Tiết Thực Tế', desc: 'Dữ liệu trực tiếp Q.1 HCM từ Open-Meteo', icon: 'Zap' },
+    { id: null, label: 'API Thời Tiết Thực Tế', desc: 'Dữ liệu trực tiếp từ Open-Meteo API', icon: 'Zap' },
     { id: 'clear', label: 'Nắng Gắt Sài Gòn', desc: 'Trời quang, bức xạ cực đại ~1000 W/m²', icon: 'Sun' },
     { id: 'partly_cloudy', label: 'Nắng Mây Đan Xen', desc: 'Quang thông thay đổi, test Fuzzy-PID', icon: 'CloudSun' },
     { id: 'clouds', label: 'Trời Âm U / Mây Dày', desc: 'Bức xạ khuếch tán, test thuật toán PSO', icon: 'Cloud' },
     { id: 'rain', label: 'Mưa Rào Nhiệt Đới', desc: 'Mưa rào làm sạch bụi bề mặt tấm pin', icon: 'CloudRain' },
     { id: 'thunderstorm', label: 'Giông Sét Sấm Chớp', desc: 'Mưa dông lớn, kích hoạt bảo vệ E-Stop', icon: 'CloudLightning' },
     { id: 'golden_hour', label: 'Hoàng Hôn Chiều Tà', desc: 'Mặt trời lặn, pin quay về hướng Đông', icon: 'Sunset' },
-    { id: 'night', label: 'Đêm Sài Gòn (Trăng Sao)', desc: 'Chế độ nghỉ ban đêm tiết kiệm điện', icon: 'Moon' },
+    { id: 'night', label: 'Đêm Trăng Sao', desc: 'Chế độ nghỉ ban đêm tiết kiệm điện', icon: 'Moon' },
   ];
 
   return (
     <>
       {/* 1. COMPACT WEATHER PILL IN HEADER */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <button
           id="btn-open-weather-modal"
           onClick={() => setIsOpenModal(true)}
-          className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800/90 border border-zinc-700/60 hover:border-sky-500/50 backdrop-blur-md transition-all cursor-pointer shadow-sm hover:shadow-sky-500/10 active:scale-95 text-left"
-          title="Xem chi tiết thời tiết Quận 1 & điều khiển hiệu ứng nền"
+          className="group flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer shadow-xs active:scale-95 text-left"
+          title="Xem chi tiết thời tiết & đổi tọa độ bản đồ"
         >
           {/* Weather Icon with subtle pulse */}
           <div className="shrink-0 group-hover:scale-110 transition-transform">
-            <RenderWeatherIcon iconName={condition.icon} className="w-5 h-5" isDay={current.isDay} />
+            <RenderWeatherIcon iconName={condition.icon} className="w-4 h-4 sm:w-5 sm:h-5" isDay={current.isDay} />
           </div>
 
           {/* Weather Info text */}
           <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-white tracking-tight">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <span className="text-xs font-bold text-zinc-950 tracking-tight">
                 {current.temp !== undefined ? `${current.temp}°C` : '--°C'}
               </span>
-              <span className="text-[10px] text-zinc-400 font-medium hidden sm:inline-block">
+              <span className="text-[10px] text-zinc-600 font-medium hidden md:inline-block">
                 • {condition.label}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
-              <MapPin className="w-2.5 h-2.5 text-sky-400 shrink-0" />
-              <span className="truncate max-w-[110px]">Q.1, TP.HCM</span>
+            <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-mono">
+              <MapPin className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+              <span className="truncate max-w-[90px] sm:max-w-[120px] font-sans font-medium text-zinc-700">
+                {weatherData?.location?.split(',')[0] || 'Q.1, TP.HCM'}
+              </span>
               {customOverrideType ? (
-                <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans border border-amber-500/30">
+                <span className="text-[9px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 font-sans border border-amber-300 font-bold">
                   Demo
                 </span>
               ) : (
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Live API" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" title="Live API" />
               )}
             </div>
           </div>
         </button>
 
-        {/* Quick Weather Preset Switcher (Mini Dropdown/Selector Button) */}
-        <button
-          onClick={() => setIsOpenModal(true)}
-          className="hidden md:flex items-center justify-center p-1.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          title="Tùy chỉnh hiệu ứng thời tiết nền"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
+        {/* Map Location Quick Trigger Button */}
+        {onOpenMapModal && (
+          <button
+            onClick={onOpenMapModal}
+            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-800 text-xs font-semibold transition-all cursor-pointer active:scale-95"
+            title="Chọn tọa độ trên Google Map"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-600" />
+            <span>Bản đồ</span>
+          </button>
+        )}
       </div>
 
       {/* 2. FULL DETAILED WEATHER MODAL & ATMOSPHERIC DASHBOARD */}
@@ -126,23 +132,36 @@ export default function WeatherWidget({
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-[#202738] flex items-center justify-between sticky top-0 bg-[#0f1219]/95 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 shrink-0">
                   <RenderWeatherIcon iconName={condition.icon} className="w-6 h-6" isDay={current.isDay} />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                    Thời Tiết Thực Tế: Quận 1, TP. Hồ Chí Minh
+                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                    <span>{weatherData?.location || 'Quận 1, TP. Hồ Chí Minh'}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-normal border border-sky-500/30">
                       Open-Meteo API
                     </span>
                   </h3>
                   <p className="text-xs text-zinc-400">
-                    Phường Sài Gòn (Bến Nghé) • Tọa độ 10.7769°N, 106.7009°E • Cập nhật lúc {weatherData?.lastUpdated}
+                    {weatherData?.ward ? `${weatherData.ward} • ` : ''}Tọa độ {weatherData?.lat?.toFixed(4)}°N, {weatherData?.lon?.toFixed(4)}°E • Cập nhật lúc {weatherData?.lastUpdated}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                {onOpenMapModal && (
+                  <button
+                    onClick={() => {
+                      setIsOpenModal(false);
+                      onOpenMapModal();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-semibold flex items-center gap-1.5 border border-amber-400/40 transition-colors cursor-pointer active:scale-95"
+                    title="Mở bản đồ chọn tọa độ"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Đổi tọa độ bản đồ</span>
+                  </button>
+                )}
                 <button
                   onClick={onRefresh}
                   disabled={isLoading}

@@ -4,10 +4,12 @@ import {
   Settings, 
   AlertTriangle, 
   RotateCcw, 
-  Clock,
-  LogOut,
-  ShieldCheck
+  Clock, 
+  LogOut, 
+  ShieldCheck,
+  MapPin
 } from 'lucide-react';
+import WeatherWidget from './WeatherWidget';
 
 export default function Header({ 
   system = {}, 
@@ -17,7 +19,13 @@ export default function Header({
   onLogout,
   onOpenManualModal, 
   onOpenSettingsModal,
-  onResetEstop
+  onResetEstop,
+  weatherData = null,
+  isLoadingWeather = false,
+  onRefreshWeather = null,
+  customOverrideType = null,
+  setCustomOverrideType = null,
+  onOpenMapModal = null
 }) {
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -97,6 +105,18 @@ export default function Header({
                 {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
               </span>
             </div>
+          )}
+
+          {/* Weather Widget & Map Button */}
+          {weatherData && (
+            <WeatherWidget 
+              weatherData={weatherData}
+              isLoading={isLoadingWeather}
+              onRefresh={onRefreshWeather}
+              customOverrideType={customOverrideType}
+              setCustomOverrideType={setCustomOverrideType}
+              onOpenMapModal={onOpenMapModal}
+            />
           )}
 
           {/* Clock & Date Badge (Always visible for all users) */}
