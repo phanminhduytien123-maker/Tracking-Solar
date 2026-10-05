@@ -48,21 +48,60 @@ export default function InstallationLocationTab({
   const tileLayerRef = useRef(null);
   const markerRef = useRef(null);
 
-  // Helper to build tile layer URL
-  const getTileUrl = (style, token) => {
-    if (token && token.startsWith('pk.')) {
-      if (style === 'satellite') {
-        return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
-      }
-      if (style === 'streets') {
-        return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
-      }
-      if (style === 'dark') {
-        return `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
-      }
+  // Helper to build robust tile layer configuration
+  const getTileConfig = (style, token) => {
+    if (style === 'satellite') {
+      // Google Maps Satellite + Road Labels Hybrid (Ultra-crisp, 100% reliable worldwide, zero token errors)
+      return {
+        url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        options: {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '© Google Maps'
+        }
+      };
     }
-    // Fallback: CartoDB Voyager (No API key required)
-    return 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    if (style === 'streets') {
+      // Google Maps Street View
+      return {
+        url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+        options: {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          attribution: '© Google Maps'
+        }
+      };
+    }
+    if (style === 'dark') {
+      // CartoDB Dark Matter
+      return {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        options: {
+          maxZoom: 20,
+          subdomains: 'abcd',
+          attribution: '© CARTO'
+        }
+      };
+    }
+    if (style === 'mapbox' && token && token.startsWith('pk.')) {
+      // Custom Mapbox Satellite
+      return {
+        url: `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}?access_token=${token}`,
+        options: {
+          maxZoom: 20,
+          attribution: '© Mapbox'
+        }
+      };
+    }
+    // Default: CartoDB Voyager / OpenStreetMap Clean
+    return {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      options: {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '© OpenStreetMap'
+      }
+    };
   };
 
   // Switch Tile Layer dynamically
@@ -74,14 +113,10 @@ export default function InstallationLocationTab({
       if (tileLayerRef.current) {
         mapInstanceRef.current.removeLayer(tileLayerRef.current);
       }
-      const url = getTileUrl(newStyle, mapboxToken);
-      const isMapbox = mapboxToken && mapboxToken.startsWith('pk.') && newStyle !== 'osm';
-      const newLayer = L.tileLayer(url, {
-        maxZoom: 20,
-        subdomains: isMapbox ? [] : 'abcd',
-        attribution: isMapbox ? '© Mapbox' : '© OpenStreetMap'
-      }).addTo(mapInstanceRef.current);
+      const config = getTileConfig(newStyle, mapboxToken);
+      const newLayer = L.tileLayer(config.url, config.options).addTo(mapInstanceRef.current);
       tileLayerRef.current = newLayer;
+      mapInstanceRef.current.invalidateSize();
     }
   };
 
@@ -149,7 +184,9 @@ export default function InstallationLocationTab({
 
   // Initialize Leaflet Map
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let timers = [];
+
+    const initMap = () => {
       if (!mapContainerRef.current) return;
 
       if (!mapInstanceRef.current) {
@@ -183,19 +220,14 @@ export default function InstallationLocationTab({
         // Initialize Map
         const map = L.map(mapContainerRef.current, {
           center: [selectedLat, selectedLon],
-          zoom: 14,
+          zoom: 15,
           zoomControl: true,
           attributionControl: false
         });
 
         // Tile layer
-        const isMapbox = mapboxToken && mapboxToken.startsWith('pk.') && mapStyle !== 'osm';
-        const url = getTileUrl(mapStyle, mapboxToken);
-        const tileLayer = L.tileLayer(url, {
-          maxZoom: 20,
-          subdomains: isMapbox ? [] : 'abcd',
-          attribution: isMapbox ? '© Mapbox' : '© OpenStreetMap'
-        }).addTo(map);
+        const config = getTileConfig(mapStyle, mapboxToken);
+        const tileLayer = L.tileLayer(config.url, config.options).addTo(map);
         tileLayerRef.current = tileLayer;
 
         // Marker
@@ -218,17 +250,26 @@ export default function InstallationLocationTab({
 
         mapInstanceRef.current = map;
         markerRef.current = marker;
-      } else {
-        mapInstanceRef.current.invalidateSize();
-        mapInstanceRef.current.setView([selectedLat, selectedLon], 14);
-        if (markerRef.current) {
-          markerRef.current.setLatLng([selectedLat, selectedLon]);
-        }
       }
-    }, 100);
+
+      // Ensure Leaflet calculates real container size correctly
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+        mapInstanceRef.current.setView([selectedLat, selectedLon], 15);
+      }
+    };
+
+    // Staggered size invalidation to handle modal entry animation
+    timers.push(setTimeout(initMap, 50));
+    timers.push(setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200));
+    timers.push(setTimeout(() => mapInstanceRef.current?.invalidateSize(), 500));
+
+    const handleResize = () => mapInstanceRef.current?.invalidateSize();
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      clearTimeout(timer);
+      timers.forEach(clearTimeout);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
