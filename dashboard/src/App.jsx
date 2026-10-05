@@ -17,6 +17,7 @@ import {
 import { ESP32CommunicationService } from './services/esp32Service';
 import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebaseService';
 import { fetchLiveWeather, getFallbackWeatherData } from './services/weatherService';
+import { checkUserLoginAllowedAsync } from './services/userService';
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -40,6 +41,27 @@ export default function App() {
       localStorage.removeItem('solar_auth_session');
     }
   };
+
+  // Live Cloud Security Guard: Periodically checks if active guest account is locked
+  useEffect(() => {
+    if (authSession?.role === 'guest') {
+      const checkLockout = async () => {
+        try {
+          const status = await checkUserLoginAllowedAsync('khach123');
+          if (!status.allowed) {
+            localStorage.removeItem('solar_auth_session');
+            setAuthSession(null);
+            alert(status.reason || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên.');
+          }
+        } catch (e) {}
+      };
+
+      // Check immediately on mount and every 3 seconds
+      checkLockout();
+      const interval = setInterval(checkLockout, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [authSession]);
 
   // Data Source: 'firebase' | 'mock' | 'esp32_ws'
   const [dataSource, setDataSource] = useState(() => {

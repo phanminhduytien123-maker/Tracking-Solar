@@ -17,7 +17,7 @@ import {
   RefreshCw,
   ShieldAlert
 } from 'lucide-react';
-import { getStoredUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
+import { getStoredUsers, fetchCloudUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
 
 export default function SettingsModal({
   isOpen,
@@ -46,46 +46,50 @@ export default function SettingsModal({
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userActionFeedback, setUserActionFeedback] = useState(null);
 
-  // Sync users whenever the modal opens or tab changes
+  // Sync users from Firebase Cloud whenever the modal opens or tab changes
   useEffect(() => {
     if (isOpen) {
       setUsersList(getStoredUsers());
+      fetchCloudUsers().then(cloudUsers => {
+        if (cloudUsers) setUsersList(cloudUsers);
+      });
     }
   }, [isOpen, activeTab]);
 
-  const handleRefreshUsers = () => {
-    setUsersList(getStoredUsers());
+  const handleRefreshUsers = async () => {
+    const cloudUsers = await fetchCloudUsers();
+    setUsersList(cloudUsers || getStoredUsers());
     setUserActionFeedback({
       type: 'info',
-      message: 'Đã đồng bộ danh sách trạng thái người dùng mới nhất!'
+      message: 'Đã đồng bộ danh sách trạng thái người dùng từ Firebase Cloud!'
     });
     setTimeout(() => setUserActionFeedback(null), 3000);
   };
 
-  const handleLock1H = (user) => {
-    const updated = lockUser1Hour(user.id);
+  const handleLock1H = async (user) => {
+    const updated = await lockUser1Hour(user.id);
     setUsersList(updated);
     setUserActionFeedback({
       type: 'warning',
-      message: `Đã khóa tạm thời 1 giờ tài khoản "${user.displayName}" (@${user.username}).`
+      message: `Đã khóa tạm thời 1 giờ tài khoản "${user.displayName}" (@${user.username}) trên toàn hệ thống.`
     });
     setTimeout(() => setUserActionFeedback(null), 4000);
   };
 
-  const handleLockPerm = (user) => {
+  const handleLockPerm = async (user) => {
     if (window.confirm(`Xác nhận khóa VĨNH VIỄN tài khoản "${user.displayName}" (@${user.username})?`)) {
-      const updated = lockUserPermanent(user.id);
+      const updated = await lockUserPermanent(user.id);
       setUsersList(updated);
       setUserActionFeedback({
         type: 'danger',
-        message: `Đã khóa vĩnh viễn tài khoản "${user.displayName}" (@${user.username}).`
+        message: `Đã khóa vĩnh viễn tài khoản "${user.displayName}" (@${user.username}) trên toàn hệ thống.`
       });
       setTimeout(() => setUserActionFeedback(null), 4000);
     }
   };
 
-  const handleRestore = (user) => {
-    const updated = restoreUser(user.id);
+  const handleRestore = async (user) => {
+    const updated = await restoreUser(user.id);
     setUsersList(updated);
     setUserActionFeedback({
       type: 'success',

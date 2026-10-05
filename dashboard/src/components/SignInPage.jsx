@@ -9,7 +9,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
-import { checkUserLoginAllowed } from '../services/userService';
+import { checkUserLoginAllowedAsync } from '../services/userService';
 
 export default function SignInPage({ onLoginSuccess }) {
 
@@ -58,24 +58,16 @@ export default function SignInPage({ onLoginSuccess }) {
     }
   }, [authMode]);
 
-  // Handle standard form submit
-  const handleRegularFormSubmit = (e) => {
+  // Handle standard form submit (Cloud Synchronized)
+  const handleRegularFormSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
 
     const cleanUser = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Check if Account is Locked (1h or permanent)
-    const lockoutStatus = checkUserLoginAllowed(cleanUser);
-    if (!lockoutStatus.allowed) {
-      setFormError(lockoutStatus.reason);
-      return;
-    }
-
-    // Check if Guest Account (khach123 / 123)
+    // Check credentials first
     const isGuest = (cleanUser === 'khach123' || cleanUser === 'khach123@gmail.com') && cleanPass === '123';
-
     if (!isGuest) {
       setFormError('Tên đăng nhập hoặc mật khẩu không chính xác');
       return;
@@ -88,6 +80,19 @@ export default function SignInPage({ onLoginSuccess }) {
     }
 
     setIsSubmitting(true);
+
+    // Asynchronous Cloud Lockout Verification from Firebase Realtime Database
+    try {
+      const lockoutStatus = await checkUserLoginAllowedAsync(cleanUser);
+      if (!lockoutStatus.allowed) {
+        setIsSubmitting(false);
+        setFormError(lockoutStatus.reason);
+        return;
+      }
+    } catch (err) {
+      console.warn('[SignIn] Lockout verification error:', err);
+    }
+
     setTimeout(() => {
       setIsSubmitting(false);
       onLoginSuccess({
