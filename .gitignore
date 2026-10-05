@@ -34,3 +34,8 @@ Thumbs.db
 # PlatformIO
 .pio/
 **/.pio/
+
+# Backup docx files
+*_backup.docx
+*_fixed.docx
+

@@ -4,17 +4,22 @@ import {
   Settings, 
   AlertTriangle, 
   RotateCcw, 
-  Clock
+  Clock,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Header({ 
   system = {}, 
   mode = 'AUTO', 
   dataSource = 'firebase',
+  currentUser = null,
+  onLogout,
   onOpenManualModal, 
   onOpenSettingsModal,
   onResetEstop
 }) {
+
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -117,6 +122,25 @@ export default function Header({
           >
             <Settings className="w-4 h-4" />
           </button>
+
+          {/* Admin User Badge & Logout Button */}
+          <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-200">
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>Admin</span>
+            </div>
+            {onLogout && (
+              <button
+                id="btn-logout"
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-700 hover:text-red-950 bg-red-50 hover:bg-red-100 border border-red-200 transition-all cursor-pointer active:scale-95"
+                title="Đăng xuất khỏi hệ thống"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Đăng xuất</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

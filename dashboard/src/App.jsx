@@ -7,6 +7,7 @@ import ManualControlModal from './components/ManualControlModal';
 import SettingsModal from './components/SettingsModal';
 import WeatherBackground from './components/WeatherBackground';
 import MobileBottomNav from './components/MobileBottomNav';
+import SignInPage from './components/SignInPage';
 
 import { 
   MockTelemetryEngine, 
@@ -19,10 +20,32 @@ import { fetchLiveWeather, getFallbackWeatherData } from './services/weatherServ
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles } from 'lucide-react';
 
 export default function App() {
+  // Authentication State
+  const [authSession, setAuthSession] = useState(() => {
+    const saved = localStorage.getItem('solar_auth_session');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return null;
+  });
+
+  const handleLoginSuccess = (userData) => {
+    setAuthSession(userData);
+    localStorage.setItem('solar_auth_session', JSON.stringify(userData));
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
+      setAuthSession(null);
+      localStorage.removeItem('solar_auth_session');
+    }
+  };
+
   // Data Source: 'firebase' | 'mock' | 'esp32_ws'
   const [dataSource, setDataSource] = useState(() => {
     return localStorage.getItem('solar_datasource') || 'firebase';
   });
+
 
   const [firebaseConfig, setFirebaseConfig] = useState(() => {
     const saved = localStorage.getItem('solar_firebase_config');
@@ -390,6 +413,11 @@ export default function App() {
         ? 'rainy'
         : 'night';
 
+  // If not authenticated, render the Sign-in Page
+  if (!authSession) {
+    return <SignInPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div 
       data-weather-theme={weatherTheme}
@@ -407,6 +435,8 @@ export default function App() {
         system={telemetry.system}
         mode={telemetry.system.mode}
         dataSource={dataSource}
+        currentUser={authSession}
+        onLogout={handleLogout}
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onResetEstop={handleResetEstop}
@@ -498,6 +528,7 @@ export default function App() {
         onOpenManual={() => setIsManualModalOpen(true)}
         onOpenDetails={() => setIsDetailsModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Floating Switcher) */}

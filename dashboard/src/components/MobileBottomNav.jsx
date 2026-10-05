@@ -1,10 +1,11 @@
 import React from 'react';
-import { LayoutDashboard, Sliders, BarChart3, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, Sliders, BarChart3, Activity, Settings, LogOut } from 'lucide-react';
 
 export default function MobileBottomNav({
   onOpenManual,
   onOpenDetails,
-  onOpenSettings
+  onOpenSettings,
+  onLogout
 }) {
   const scrollToCharts = () => {
     const chartEl = document.getElementById('section-charts');
@@ -60,13 +61,27 @@ export default function MobileBottomNav({
         {/* 4. Thông số */}
         <button
           onClick={onOpenDetails}
-          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-3 rounded-xl cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 text-zinc-300 hover:text-white transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
         >
           <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-200">
             <Activity className="w-4 h-4" />
           </div>
           <span className="text-xs font-semibold tracking-tight text-zinc-200">Thông số</span>
         </button>
+
+        {/* 5. Đăng xuất */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="flex flex-col items-center justify-center gap-1 text-red-300 hover:text-red-100 transition-all active:scale-95 py-1 px-2 rounded-xl cursor-pointer"
+            title="Đăng xuất"
+          >
+            <div className="w-8 h-8 rounded-lg bg-red-950/60 flex items-center justify-center border border-red-800/80 text-red-300">
+              <LogOut className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-semibold tracking-tight text-red-300">Thoát</span>
+          </button>
+        )}
 
       </div>
     </nav>
