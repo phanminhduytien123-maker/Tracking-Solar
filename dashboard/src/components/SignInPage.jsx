@@ -68,19 +68,13 @@ export default function SignInPage({ onLoginSuccess }) {
     const isGuest = (cleanUser === 'khach123' || cleanUser === 'khach123@gmail.com') && cleanPass === '123';
 
     if (!isGuest) {
-      setFormError({
-        title: 'Đăng nhập không thành công',
-        message: 'Tên đăng nhập hoặc mật khẩu không đúng. (Gợi ý tài khoản khách: khach123 / Mật khẩu: 123)'
-      });
+      setFormError('Tên đăng nhập hoặc mật khẩu không chính xác');
       return;
     }
 
     // Require Captcha verification for guest login
     if (!isCaptchaVerified) {
-      setFormError({
-        title: 'Chưa xác thực Captcha',
-        message: 'Vui lòng tích chọn ô "I\'m not a robot" trước khi đăng nhập.'
-      });
+      setFormError('Vui lòng xác thực "I\'m not a robot" trước khi đăng nhập');
       return;
     }
 
@@ -249,15 +243,11 @@ export default function SignInPage({ onLoginSuccess }) {
               {/* 3. Regular Login Form */}
               <form onSubmit={handleRegularFormSubmit} className="space-y-4 sm:space-y-5">
                 
-                {/* Form Alert Message */}
+                {/* Form Error Message (Chữ đỏ, không viền) */}
                 {formError && (
-                  <div className="p-3.5 rounded-2xl bg-amber-500/20 backdrop-blur-xl border border-amber-400/40 text-xs sm:text-sm text-amber-200 space-y-1 animate-in fade-in duration-200 shadow-lg">
-                    <div className="flex items-center gap-2 font-bold text-amber-300">
-                      <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                      <span>{formError.title}</span>
-                    </div>
-                    <p className="text-xs sm:text-[13px] text-zinc-200 leading-relaxed pl-6">
-                      {formError.message}
+                  <div className="text-center py-0.5 animate-in fade-in duration-200">
+                    <p className="text-red-400 text-xs sm:text-sm font-medium tracking-wide">
+                      {formError}
                     </p>
                   </div>
                 )}
@@ -280,7 +270,10 @@ export default function SignInPage({ onLoginSuccess }) {
                       autoComplete="username"
                       autoCapitalize="none"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
                       placeholder="Tên tài khoản hoặc email..."
                       className="w-full pl-12 pr-4 py-3 sm:py-3.5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] focus:bg-white/[0.16] backdrop-blur-xl border border-white/20 focus:border-amber-400 text-sm sm:text-base text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition-all font-sans shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
                     />
@@ -298,7 +291,7 @@ export default function SignInPage({ onLoginSuccess }) {
                     </label>
                     <button
                       type="button"
-                      onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) hoặc tài khoản khách: khach123 / 123.')}
+                      onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) hoặc tài khoản khách: khach123 / Mật khẩu: 123.')}
                       className="text-xs sm:text-sm text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer"
                     >
                       Quên mật khẩu?
@@ -313,7 +306,10 @@ export default function SignInPage({ onLoginSuccess }) {
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
                       placeholder="••••••••"
                       className="w-full pl-12 pr-12 py-3 sm:py-3.5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] focus:bg-white/[0.16] backdrop-blur-xl border border-white/20 focus:border-amber-400 text-sm sm:text-base text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition-all font-sans shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
                     />
