@@ -194,23 +194,26 @@ export default function SignInPage({ onLoginSuccess }) {
         <source src="/Login_BG.mp4" type="video/mp4" />
       </video>
 
-      {/* Cinematic Dark Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#080a10]/95 via-black/60 to-black/75 z-0 pointer-events-none backdrop-blur-[2px]"></div>
+      {/* Cinematic Dark Overlay with Fluid Transparency */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080a10]/80 via-black/35 to-black/55 z-0 pointer-events-none backdrop-blur-[1px]"></div>
 
       {/* Subtle Glow Accents */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-amber-500/10 blur-[140px] pointer-events-none z-0 animate-pulse duration-[8000ms]"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] rounded-full bg-cyan-500/10 blur-[160px] pointer-events-none z-0"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-amber-500/15 blur-[140px] pointer-events-none z-0 animate-pulse duration-[8000ms]"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] rounded-full bg-cyan-500/15 blur-[160px] pointer-events-none z-0"></div>
 
-      {/* Center Main Card Container */}
+      {/* Center Main Card Container (Liquid Glass Effect) */}
       <main className="relative z-10 flex-1 w-full flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-[480px] bg-zinc-950/85 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 sm:p-9 shadow-2xl shadow-black/90 relative transition-all duration-300">
+        <div className="w-full max-w-[480px] bg-white/[0.07] backdrop-blur-[32px] backdrop-saturate-[200%] border border-white/[0.22] hover:border-white/[0.32] rounded-[32px] p-6 sm:p-9 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_1px_rgba(255,255,255,0.1),0_0_50px_rgba(251,191,36,0.06)] relative transition-all duration-300 overflow-hidden">
           
+          {/* Liquid Glass Top Specular Sheen Reflection */}
+          <div className="absolute top-0 inset-x-0 h-36 bg-gradient-to-b from-white/[0.16] via-white/[0.03] to-transparent pointer-events-none"></div>
+
           {/* Card Ambient Glow Line */}
-          <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"></div>
+          <div className="absolute top-0 inset-x-12 h-[1.5px] bg-gradient-to-r from-transparent via-amber-300/80 to-transparent"></div>
 
           {/* Header Title */}
-          <div className="text-center mb-6 sm:mb-7">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase font-playfair drop-shadow-md">
+          <div className="text-center mb-6 sm:mb-7 relative z-10">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase font-playfair drop-shadow-lg">
               Tracking Solar
             </h2>
           </div>
@@ -219,7 +222,7 @@ export default function SignInPage({ onLoginSuccess }) {
           {/* VIEW 1: SIGN-IN FORM */}
           {/* ========================================================================= */}
           {authMode === 'form' ? (
-            <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200 relative z-10">
               
               {/* 1. Federated Sign-in Button */}
               <div>
@@ -227,7 +230,7 @@ export default function SignInPage({ onLoginSuccess }) {
                   id="btn-continue-as-admin"
                   type="button"
                   onClick={() => setAuthMode('admin_pin')}
-                  className="w-full py-3 sm:py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500/25 via-amber-500/15 to-amber-500/25 hover:from-amber-500/35 hover:via-amber-500/25 hover:to-amber-500/35 border border-amber-500/60 hover:border-amber-400 text-amber-200 hover:text-white font-bold text-base sm:text-lg transition-all duration-200 cursor-pointer shadow-lg shadow-amber-950/30 active:scale-[0.98] text-center flex items-center justify-center"
+                  className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500/35 via-amber-400/20 to-amber-500/35 hover:from-amber-500/45 hover:via-amber-400/30 hover:to-amber-500/45 border border-amber-400/70 text-amber-100 hover:text-white font-bold text-base sm:text-lg transition-all duration-200 cursor-pointer shadow-[inset_0_1px_2px_rgba(255,255,255,0.35),0_10px_25px_rgba(245,158,11,0.25)] backdrop-blur-xl active:scale-[0.98] text-center flex items-center justify-center"
                   aria-label="Tiếp tục với quyền admin"
                 >
                   <span>Tiếp tục với quyền admin</span>
@@ -236,8 +239,8 @@ export default function SignInPage({ onLoginSuccess }) {
 
               {/* 2. Divider */}
               <div className="relative flex items-center justify-center my-4 sm:my-5">
-                <div className="w-full border-t border-zinc-700/80"></div>
-                <span className="absolute px-4 bg-zinc-950 text-xs sm:text-sm uppercase tracking-wider text-zinc-400 font-bold font-sans">
+                <div className="w-full border-t border-white/20"></div>
+                <span className="absolute px-4 bg-white/[0.10] backdrop-blur-xl border border-white/15 rounded-full text-xs sm:text-sm uppercase tracking-wider text-zinc-200 font-bold font-sans shadow-sm py-0.5">
                   Hoặc
                 </span>
               </div>
@@ -247,7 +250,7 @@ export default function SignInPage({ onLoginSuccess }) {
                 
                 {/* Form Alert Message */}
                 {formError && (
-                  <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs sm:text-sm text-amber-200 space-y-1 animate-in fade-in duration-200">
+                  <div className="p-3.5 rounded-2xl bg-amber-500/20 backdrop-blur-xl border border-amber-400/40 text-xs sm:text-sm text-amber-200 space-y-1 animate-in fade-in duration-200 shadow-lg">
                     <div className="flex items-center gap-2 font-bold text-amber-300">
                       <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                       <span>{formError.title}</span>
@@ -262,12 +265,12 @@ export default function SignInPage({ onLoginSuccess }) {
                 <div className="space-y-1.5 sm:space-y-2">
                   <label 
                     htmlFor="signin-email" 
-                    className="block text-sm sm:text-base font-semibold text-zinc-200 tracking-wide"
+                    className="block text-sm sm:text-base font-semibold text-zinc-100 tracking-wide drop-shadow-sm"
                   >
                     Email hoặc Tên đăng nhập
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                       <Mail className="w-5 h-5" />
                     </div>
                     <input
@@ -278,7 +281,7 @@ export default function SignInPage({ onLoginSuccess }) {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Tên tài khoản hoặc email..."
-                      className="w-full pl-11 pr-4 py-3 sm:py-3.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/25 transition-all font-sans"
+                      className="w-full pl-12 pr-4 py-3 sm:py-3.5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] focus:bg-white/[0.16] backdrop-blur-xl border border-white/20 focus:border-amber-400 text-sm sm:text-base text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition-all font-sans shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
                     />
                   </div>
                 </div>
@@ -288,20 +291,20 @@ export default function SignInPage({ onLoginSuccess }) {
                   <div className="flex items-center justify-between">
                     <label 
                       htmlFor="signin-password" 
-                      className="block text-sm sm:text-base font-semibold text-zinc-200 tracking-wide"
+                      className="block text-sm sm:text-base font-semibold text-zinc-100 tracking-wide drop-shadow-sm"
                     >
                       Mật khẩu
                     </label>
                     <button
                       type="button"
                       onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) hoặc tài khoản khách: khach123 / 123.')}
-                      className="text-xs sm:text-sm text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
+                      className="text-xs sm:text-sm text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer"
                     >
                       Quên mật khẩu?
                     </button>
                   </div>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                       <Lock className="w-5 h-5" />
                     </div>
                     <input
@@ -311,13 +314,13 @@ export default function SignInPage({ onLoginSuccess }) {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-11 pr-12 py-3 sm:py-3.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/25 transition-all font-sans"
+                      className="w-full pl-12 pr-12 py-3 sm:py-3.5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] focus:bg-white/[0.16] backdrop-blur-xl border border-white/20 focus:border-amber-400 text-sm sm:text-base text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition-all font-sans shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
                     />
                     <button
                       type="button"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-zinc-300 hover:text-white transition-colors cursor-pointer"
                     >
                       {showPassword ? (
                         <EyeOff className="w-5 h-5" />
@@ -335,9 +338,9 @@ export default function SignInPage({ onLoginSuccess }) {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 sm:w-5 sm:h-5 rounded bg-zinc-900 border-zinc-700 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 cursor-pointer accent-amber-500"
+                    className="w-4 h-4 sm:w-5 sm:h-5 rounded bg-black/40 border-white/30 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 cursor-pointer accent-amber-500"
                   />
-                  <label htmlFor="remember-me-checkbox" className="text-xs sm:text-sm text-zinc-300 cursor-pointer select-none">
+                  <label htmlFor="remember-me-checkbox" className="text-xs sm:text-sm text-zinc-200 cursor-pointer select-none">
                     Ghi nhớ phiên đăng nhập trên thiết bị này
                   </label>
                 </div>
@@ -348,7 +351,7 @@ export default function SignInPage({ onLoginSuccess }) {
                 <div className="pt-1">
                   <div 
                     onClick={handleCaptchaBoxClick}
-                    className="w-full h-[74px] px-3.5 bg-[#f9f9f9] hover:bg-[#fafafa] border border-[#d3d3d3] rounded-[3px] shadow-[0_0_4px_1px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none"
+                    className="w-full h-[74px] px-3.5 bg-white/95 hover:bg-white border border-white/40 rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none backdrop-blur-md"
                     role="checkbox"
                     aria-checked={isCaptchaVerified}
                     tabIndex={0}
@@ -356,7 +359,7 @@ export default function SignInPage({ onLoginSuccess }) {
                   >
                     {/* Left: Square Checkbox + "I'm not a robot" */}
                     <div className="flex items-center gap-3.5">
-                      <div className={`w-[28px] h-[28px] rounded-[2px] border-2 flex items-center justify-center transition-all duration-150 ${
+                      <div className={`w-[28px] h-[28px] rounded-[3px] border-2 flex items-center justify-center transition-all duration-150 ${
                         isCaptchaVerified 
                           ? 'border-transparent bg-transparent' 
                           : isCaptchaLoading
@@ -403,16 +406,16 @@ export default function SignInPage({ onLoginSuccess }) {
                   </div>
                 </div>
 
-                {/* Submit Button */}
+                {/* Submit Button (Liquid Glass) */}
                 <button
                   id="btn-submit-signin"
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 hover:text-white font-bold text-sm sm:text-base transition-all duration-150 cursor-pointer active:scale-[0.98] border border-zinc-700 shadow-md flex items-center justify-center gap-2"
+                  className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-gradient-to-r from-white/[0.22] via-white/[0.15] to-white/[0.22] hover:from-white/[0.32] hover:via-white/[0.22] hover:to-white/[0.32] border border-white/30 text-white font-bold text-base sm:text-lg transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-[inset_0_1px_2px_rgba(255,255,255,0.35),0_10px_25px_rgba(0,0,0,0.35)] backdrop-blur-xl flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
-                      <span className="w-5 h-5 border-2 border-zinc-300 border-t-transparent rounded-full animate-spin"></span>
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                       <span>Đang kiểm tra...</span>
                     </>
                   ) : (
@@ -426,7 +429,7 @@ export default function SignInPage({ onLoginSuccess }) {
             /* ========================================================================= */
             /* VIEW 2: 4-DIGIT ADMIN PASSCODE (PIN: 0101) */
             /* ========================================================================= */
-            <div className={`space-y-6 animate-in fade-in duration-200 py-2 ${isShaking ? 'animate-shake' : ''}`}>
+            <div className={`space-y-6 animate-in fade-in duration-200 py-2 relative z-10 ${isShaking ? 'animate-shake' : ''}`}>
               
               {/* Back Button */}
               <div className="flex items-center">
@@ -437,7 +440,7 @@ export default function SignInPage({ onLoginSuccess }) {
                     setPinError(null);
                     setPinDigits(['', '', '', '']);
                   }}
-                  className="inline-flex items-center gap-1.5 text-sm sm:text-base text-zinc-300 hover:text-white transition-colors cursor-pointer py-1 font-medium"
+                  className="inline-flex items-center gap-1.5 text-sm sm:text-base text-zinc-200 hover:text-white transition-colors cursor-pointer py-1 font-medium drop-shadow-sm"
                 >
                   <ChevronLeft className="w-5 h-5" />
                   <span>Quay lại</span>
@@ -445,15 +448,15 @@ export default function SignInPage({ onLoginSuccess }) {
               </div>
 
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight drop-shadow-md">
                   Xác thực Quản trị viên
                 </h3>
-                <p className="text-sm text-zinc-300">
+                <p className="text-sm text-zinc-200">
                   Nhập mã Passcode 4 chữ số để mở khóa Dashboard
                 </p>
               </div>
 
-              {/* 4-Digit Box Inputs */}
+              {/* 4-Digit Box Inputs (Liquid Glass) */}
               <div className="flex items-center justify-center gap-3 sm:gap-4 my-6" onPaste={handlePinPaste}>
                 {pinDigits.map((digit, idx) => (
                   <input
@@ -467,14 +470,14 @@ export default function SignInPage({ onLoginSuccess }) {
                     onChange={(e) => handlePinChange(idx, e.target.value)}
                     onKeyDown={(e) => handlePinKeyDown(idx, e)}
                     disabled={isPinVerifying || isPinSuccess}
-                    className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-mono font-black rounded-2xl bg-zinc-900/90 border transition-all duration-150 focus:outline-none ${
+                    className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-mono font-black rounded-2xl backdrop-blur-xl border transition-all duration-150 focus:outline-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.2)] ${
                       isPinSuccess
-                        ? 'border-emerald-500 bg-emerald-950/30 text-emerald-400 shadow-lg shadow-emerald-500/20'
+                        ? 'border-emerald-400 bg-emerald-500/30 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.4)]'
                         : pinError
-                        ? 'border-red-500/80 bg-red-950/20 text-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-500/20'
+                        ? 'border-red-400/80 bg-red-500/25 text-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-500/30'
                         : digit
-                        ? 'border-amber-400/80 bg-amber-950/20 text-amber-300 shadow-sm shadow-amber-500/10'
-                        : 'border-zinc-700 text-zinc-100 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20'
+                        ? 'border-amber-400/90 bg-amber-500/25 text-amber-200 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                        : 'bg-white/[0.08] hover:bg-white/[0.12] border-white/20 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30'
                     }`}
                   />
                 ))}
@@ -482,15 +485,15 @@ export default function SignInPage({ onLoginSuccess }) {
 
               {/* Status Message */}
               {isPinSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-sm text-emerald-300 flex items-center justify-center gap-2 animate-in zoom-in-95">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 animate-bounce" />
+                <div className="p-3.5 rounded-2xl bg-emerald-500/25 backdrop-blur-xl border border-emerald-400/40 text-sm text-emerald-200 flex items-center justify-center gap-2 animate-in zoom-in-95 shadow-lg">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-300 animate-bounce" />
                   <span className="font-bold">Xác thực thành công! Đang chuyển hướng...</span>
                 </div>
               )}
 
               {pinError && (
-                <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-500/30 text-sm text-red-300 flex items-center justify-center gap-2 animate-in fade-in">
-                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                <div className="p-3.5 rounded-2xl bg-red-500/25 backdrop-blur-xl border border-red-400/40 text-sm text-red-200 flex items-center justify-center gap-2 animate-in fade-in shadow-lg">
+                  <AlertCircle className="w-5 h-5 text-red-300 shrink-0" />
                   <span>{pinError}</span>
                 </div>
               )}
@@ -499,9 +502,9 @@ export default function SignInPage({ onLoginSuccess }) {
           )}
 
           {/* Footer Info inside Card */}
-          <div className="mt-6 sm:mt-7 pt-4 border-t border-zinc-800/80 text-center">
-            <p className="text-xs sm:text-sm text-zinc-400">
-              Sinh viên thực hiện: <span className="text-zinc-200 font-semibold">Phan Minh Duy Tiến</span> & <span className="text-zinc-200 font-semibold">Võ Hồng Phát</span>
+          <div className="mt-6 sm:mt-7 pt-4 border-t border-white/15 text-center relative z-10">
+            <p className="text-xs sm:text-sm text-zinc-300">
+              Sinh viên thực hiện: <span className="text-white font-semibold">Phan Minh Duy Tiến</span> & <span className="text-white font-semibold">Võ Hồng Phát</span>
             </p>
           </div>
 
