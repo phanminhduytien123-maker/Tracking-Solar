@@ -509,8 +509,14 @@ export default function SignInPage({ onLoginSuccess }) {
       </main>
 
       {/* Bottom Minimal Footer */}
-      <footer className="relative z-10 w-full text-center py-3 text-xs text-zinc-400 font-mono">
-        SMART DUAL-AXIS SOLAR TRACKER DASHBOARD • VER 2.0 (FUZZY-PID & PSO)
+      <footer className="relative z-10 w-full text-center py-3.5 px-4 text-xs sm:text-sm text-zinc-400 font-sans flex items-center justify-center gap-1.5 select-none">
+        <span>Powered by</span>
+        <span className="font-semibold text-zinc-200 inline-flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4.6 17.5L8.2 4.4c.1-.4.6-.5.9-.2l3.4 5.3-7.9 8zm14.8 0L13.7 2.3c-.2-.4-.8-.4-1 0L3.8 20.3l7.9-4.5 7.7 1.7zm.8 1.8L18.4 12l-6.7 3.8 8.5 3.5z" />
+          </svg>
+          Google Firebase
+        </span>
       </footer>
 
     </div>
