@@ -1,20 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  ShieldCheck, 
-  KeyRound, 
   Lock, 
   Mail, 
   Eye, 
   EyeOff, 
-  Sun, 
-  ArrowRight, 
   CheckCircle2, 
   AlertCircle, 
-  ChevronLeft,
-  Info
+  ChevronLeft
 } from 'lucide-react';
 
 export default function SignInPage({ onLoginSuccess }) {
+
   // Mode: 'form' | 'admin_pin'
   const [authMode, setAuthMode] = useState('form');
 
@@ -118,32 +114,6 @@ export default function SignInPage({ onLoginSuccess }) {
       verifyPasscode(pasted);
     } else {
       pinInputRefs[Math.min(pasted.length, 3)].current?.focus();
-    }
-  };
-
-  // Handle on-screen keypad click
-  const handleKeypadPress = (val) => {
-    if (val === 'clear') {
-      setPinDigits(['', '', '', '']);
-      setPinError(null);
-      pinInputRefs[0].current?.focus();
-      return;
-    }
-    if (val === 'backspace') {
-      const lastFilledIndex = pinDigits.reduce((acc, cur, idx) => (cur !== '' ? idx : acc), -1);
-      if (lastFilledIndex >= 0) {
-        const newPins = [...pinDigits];
-        newPins[lastFilledIndex] = '';
-        setPinDigits(newPins);
-        pinInputRefs[lastFilledIndex].current?.focus();
-      }
-      return;
-    }
-
-    // Add numeric digit
-    const firstEmptyIndex = pinDigits.findIndex(d => d === '');
-    if (firstEmptyIndex !== -1) {
-      handlePinChange(firstEmptyIndex, String(val));
     }
   };
 
@@ -361,10 +331,10 @@ export default function SignInPage({ onLoginSuccess }) {
             /* ========================================================================= */
             /* VIEW 2: 4-DIGIT ADMIN PASSCODE (PIN: 0101) */
             /* ========================================================================= */
-            <div className={`space-y-5 sm:space-y-6 animate-in fade-in duration-200 ${isShaking ? 'animate-shake' : ''}`}>
+            <div className={`space-y-6 animate-in fade-in duration-200 py-2 ${isShaking ? 'animate-shake' : ''}`}>
               
-              {/* Back Button & Subtitle */}
-              <div className="flex items-center justify-between">
+              {/* Back Button */}
+              <div className="flex items-center">
                 <button
                   type="button"
                   onClick={() => {
@@ -377,24 +347,19 @@ export default function SignInPage({ onLoginSuccess }) {
                   <ChevronLeft className="w-5 h-5" />
                   <span>Quay lại</span>
                 </button>
-
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs sm:text-sm text-amber-300 font-mono">
-                  <KeyRound className="w-4 h-4 text-amber-400" />
-                  <span>Passcode: 4 số</span>
-                </div>
               </div>
 
-              <div className="text-center">
-                <h3 className="text-lg sm:text-xl font-bold text-white">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   Xác thực Quản trị viên
                 </h3>
-                <p className="text-xs sm:text-sm text-zinc-300 mt-1">
+                <p className="text-sm text-zinc-300">
                   Nhập mã Passcode 4 chữ số để mở khóa Dashboard
                 </p>
               </div>
 
               {/* 4-Digit Box Inputs */}
-              <div className="flex items-center justify-center gap-3 sm:gap-4 my-2" onPaste={handlePinPaste}>
+              <div className="flex items-center justify-center gap-3 sm:gap-4 my-6" onPaste={handlePinPaste}>
                 {pinDigits.map((digit, idx) => (
                   <input
                     key={idx}
@@ -407,7 +372,7 @@ export default function SignInPage({ onLoginSuccess }) {
                     onChange={(e) => handlePinChange(idx, e.target.value)}
                     onKeyDown={(e) => handlePinKeyDown(idx, e)}
                     disabled={isPinVerifying || isPinSuccess}
-                    className={`w-13 h-15 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-mono font-black rounded-2xl bg-zinc-900/90 border transition-all duration-150 focus:outline-none ${
+                    className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-mono font-black rounded-2xl bg-zinc-900/90 border transition-all duration-150 focus:outline-none ${
                       isPinSuccess
                         ? 'border-emerald-500 bg-emerald-950/30 text-emerald-400 shadow-lg shadow-emerald-500/20'
                         : pinError
@@ -421,61 +386,19 @@ export default function SignInPage({ onLoginSuccess }) {
               </div>
 
               {/* Status Message */}
-              {isPinSuccess ? (
-                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-xs sm:text-sm text-emerald-300 flex items-center justify-center gap-2 animate-in zoom-in-95">
+              {isPinSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-sm text-emerald-300 flex items-center justify-center gap-2 animate-in zoom-in-95">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 animate-bounce" />
                   <span className="font-bold">Xác thực thành công! Đang chuyển hướng...</span>
                 </div>
-              ) : pinError ? (
-                <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs sm:text-sm text-red-300 flex items-center justify-center gap-2 animate-in fade-in">
+              )}
+
+              {pinError && (
+                <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-500/30 text-sm text-red-300 flex items-center justify-center gap-2 animate-in fade-in">
                   <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
                   <span>{pinError}</span>
                 </div>
-              ) : (
-                <div className="text-center text-xs sm:text-sm text-zinc-400 flex items-center justify-center gap-1.5">
-                  <Info className="w-4 h-4 text-zinc-400" />
-                  <span>Passcode mặc định: <code className="text-amber-400 font-mono font-bold bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">0101</code></span>
-                </div>
               )}
-
-              {/* On-screen Numeric Keypad for Mobile & Touch devices */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-2 max-w-[300px] mx-auto">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => handleKeypadPress(num)}
-                    disabled={isPinVerifying || isPinSuccess}
-                    className="py-3 sm:py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:bg-amber-500/25 active:scale-95 border border-zinc-800 text-lg sm:text-xl font-bold text-zinc-100 hover:text-white font-mono transition-all cursor-pointer shadow-xs"
-                  >
-                    {num}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => handleKeypadPress('clear')}
-                  disabled={isPinVerifying || isPinSuccess}
-                  className="py-3 sm:py-3.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-800 text-xs sm:text-sm font-semibold text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-all cursor-pointer"
-                >
-                  Xóa hết
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeypadPress(0)}
-                  disabled={isPinVerifying || isPinSuccess}
-                  className="py-3 sm:py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:bg-amber-500/25 active:scale-95 border border-zinc-800 text-lg sm:text-xl font-bold text-zinc-100 hover:text-white font-mono transition-all cursor-pointer shadow-xs"
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKeypadPress('backspace')}
-                  disabled={isPinVerifying || isPinSuccess}
-                  className="py-3 sm:py-3.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-800 text-xs sm:text-sm font-semibold text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-all cursor-pointer flex items-center justify-center"
-                >
-                  ⌫ Xóa
-                </button>
-              </div>
 
             </div>
           )}
