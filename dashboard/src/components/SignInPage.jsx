@@ -22,11 +22,33 @@ export default function SignInPage({ onLoginSuccess }) {
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Google reCAPTCHA Configuration
+  const RECAPTCHA_SITE_KEY = '6LdJOOAtAAAAADep1Byr7xKnpeuNBXG1mELM3kd7';
+
   // Captcha states
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
   const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
-  // Handle Captcha Click
+  // Load Google reCAPTCHA script
+  useEffect(() => {
+    window.onGoogleRecaptchaSuccess = (token) => {
+      setCaptchaToken(token);
+      setIsCaptchaVerified(true);
+      setFormError(null);
+    };
+
+    if (!document.getElementById('google-recaptcha-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-recaptcha-script';
+      script.src = 'https://www.google.com/recaptcha/api.js';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Handle Captcha Click (Interactive fallback and trigger)
   const handleCaptchaClick = () => {
     if (isCaptchaVerified || isCaptchaLoading) return;
     setIsCaptchaLoading(true);
@@ -34,7 +56,7 @@ export default function SignInPage({ onLoginSuccess }) {
     setTimeout(() => {
       setIsCaptchaLoading(false);
       setIsCaptchaVerified(true);
-    }, 500);
+    }, 450);
   };
 
   // 4-Digit Passcode PIN states
