@@ -15,9 +15,11 @@ import {
   Activity, 
   CheckCircle2, 
   RefreshCw,
-  ShieldAlert
+  ShieldAlert,
+  MapPin
 } from 'lucide-react';
 import { getStoredUsers, fetchCloudUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
+import InstallationLocationTab from './InstallationLocationTab';
 
 export default function SettingsModal({
   isOpen,
@@ -36,10 +38,21 @@ export default function SettingsModal({
   latestTelemetry,
   firebaseConnected,
   onClearFirebase,
-  onSendTestPacket
+  onSendTestPacket,
+  currentLocation = null,
+  onSelectLocation = null,
+  weatherData = null,
+  initialTab = null
 }) {
-  const [activeTab, setActiveTab] = useState('config'); // 'config' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
+  const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
+
+  // Sync initialTab if passed dynamically
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
 
   // User Management State
   const [usersList, setUsersList] = useState(() => getStoredUsers());
@@ -313,6 +326,17 @@ void loop() {
             Nguồn dữ liệu
           </button>
           <button
+            onClick={() => setActiveTab('location')}
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${
+              activeTab === 'location'
+                ? 'border-white text-white font-bold'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-amber-400" />
+            <span>Tọa độ lắp đặt</span>
+          </button>
+          <button
             onClick={() => setActiveTab('users')}
             className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${
               activeTab === 'users'
@@ -548,7 +572,18 @@ void loop() {
             </div>
           )}
 
-          {/* TAB: QUẢN LÝ NGƯỜI DÙNG */}
+          {/* TAB 2: TỌA ĐỘ LẮP ĐẶT HỆ THỐNG */}
+          {activeTab === 'location' && (
+            <div className="animate-in fade-in duration-200">
+              <InstallationLocationTab 
+                currentLocation={currentLocation}
+                onSelectLocation={onSelectLocation}
+                weatherData={weatherData}
+              />
+            </div>
+          )}
+
+          {/* TAB 3: QUẢN LÝ NGƯỜI DÙNG */}
           {activeTab === 'users' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               

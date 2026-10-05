@@ -5,7 +5,6 @@ import ChartsSection from './components/ChartsSection';
 import DetailedTelemetryModal from './components/DetailedTelemetryModal';
 import ManualControlModal from './components/ManualControlModal';
 import SettingsModal from './components/SettingsModal';
-import MapLocationModal from './components/MapLocationModal';
 import WeatherBackground from './components/WeatherBackground';
 import MobileBottomNav from './components/MobileBottomNav';
 import SignInPage from './components/SignInPage';
@@ -91,7 +90,12 @@ export default function App() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('config');
+
+  const openSettingsTab = (tab = 'config') => {
+    setSettingsInitialTab(tab);
+    setIsSettingsModalOpen(true);
+  };
 
   // Weather Coordinates & State (Interactive Map / Live API)
   const [selectedLocation, setSelectedLocation] = useState(() => {
@@ -482,14 +486,14 @@ export default function App() {
         currentUser={authSession}
         onLogout={handleLogout}
         onOpenManualModal={() => setIsManualModalOpen(true)}
-        onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+        onOpenSettingsModal={() => openSettingsTab('config')}
         onResetEstop={handleResetEstop}
         weatherData={weatherData}
         isLoadingWeather={isLoadingWeather}
         onRefreshWeather={() => loadWeather(selectedLocation)}
         customOverrideType={customWeatherType}
         setCustomOverrideType={setCustomWeatherType}
-        onOpenMapModal={() => setIsMapModalOpen(true)}
+        onOpenMapModal={() => openSettingsTab('location')}
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
@@ -516,14 +520,6 @@ export default function App() {
       </main>
 
       {/* 3. MODALS */}
-      {/* Modal Chọn Tọa Độ Bản Đồ & Các Trạm Pin Mặt Trời */}
-      <MapLocationModal 
-        isOpen={isMapModalOpen}
-        onClose={() => setIsMapModalOpen(false)}
-        currentLocation={selectedLocation}
-        onSelectLocation={handleSelectLocation}
-      />
-
       {/* Modal Chi Tiết Cảm Biến LDR & Thuật Toán Fuzzy-PID, PSO */}
       <DetailedTelemetryModal 
         isOpen={isDetailsModalOpen}
@@ -546,7 +542,7 @@ export default function App() {
         motors={telemetry.motors}
       />
 
-      {/* Modal Cài Đặt Kết Nối & Mã Nguồn ESP32 */}
+      {/* Modal Cài Đặt Hệ Thống & Tọa Độ Lắp Đặt & Quản Lý Người Dùng & Mã Nguồn ESP32 */}
       <SettingsModal 
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
@@ -565,6 +561,10 @@ export default function App() {
         latestTelemetry={telemetry}
         onClearFirebase={handleClearFirebase}
         onSendTestPacket={handleSendTestPacket}
+        currentLocation={selectedLocation}
+        onSelectLocation={handleSelectLocation}
+        weatherData={weatherData}
+        initialTab={settingsInitialTab}
       />
 
       {/* 4. FOOTER */}
@@ -588,7 +588,7 @@ export default function App() {
         systemMode={telemetry.system.mode}
         onOpenManual={() => setIsManualModalOpen(true)}
         onOpenDetails={() => setIsDetailsModalOpen(true)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenSettings={() => openSettingsTab('config')}
         onLogout={handleLogout}
       />
 
@@ -597,12 +597,12 @@ export default function App() {
         {showWeatherSwitcher ? (
           <div className="p-1.5 sm:p-2 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/25 shadow-2xl flex items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto scrollbar-none animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto">
             <button
-              onClick={() => { setShowWeatherSwitcher(false); setIsMapModalOpen(true); }}
+              onClick={() => { setShowWeatherSwitcher(false); openSettingsTab('location'); }}
               className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-amber-500/25 text-amber-300 border border-amber-400/50 hover:bg-amber-500/40"
-              title="Chọn tọa độ trên Google Maps / Bản đồ"
+              title="Mở tab cài đặt Tọa độ lắp đặt trên bản đồ"
             >
               <MapPin className="w-3.5 h-3.5 text-amber-400" />
-              <span>Bản đồ Tọa độ</span>
+              <span>Tọa độ lắp đặt</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
