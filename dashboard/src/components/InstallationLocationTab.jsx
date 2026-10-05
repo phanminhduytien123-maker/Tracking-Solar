@@ -327,16 +327,20 @@ export default function InstallationLocationTab({
 
   // Apply location and save
   const handleSaveLocation = () => {
+    const locObj = {
+      lat: Number(selectedLat),
+      lon: Number(selectedLon),
+      locationName: locationName || 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
+      ward: wardName || 'Phường Nhiêu Lộc, TP.HCM'
+    };
+
+    localStorage.setItem('solar_custom_location', JSON.stringify(locObj));
+
     if (onSelectLocation) {
-      onSelectLocation({
-        lat: Number(selectedLat),
-        lon: Number(selectedLon),
-        locationName: locationName || 'Vị trí tùy chọn',
-        ward: wardName || 'Tọa độ tùy chọn'
-      });
+      onSelectLocation(locObj);
     }
 
-    setSaveSuccessMsg(`Đã áp dụng tọa độ ${Number(selectedLat).toFixed(4)}°N, ${Number(selectedLon).toFixed(4)}°E cho toàn hệ thống!`);
+    setSaveSuccessMsg(`Đã lưu vĩnh viễn tọa độ ${Number(selectedLat).toFixed(4)}°N, ${Number(selectedLon).toFixed(4)}°E (${locObj.locationName}) cho toàn hệ thống!`);
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
@@ -622,7 +626,7 @@ export default function InstallationLocationTab({
           className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>Đặt lại mặc định (Quận 1, TP.HCM)</span>
+          <span>Đặt lại mặc định (Phường Nhiêu Lộc, TP.HCM)</span>
         </button>
 
         <button

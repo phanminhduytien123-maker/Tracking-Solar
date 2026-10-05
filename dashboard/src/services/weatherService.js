@@ -5,14 +5,22 @@
  */
 
 export const HCMC_COORDINATES = {
-  lat: 10.7769,
-  lon: 106.7009,
-  locationName: 'Quận 1, TP. Hồ Chí Minh',
-  ward: 'Phường Sài Gòn (Bến Nghé)',
+  lat: 10.7831,
+  lon: 106.6721,
+  locationName: 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
+  ward: 'Phường Nhiêu Lộc, TP.HCM',
   timezone: 'Asia/Ho_Chi_Minh',
 };
 
 export const DEFAULT_PRESET_LOCATIONS = [
+  {
+    id: 'nhieu_loc',
+    name: 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
+    ward: 'Phường Nhiêu Lộc, TP.HCM',
+    lat: 10.7831,
+    lon: 106.6721,
+    description: 'Vị trí lắp đặt hệ thống Solar Tracking'
+  },
   {
     id: 'tdtu_q7',
     name: 'Đại học Tôn Đức Thắng (TDTU)',
