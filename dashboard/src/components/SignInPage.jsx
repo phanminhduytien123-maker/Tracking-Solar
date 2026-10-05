@@ -428,44 +428,61 @@ export default function SignInPage({ onLoginSuccess }) {
                 </div>
 
                 {/* ========================================================= */}
-                {/* Google reCAPTCHA v2 Checkbox & Trigger */}
+                {/* Standard Google reCAPTCHA v2 Widget Box */}
                 {/* ========================================================= */}
-                <div className="pt-1 relative">
+                <div className="pt-1">
                   <div 
                     onClick={handleCaptchaBoxClick}
-                    className={`w-full p-2.5 sm:p-3 rounded-xl border flex items-center justify-between transition-all duration-200 cursor-pointer select-none ${
-                      isCaptchaVerified 
-                        ? 'bg-zinc-900/95 border-emerald-500/80 shadow-md shadow-emerald-950/30' 
-                        : 'bg-zinc-900/70 hover:bg-zinc-900 border-zinc-700 hover:border-zinc-500 active:scale-[0.99]'
-                    }`}
+                    className="w-full h-[74px] px-3.5 bg-[#f9f9f9] hover:bg-[#fafafa] border border-[#d3d3d3] rounded-[3px] shadow-[0_0_4px_1px_rgba(0,0,0,0.08)] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] select-none"
+                    role="checkbox"
+                    aria-checked={isCaptchaVerified}
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') handleCaptchaBoxClick(); }}
                   >
-                    <div className="flex items-center gap-3">
-                      {/* Checkbox box */}
-                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-200 ${
+                    {/* Left: Square Checkbox + "I'm not a robot" */}
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-[28px] h-[28px] rounded-[2px] border-2 flex items-center justify-center transition-all duration-150 ${
                         isCaptchaVerified 
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-sm' 
-                          : 'bg-zinc-800/90 border-zinc-500 hover:border-zinc-300'
+                          ? 'border-transparent bg-transparent' 
+                          : isVerifyingChallenge
+                          ? 'border-[#1a73e8] bg-white'
+                          : 'border-[#c1c1c1] bg-white hover:border-[#a6a6a6]'
                       }`}>
-                        {isCaptchaVerified && (
-                          <Check className="w-5 h-5 text-white stroke-[3] animate-in zoom-in-75 duration-200" />
-                        )}
+                        {isCaptchaVerified ? (
+                          <svg className="w-8 h-8 text-[#0f9d58] -ml-0.5 -mt-0.5 animate-in zoom-in-75 duration-200" viewBox="0 0 36 36" fill="none">
+                            <path d="M7 18.5L14 25.5L29 10.5" stroke="#0f9d58" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        ) : isVerifyingChallenge ? (
+                          <span className="w-4 h-4 border-2 border-[#1a73e8] border-t-transparent rounded-full animate-spin"></span>
+                        ) : null}
                       </div>
                       
-                      <span className="text-xs sm:text-sm font-semibold text-zinc-200">
-                        {isCaptchaVerified ? 'Đã xác thực thành công' : 'Tôi không phải là người máy'}
+                      <span className="text-[14px] sm:text-[15px] text-[#282727] font-normal tracking-normal select-none">
+                        I'm not a robot
                       </span>
                     </div>
 
-                    {/* reCAPTCHA Brand Badge */}
-                    <div className="flex flex-col items-center justify-center text-[9px] text-zinc-400 leading-tight pl-2.5 border-l border-zinc-800">
-                      <div className="w-6 h-6 flex items-center justify-center text-sky-400">
-                        <ShieldCheck className="w-5 h-5 text-sky-400" />
+                    {/* Right: Authentic Google reCAPTCHA Logo & Links */}
+                    <div className="flex flex-col items-center justify-center select-none shrink-0 pl-2">
+                      <div className="w-8 h-8 relative flex items-center justify-center">
+                        <svg className="w-7 h-7" viewBox="0 0 48 48" fill="none">
+                          {/* Top Blue Arrow */}
+                          <path 
+                            d="M36.4 14.2C33.2 9.8 28 7 22.2 7.4C13.8 7.9 6.9 14.9 6.9 23.5c0 1.6 0.3 3.2 0.8 4.7l4.9-2.8c-0.2-0.6-0.3-1.3-0.3-1.9 0-6 4.9-10.9 10.9-10.9 3.5 0 6.5 1.6 8.5 4.1L26 21h16V5l-5.6 9.2z" 
+                            fill="#1a73e8" 
+                          />
+                          {/* Bottom Silver Arrow */}
+                          <path 
+                            d="M11.6 33.8C14.8 38.2 20 41 25.8 40.6C34.2 40.1 41.1 33.1 41.1 24.5c0-1.6-0.3-3.2-0.8-4.7l-4.9 2.8c0.2 0.6 0.3 1.3 0.3 1.9 0 6-4.9 10.9-10.9 10.9-3.5 0-6.5-1.6-8.5-4.1L22 27H6v16l5.6-9.2z" 
+                            fill="#9e9e9e" 
+                          />
+                        </svg>
                       </div>
-                      <span className="font-bold text-zinc-300 text-[10px] tracking-tight">reCAPTCHA</span>
-                      <div className="flex gap-1 text-[8px] text-zinc-500 mt-0.5">
-                        <span>Bảo mật</span>
+                      <span className="text-[10px] font-medium text-[#555] tracking-tight -mt-0.5">reCAPTCHA</span>
+                      <div className="flex gap-1 text-[8px] text-[#555] mt-0.5">
+                        <span className="hover:underline">Privacy</span>
                         <span>-</span>
-                        <span>Điều khoản</span>
+                        <span className="hover:underline">Terms</span>
                       </div>
                     </div>
                   </div>
