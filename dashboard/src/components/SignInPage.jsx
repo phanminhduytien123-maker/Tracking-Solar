@@ -22,6 +22,21 @@ export default function SignInPage({ onLoginSuccess }) {
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Captcha states
+  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+  const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
+
+  // Handle Captcha Click
+  const handleCaptchaClick = () => {
+    if (isCaptchaVerified || isCaptchaLoading) return;
+    setIsCaptchaLoading(true);
+    setFormError(null);
+    setTimeout(() => {
+      setIsCaptchaLoading(false);
+      setIsCaptchaVerified(true);
+    }, 500);
+  };
+
   // 4-Digit Passcode PIN states
   const [pinDigits, setPinDigits] = useState(['', '', '', '']);
   const [pinError, setPinError] = useState(null);
@@ -43,16 +58,39 @@ export default function SignInPage({ onLoginSuccess }) {
   // Handle standard form submit
   const handleRegularFormSubmit = (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setFormError(null);
 
-    // Simulate validation
+    const cleanUser = email.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    // Check if Guest Account (khach123 / 123)
+    const isGuest = (cleanUser === 'khach123' || cleanUser === 'khach123@gmail.com') && cleanPass === '123';
+
+    if (!isGuest) {
+      setFormError({
+        title: 'Đăng nhập không thành công',
+        message: 'Tên đăng nhập hoặc mật khẩu không đúng. (Gợi ý tài khoản khách: khach123 / Mật khẩu: 123)'
+      });
+      return;
+    }
+
+    // Require Captcha verification for guest login
+    if (!isCaptchaVerified) {
+      setFormError({
+        title: 'Chưa xác thực Captcha',
+        message: 'Vui lòng tích chọn "Tôi không phải là người máy" trước khi đăng nhập.'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      // As requested: no regular account works currently, inform user
-      setFormError({
-        title: 'Chế độ công khai đang bảo trì',
-        message: 'Tài khoản thường chưa được cấp quyền truy cập. Vui lòng bấm "Continue as Admin" và nhập mã Passcode để đăng nhập toàn quyền.'
+      onLoginSuccess({
+        role: 'guest',
+        username: 'khach123',
+        displayName: 'Khách (khach123)',
+        loginAt: new Date().toISOString()
       });
     }, 600);
   };
@@ -306,6 +344,54 @@ export default function SignInPage({ onLoginSuccess }) {
                   <label htmlFor="remember-me-checkbox" className="text-xs sm:text-sm text-zinc-300 cursor-pointer select-none">
                     Ghi nhớ phiên đăng nhập trên thiết bị này
                   </label>
+                </div>
+
+                {/* Google reCAPTCHA v2 Checkbox */}
+                <div className="pt-1">
+                  <div 
+                    onClick={handleCaptchaClick}
+                    className={`w-full p-2.5 sm:p-3 rounded-xl border flex items-center justify-between transition-all duration-200 cursor-pointer select-none ${
+                      isCaptchaVerified 
+                        ? 'bg-zinc-900/90 border-emerald-500/70 shadow-md shadow-emerald-950/20' 
+                        : 'bg-zinc-900/70 hover:bg-zinc-900 border-zinc-700 hover:border-zinc-500'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Checkbox box */}
+                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                        isCaptchaVerified 
+                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-sm' 
+                          : isCaptchaLoading
+                          ? 'bg-zinc-800 border-amber-400'
+                          : 'bg-zinc-800 border-zinc-600 hover:border-zinc-400'
+                      }`}>
+                        {isCaptchaLoading ? (
+                          <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                        ) : isCaptchaVerified ? (
+                          <CheckCircle2 className="w-5 h-5 text-white" />
+                        ) : null}
+                      </div>
+                      
+                      <span className="text-xs sm:text-sm font-semibold text-zinc-200">
+                        Tôi không phải là người máy
+                      </span>
+                    </div>
+
+                    {/* reCAPTCHA Brand Badge */}
+                    <div className="flex flex-col items-center justify-center text-[9px] text-zinc-400 leading-tight pl-2.5 border-l border-zinc-800">
+                      <div className="w-6 h-6 flex items-center justify-center text-sky-400">
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="rgba(56, 189, 248, 0.15)" />
+                        </svg>
+                      </div>
+                      <span className="font-bold text-zinc-300 text-[10px] tracking-tight">reCAPTCHA</span>
+                      <div className="flex gap-1 text-[8px] text-zinc-500 mt-0.5">
+                        <span>Bảo mật</span>
+                        <span>-</span>
+                        <span>Điều khoản</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Submit Button */}

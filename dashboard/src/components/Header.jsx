@@ -123,12 +123,19 @@ export default function Header({
             <Settings className="w-4 h-4" />
           </button>
 
-          {/* Admin User Badge & Logout Button */}
+          {/* User Badge & Logout Button */}
           <div className="flex items-center gap-1.5 pl-2 border-l border-zinc-200">
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-              <span>Admin</span>
-            </div>
+            {currentUser?.role === 'admin' ? (
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>Admin</span>
+              </div>
+            ) : (
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                <span>Khách (khach123)</span>
+              </div>
+            )}
             {onLogout && (
               <button
                 id="btn-logout"
