@@ -56,7 +56,7 @@ export default function Header({
         {/* Left: Mobile Title / Desktop Logo */}
         <div className="flex items-center shrink min-w-0">
           {/* Mobile Title */}
-          <h1 className="sm:hidden text-base font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
+          <h1 className="sm:hidden text-base font-times font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
           </h1>
 
@@ -70,7 +70,7 @@ export default function Header({
 
         {/* Center (Desktop): Title TRACKING SOLAR Centered */}
         <div className="hidden sm:flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
-          <h1 className="text-2xl lg:text-[26px] font-playfair font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
+          <h1 className="text-2xl lg:text-[26px] font-times font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
           </h1>
         </div>

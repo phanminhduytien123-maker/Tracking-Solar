@@ -207,8 +207,8 @@ export default function SignInPage({ onLoginSuccess }) {
 
           {/* Header Title */}
           <div className="text-center mb-6 sm:mb-7 relative z-10">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase font-playfair drop-shadow-lg">
-              Tracking Solar
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white uppercase font-times drop-shadow-lg">
+              TRACKING SOLAR
             </h2>
           </div>
 
