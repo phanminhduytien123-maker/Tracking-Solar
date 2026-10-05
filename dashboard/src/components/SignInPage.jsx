@@ -6,15 +6,58 @@ import {
   EyeOff, 
   CheckCircle2, 
   AlertCircle, 
-  ChevronLeft
+  ChevronLeft,
+  RotateCcw,
+  Info,
+  Check,
+  X,
+  ShieldCheck
 } from 'lucide-react';
+
+// Authentic reCAPTCHA Visual Challenges
+const CAPTCHA_CHALLENGES = [
+  {
+    id: 'solar',
+    title: 'Tấm pin năng lượng mặt trời',
+    instruction: 'Chọn tất cả hình ảnh có chứa',
+    hint: 'Nhấp vào Xác minh sau khi bạn đã chọn hết các hình ảnh liên quan.',
+    items: [
+      { id: 1, title: 'Cánh đồng quang điện mặt trời', isTarget: true, img: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=240&auto=format&fit=crop&q=80' },
+      { id: 2, title: 'Tua bin gió phong điện', isTarget: false, img: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=240&auto=format&fit=crop&q=80' },
+      { id: 3, title: 'Mái nhà lắp pin mặt trời', isTarget: true, img: 'https://images.unsplash.com/photo-1508873696983-2df5293cb395?w=240&auto=format&fit=crop&q=80' },
+      { id: 4, title: 'Cột điện cao thế đường dây', isTarget: false, img: 'https://images.unsplash.com/photo-1558441719-8b449c6ff67c?w=240&auto=format&fit=crop&q=80' },
+      { id: 5, title: 'Hệ thống Solar Tracker xoay', isTarget: true, img: 'https://images.unsplash.com/photo-1613665813446-82a78c468a1d?w=240&auto=format&fit=crop&q=80' },
+      { id: 6, title: 'Trạm sạc ô tô điện', isTarget: false, img: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=240&auto=format&fit=crop&q=80' },
+      { id: 7, title: 'Tấm thu năng lượng mặt trời', isTarget: true, img: 'https://images.unsplash.com/photo-1548337138-e87d889cc369?w=240&auto=format&fit=crop&q=80' },
+      { id: 8, title: 'Thành phố về đêm', isTarget: false, img: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=240&auto=format&fit=crop&q=80' },
+      { id: 9, title: 'Rừng cây tự nhiên', isTarget: false, img: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=240&auto=format&fit=crop&q=80' },
+    ]
+  },
+  {
+    id: 'traffic',
+    title: 'Đèn tín hiệu giao thông',
+    instruction: 'Chọn tất cả hình ảnh có chứa',
+    hint: 'Nhấp vào Xác minh sau khi bạn đã chọn hết các hình ảnh liên quan.',
+    items: [
+      { id: 1, title: 'Đèn giao thông ngã tư', isTarget: true, img: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?w=240&auto=format&fit=crop&q=80' },
+      { id: 2, title: 'Đường cao tốc ban đêm', isTarget: false, img: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=240&auto=format&fit=crop&q=80' },
+      { id: 3, title: 'Đèn tín hiệu người đi bộ', isTarget: true, img: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=240&auto=format&fit=crop&q=80' },
+      { id: 4, title: 'Cầu vượt xe chạy', isTarget: false, img: 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=240&auto=format&fit=crop&q=80' },
+      { id: 5, title: 'Đèn đường chiếu sáng', isTarget: false, img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=240&auto=format&fit=crop&q=80' },
+      { id: 6, title: 'Cột đèn đỏ ngã tư', isTarget: true, img: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=240&auto=format&fit=crop&q=80' },
+      { id: 7, title: 'Xe buýt thành phố', isTarget: false, img: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=240&auto=format&fit=crop&q=80' },
+      { id: 8, title: 'Cụm đèn xanh đỏ', isTarget: true, img: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=240&auto=format&fit=crop&q=80' },
+      { id: 9, title: 'Biển báo giao thông', isTarget: false, img: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=240&auto=format&fit=crop&q=80' },
+    ]
+  }
+];
 
 export default function SignInPage({ onLoginSuccess }) {
 
   // Mode: 'form' | 'admin_pin'
   const [authMode, setAuthMode] = useState('form');
 
-  // Form states (NameThatUI compliance)
+  // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,41 +65,62 @@ export default function SignInPage({ onLoginSuccess }) {
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Google reCAPTCHA Configuration
-  const RECAPTCHA_SITE_KEY = '6LdJOOAtAAAAADep1Byr7xKnpeuNBXG1mELM3kd7';
-
-  // Captcha states
+  // Captcha Verification States
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
-  const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState(null);
+  const [isChallengeOpen, setIsChallengeOpen] = useState(false);
+  const [challengeIdx, setChallengeIdx] = useState(0);
+  const [selectedTileIds, setSelectedTileIds] = useState([]);
+  const [challengeError, setChallengeError] = useState(null);
+  const [isVerifyingChallenge, setIsVerifyingChallenge] = useState(false);
 
-  // Load Google reCAPTCHA script
-  useEffect(() => {
-    window.onGoogleRecaptchaSuccess = (token) => {
-      setCaptchaToken(token);
-      setIsCaptchaVerified(true);
-      setFormError(null);
-    };
+  const currentChallenge = CAPTCHA_CHALLENGES[challengeIdx];
 
-    if (!document.getElementById('google-recaptcha-script')) {
-      const script = document.createElement('script');
-      script.id = 'google-recaptcha-script';
-      script.src = 'https://www.google.com/recaptcha/api.js';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }, []);
-
-  // Handle Captcha Click (Interactive fallback and trigger)
-  const handleCaptchaClick = () => {
-    if (isCaptchaVerified || isCaptchaLoading) return;
-    setIsCaptchaLoading(true);
+  // Open Challenge Modal when clicking checkbox
+  const handleCaptchaBoxClick = () => {
+    if (isCaptchaVerified) return;
     setFormError(null);
+    setChallengeError(null);
+    setSelectedTileIds([]);
+    setIsChallengeOpen(true);
+  };
+
+  // Toggle Tile Selection
+  const toggleTileSelection = (tileId) => {
+    setChallengeError(null);
+    setSelectedTileIds(prev => 
+      prev.includes(tileId) ? prev.filter(id => id !== tileId) : [...prev, tileId]
+    );
+  };
+
+  // Switch / Reload Challenge
+  const handleReloadChallenge = () => {
+    setChallengeIdx(prev => (prev + 1) % CAPTCHA_CHALLENGES.length);
+    setSelectedTileIds([]);
+    setChallengeError(null);
+  };
+
+  // Verify User's Selection in Challenge Modal
+  const handleVerifyChallenge = () => {
+    setIsVerifyingChallenge(true);
+    setChallengeError(null);
+
     setTimeout(() => {
-      setIsCaptchaLoading(false);
-      setIsCaptchaVerified(true);
-    }, 450);
+      setIsVerifyingChallenge(false);
+      const targetIds = currentChallenge.items.filter(i => i.isTarget).map(i => i.id);
+      
+      // Must select all target items and no wrong items
+      const isAllTargetSelected = targetIds.every(id => selectedTileIds.includes(id));
+      const hasNoWrongSelected = selectedTileIds.every(id => targetIds.includes(id));
+      const isSuccess = isAllTargetSelected && hasNoWrongSelected && selectedTileIds.length > 0;
+
+      if (isSuccess) {
+        setIsCaptchaVerified(true);
+        setIsChallengeOpen(false);
+        setFormError(null);
+      } else {
+        setChallengeError('Chưa chính xác. Vui lòng chọn tất cả các hình ảnh phù hợp và nhấn Xác minh lại.');
+      }
+    }, 400);
   };
 
   // 4-Digit Passcode PIN states
@@ -100,7 +164,7 @@ export default function SignInPage({ onLoginSuccess }) {
     if (!isCaptchaVerified) {
       setFormError({
         title: 'Chưa xác thực Captcha',
-        message: 'Vui lòng tích chọn "Tôi không phải là người máy" trước khi đăng nhập.'
+        message: 'Vui lòng nhấp vào ô "Tôi không phải là người máy" và hoàn thành xác thực hình ảnh.'
       });
       return;
     }
@@ -119,7 +183,6 @@ export default function SignInPage({ onLoginSuccess }) {
 
   // Handle PIN Digit Change
   const handlePinChange = (index, value) => {
-    // Only accept numeric digits
     const cleaned = value.replace(/\D/g, '');
     
     if (!cleaned) {
@@ -135,11 +198,9 @@ export default function SignInPage({ onLoginSuccess }) {
     setPinDigits(newPins);
     setPinError(null);
 
-    // Auto advance to next input
     if (index < 3) {
       pinInputRefs[index + 1].current?.focus();
     } else {
-      // All 4 digits entered -> auto verify
       const fullPin = newPins.join('');
       verifyPasscode(fullPin);
     }
@@ -198,7 +259,6 @@ export default function SignInPage({ onLoginSuccess }) {
         setPinError('Mã Passcode không chính xác. Gợi ý: 0101');
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 500);
-        // Clear pins
         setPinDigits(['', '', '', '']);
         pinInputRefs[0].current?.focus();
       }
@@ -219,14 +279,14 @@ export default function SignInPage({ onLoginSuccess }) {
         <source src="/Login_BG.mp4" type="video/mp4" />
       </video>
 
-      {/* Cinematic Dark Overlay with Glassmorphism for crisp readability */}
+      {/* Cinematic Dark Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#080a10]/95 via-black/60 to-black/75 z-0 pointer-events-none backdrop-blur-[2px]"></div>
 
       {/* Subtle Glow Accents */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-amber-500/10 blur-[140px] pointer-events-none z-0 animate-pulse duration-[8000ms]"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] rounded-full bg-cyan-500/10 blur-[160px] pointer-events-none z-0"></div>
 
-      {/* Center Main Card Container (Centered Vertically) */}
+      {/* Center Main Card Container */}
       <main className="relative z-10 flex-1 w-full flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-[480px] bg-zinc-950/85 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 sm:p-9 shadow-2xl shadow-black/90 relative transition-all duration-300">
           
@@ -241,12 +301,12 @@ export default function SignInPage({ onLoginSuccess }) {
           </div>
 
           {/* ========================================================================= */}
-          {/* VIEW 1: NAME THAT UI SIGN-IN FORM */}
+          {/* VIEW 1: SIGN-IN FORM */}
           {/* ========================================================================= */}
           {authMode === 'form' ? (
             <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
               
-              {/* 1. Federated Sign-in Button: "Tiếp tục với quyền admin" */}
+              {/* 1. Federated Sign-in Button */}
               <div>
                 <button
                   id="btn-continue-as-admin"
@@ -259,7 +319,7 @@ export default function SignInPage({ onLoginSuccess }) {
                 </button>
               </div>
 
-              {/* 2. Sign-in Method Divider: "Hoặc" */}
+              {/* 2. Divider */}
               <div className="relative flex items-center justify-center my-4 sm:my-5">
                 <div className="w-full border-t border-zinc-700/80"></div>
                 <span className="absolute px-4 bg-zinc-950 text-xs sm:text-sm uppercase tracking-wider text-zinc-400 font-bold font-sans">
@@ -267,10 +327,10 @@ export default function SignInPage({ onLoginSuccess }) {
                 </span>
               </div>
 
-              {/* 3. Regular Email / Password Form (Native HTML Semantics) */}
+              {/* 3. Regular Login Form */}
               <form onSubmit={handleRegularFormSubmit} className="space-y-4 sm:space-y-5">
                 
-                {/* Form Alert Message if user attempts submit */}
+                {/* Form Alert Message */}
                 {formError && (
                   <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs sm:text-sm text-amber-200 space-y-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 font-bold text-amber-300">
@@ -283,7 +343,7 @@ export default function SignInPage({ onLoginSuccess }) {
                   </div>
                 )}
 
-                {/* Email Field */}
+                {/* Username / Email Field */}
                 <div className="space-y-1.5 sm:space-y-2">
                   <label 
                     htmlFor="signin-email" 
@@ -308,7 +368,7 @@ export default function SignInPage({ onLoginSuccess }) {
                   </div>
                 </div>
 
-                {/* Password Field with Visibility Toggle */}
+                {/* Password Field */}
                 <div className="space-y-1.5 sm:space-y-2">
                   <div className="flex items-center justify-between">
                     <label 
@@ -319,7 +379,7 @@ export default function SignInPage({ onLoginSuccess }) {
                     </label>
                     <button
                       type="button"
-                      onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) để truy cập hệ thống.')}
+                      onClick={() => alert('Vui lòng sử dụng tính năng "Tiếp tục với quyền admin" (Mã PIN: 0101) hoặc tài khoản khách: khach123 / 123.')}
                       className="text-xs sm:text-sm text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
                     >
                       Quên mật khẩu?
@@ -338,7 +398,6 @@ export default function SignInPage({ onLoginSuccess }) {
                       placeholder="••••••••"
                       className="w-full pl-11 pr-12 py-3 sm:py-3.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/25 transition-all font-sans"
                     />
-                    {/* Password Visibility Toggle Button */}
                     <button
                       type="button"
                       aria-label={showPassword ? "Hide password" : "Show password"}
@@ -368,43 +427,39 @@ export default function SignInPage({ onLoginSuccess }) {
                   </label>
                 </div>
 
-                {/* Google reCAPTCHA v2 Checkbox */}
-                <div className="pt-1">
+                {/* ========================================================= */}
+                {/* Google reCAPTCHA v2 Checkbox & Trigger */}
+                {/* ========================================================= */}
+                <div className="pt-1 relative">
                   <div 
-                    onClick={handleCaptchaClick}
+                    onClick={handleCaptchaBoxClick}
                     className={`w-full p-2.5 sm:p-3 rounded-xl border flex items-center justify-between transition-all duration-200 cursor-pointer select-none ${
                       isCaptchaVerified 
-                        ? 'bg-zinc-900/90 border-emerald-500/70 shadow-md shadow-emerald-950/20' 
-                        : 'bg-zinc-900/70 hover:bg-zinc-900 border-zinc-700 hover:border-zinc-500'
+                        ? 'bg-zinc-900/95 border-emerald-500/80 shadow-md shadow-emerald-950/30' 
+                        : 'bg-zinc-900/70 hover:bg-zinc-900 border-zinc-700 hover:border-zinc-500 active:scale-[0.99]'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       {/* Checkbox box */}
-                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-200 ${
                         isCaptchaVerified 
                           ? 'bg-emerald-600 border-emerald-400 text-white shadow-sm' 
-                          : isCaptchaLoading
-                          ? 'bg-zinc-800 border-amber-400'
-                          : 'bg-zinc-800 border-zinc-600 hover:border-zinc-400'
+                          : 'bg-zinc-800/90 border-zinc-500 hover:border-zinc-300'
                       }`}>
-                        {isCaptchaLoading ? (
-                          <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
-                        ) : isCaptchaVerified ? (
-                          <CheckCircle2 className="w-5 h-5 text-white" />
-                        ) : null}
+                        {isCaptchaVerified && (
+                          <Check className="w-5 h-5 text-white stroke-[3] animate-in zoom-in-75 duration-200" />
+                        )}
                       </div>
                       
                       <span className="text-xs sm:text-sm font-semibold text-zinc-200">
-                        Tôi không phải là người máy
+                        {isCaptchaVerified ? 'Đã xác thực thành công' : 'Tôi không phải là người máy'}
                       </span>
                     </div>
 
                     {/* reCAPTCHA Brand Badge */}
                     <div className="flex flex-col items-center justify-center text-[9px] text-zinc-400 leading-tight pl-2.5 border-l border-zinc-800">
                       <div className="w-6 h-6 flex items-center justify-center text-sky-400">
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="rgba(56, 189, 248, 0.15)" />
-                        </svg>
+                        <ShieldCheck className="w-5 h-5 text-sky-400" />
                       </div>
                       <span className="font-bold text-zinc-300 text-[10px] tracking-tight">reCAPTCHA</span>
                       <div className="flex gap-1 text-[8px] text-zinc-500 mt-0.5">
@@ -520,6 +575,136 @@ export default function SignInPage({ onLoginSuccess }) {
 
         </div>
       </main>
+
+      {/* ========================================================================= */}
+      {/* POPUP MODAL: AUTHENTIC GOOGLE reCAPTCHA IMAGE CHALLENGE */}
+      {/* ========================================================================= */}
+      {isChallengeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          
+          <div className="w-full max-w-[390px] bg-white text-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-300 animate-in zoom-in-95 duration-200">
+            
+            {/* Header: Google Blue Banner */}
+            <div className="bg-[#1a73e8] text-white p-4 relative">
+              <button 
+                type="button"
+                onClick={() => setIsChallengeOpen(false)}
+                className="absolute top-3 right-3 text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Đóng"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <p className="text-xs text-blue-100 font-medium">
+                {currentChallenge.instruction}
+              </p>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight mt-0.5">
+                {currentChallenge.title}
+              </h3>
+              <p className="text-[11px] text-blue-100 mt-1 leading-snug">
+                {currentChallenge.hint}
+              </p>
+            </div>
+
+            {/* Error Banner if invalid selection */}
+            {challengeError && (
+              <div className="bg-red-50 text-red-700 border-b border-red-200 px-3.5 py-2 text-xs flex items-center gap-1.5 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{challengeError}</span>
+              </div>
+            )}
+
+            {/* 3x3 Image Grid */}
+            <div className="p-3 bg-[#f5f5f5]">
+              <div className="grid grid-cols-3 gap-2">
+                {currentChallenge.items.map((item) => {
+                  const isSelected = selectedTileIds.includes(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => toggleTileSelection(item.id)}
+                      className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-150 select-none group bg-zinc-200 ${
+                        isSelected 
+                          ? 'border-[#1a73e8] ring-2 ring-[#1a73e8]/30 scale-[0.96] shadow-md' 
+                          : 'border-transparent hover:border-blue-300 hover:scale-[0.98]'
+                      }`}
+                    >
+                      <img 
+                        src={item.img} 
+                        alt={item.title} 
+                        className={`w-full h-full object-cover transition-transform duration-200 ${isSelected ? 'brightness-90' : 'group-hover:scale-105'}`}
+                        loading="eager"
+                      />
+
+                      {/* Checkmark Badge */}
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[#1a73e8] text-white flex items-center justify-center shadow-md animate-in zoom-in-50 duration-150">
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+                      )}
+
+                      {/* Small Caption */}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1">
+                        <p className="text-[10px] text-white/90 truncate font-medium text-center">
+                          {item.title}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-3 bg-white border-t border-zinc-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-zinc-500">
+                <button
+                  type="button"
+                  onClick={handleReloadChallenge}
+                  title="Đổi câu đố khác"
+                  className="p-2 rounded-full hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alert('Vui lòng chọn tất cả các ô hình ảnh tương ứng với tiêu đề phía trên.')}
+                  title="Thông tin trợ giúp"
+                  className="p-2 rounded-full hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
+                >
+                  <Info className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChallengeOpen(false)}
+                  className="px-3 py-2 text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded-lg hover:bg-zinc-100 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyChallenge}
+                  disabled={isVerifyingChallenge}
+                  className="px-5 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] active:scale-[0.97] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                >
+                  {isVerifyingChallenge ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Đang kiểm tra...</span>
+                    </>
+                  ) : (
+                    <span>Xác minh</span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Bottom Minimal Footer */}
       <footer className="relative z-10 w-full text-center py-3 text-xs text-zinc-400 font-mono">
