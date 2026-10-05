@@ -11,9 +11,6 @@ import {
   CheckCircle2, 
   AlertCircle, 
   ChevronLeft,
-  Sparkles,
-  Cpu,
-  Zap,
   Info
 } from 'lucide-react';
 
@@ -179,58 +176,32 @@ export default function SignInPage({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#080a10] text-zinc-100 flex flex-col justify-between relative overflow-hidden font-sans select-none">
+    <div className="min-h-screen bg-[#080a10] text-zinc-100 flex flex-col justify-between items-center relative overflow-hidden font-sans select-none">
       
-      {/* Background Animated Ambient Lights */}
-      <div className="absolute top-[-15%] left-[-10%] w-[550px] h-[550px] rounded-full bg-amber-500/10 blur-[140px] pointer-events-none animate-pulse duration-[8000ms]"></div>
-      <div className="absolute bottom-[-15%] right-[-10%] w-[650px] h-[650px] rounded-full bg-cyan-500/10 blur-[160px] pointer-events-none"></div>
-      <div className="absolute top-[40%] right-[20%] w-[350px] h-[350px] rounded-full bg-amber-600/5 blur-[120px] pointer-events-none"></div>
+      {/* Fullscreen Video Background */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+      >
+        <source src="/Login_BG.mp4" type="video/mp4" />
+      </video>
 
-      {/* Grid Overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px)',
-          backgroundSize: '24px 24px'
-        }}
-      ></div>
+      {/* Cinematic Dark Overlay with Glassmorphism for crisp readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#080a10]/95 via-black/60 to-black/75 z-0 pointer-events-none backdrop-blur-[2px]"></div>
 
-      {/* Top Brand Header */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 py-4 sm:py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img 
-            src="/tdt_logo.png" 
-            alt="Logo ĐH Tôn Đức Thắng" 
-            className="h-9 sm:h-11 w-auto object-contain filter drop-shadow-md"
-          />
-          <div className="hidden sm:block border-l border-zinc-800 pl-3">
-            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest leading-none">
-              TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG
-            </p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">
-              KHOA ĐIỆN - ĐIỆN TỬ • BỘ MÔN KỸ THUẬT ĐIỀU KHIỂN & TỰ ĐỘNG HÓA
-            </p>
-          </div>
-        </div>
+      {/* Subtle Glow Accents */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-amber-500/10 blur-[140px] pointer-events-none z-0 animate-pulse duration-[8000ms]"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[550px] h-[550px] rounded-full bg-cyan-500/10 blur-[160px] pointer-events-none z-0"></div>
 
-        <div className="flex items-center gap-2">
-          <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            Đồ Án Tốt Nghiệp 2026-2027
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            ESP32-S3 IoT
-          </span>
-        </div>
-      </header>
-
-      {/* Center Main Card Container */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
-        <div className="w-full max-w-[460px] bg-zinc-950/80 backdrop-blur-2xl border border-zinc-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 relative transition-all duration-300">
+      {/* Center Main Card Container (Centered Vertically) */}
+      <main className="relative z-10 flex-1 w-full flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-[460px] bg-zinc-950/80 backdrop-blur-2xl border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/90 relative transition-all duration-300">
           
           {/* Card Ambient Glow Line */}
-          <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent"></div>
+          <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent"></div>
 
           {/* Header Title */}
           <div className="text-center mb-6">
