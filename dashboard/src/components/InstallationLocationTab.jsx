@@ -12,11 +12,15 @@ import {
   CloudSun, 
   Compass,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Layers,
+  Key
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DEFAULT_PRESET_LOCATIONS, HCMC_COORDINATES } from '../services/weatherService';
+
+const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGhhbm1pbmhkdXl0aWVuMTIzIiwiYSI6ImNtYm1hZGl0MDASOXlycW9nbnV1cmM4M2IifQ.4_ZRvrf9ACzgdA1GA7DP-A';
 
 export default function InstallationLocationTab({
   currentLocation,
@@ -28,6 +32,11 @@ export default function InstallationLocationTab({
   const [locationName, setLocationName] = useState(() => currentLocation?.locationName || currentLocation?.name || HCMC_COORDINATES.locationName);
   const [wardName, setWardName] = useState(() => currentLocation?.ward || HCMC_COORDINATES.ward);
 
+  // Mapbox & Layer Styles
+  const [mapboxToken, setMapboxToken] = useState(() => localStorage.getItem('solar_mapbox_token') || DEFAULT_MAPBOX_TOKEN);
+  const [mapStyle, setMapStyle] = useState(() => localStorage.getItem('solar_map_style') || 'satellite'); // 'satellite' | 'streets' | 'dark' | 'osm'
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -36,7 +45,53 @@ export default function InstallationLocationTab({
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const markerRef = useRef(null);
+
+  // Helper to build tile layer URL
+  const getTileUrl = (style, token) => {
+    if (token && token.startsWith('pk.')) {
+      if (style === 'satellite') {
+        return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
+      }
+      if (style === 'streets') {
+        return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
+      }
+      if (style === 'dark') {
+        return `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=${token}`;
+      }
+    }
+    // Fallback: CartoDB Voyager (No API key required)
+    return 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  };
+
+  // Switch Tile Layer dynamically
+  const switchMapStyle = (newStyle) => {
+    setMapStyle(newStyle);
+    localStorage.setItem('solar_map_style', newStyle);
+
+    if (mapInstanceRef.current) {
+      if (tileLayerRef.current) {
+        mapInstanceRef.current.removeLayer(tileLayerRef.current);
+      }
+      const url = getTileUrl(newStyle, mapboxToken);
+      const isMapbox = mapboxToken && mapboxToken.startsWith('pk.') && newStyle !== 'osm';
+      const newLayer = L.tileLayer(url, {
+        maxZoom: 20,
+        subdomains: isMapbox ? [] : 'abcd',
+        attribution: isMapbox ? '© Mapbox' : '© OpenStreetMap'
+      }).addTo(mapInstanceRef.current);
+      tileLayerRef.current = newLayer;
+    }
+  };
+
+  // Save Token
+  const handleSaveToken = (token) => {
+    const cleanToken = token.trim();
+    setMapboxToken(cleanToken);
+    localStorage.setItem('solar_mapbox_token', cleanToken);
+    switchMapStyle(mapStyle);
+  };
 
   // Sync if currentLocation prop updates from outside
   useEffect(() => {
@@ -128,16 +183,20 @@ export default function InstallationLocationTab({
         // Initialize Map
         const map = L.map(mapContainerRef.current, {
           center: [selectedLat, selectedLon],
-          zoom: 13,
+          zoom: 14,
           zoomControl: true,
           attributionControl: false
         });
 
-        // Clean tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          subdomains: 'abcd'
+        // Tile layer
+        const isMapbox = mapboxToken && mapboxToken.startsWith('pk.') && mapStyle !== 'osm';
+        const url = getTileUrl(mapStyle, mapboxToken);
+        const tileLayer = L.tileLayer(url, {
+          maxZoom: 20,
+          subdomains: isMapbox ? [] : 'abcd',
+          attribution: isMapbox ? '© Mapbox' : '© OpenStreetMap'
         }).addTo(map);
+        tileLayerRef.current = tileLayer;
 
         // Marker
         const marker = L.marker([selectedLat, selectedLon], {
@@ -161,7 +220,7 @@ export default function InstallationLocationTab({
         markerRef.current = marker;
       } else {
         mapInstanceRef.current.invalidateSize();
-        mapInstanceRef.current.setView([selectedLat, selectedLon], 13);
+        mapInstanceRef.current.setView([selectedLat, selectedLon], 14);
         if (markerRef.current) {
           markerRef.current.setLatLng([selectedLat, selectedLon]);
         }
@@ -346,15 +405,98 @@ export default function InstallationLocationTab({
       <div className="relative rounded-2xl overflow-hidden border border-zinc-700 shadow-xl">
         <div 
           ref={mapContainerRef} 
-          className="w-full h-[280px] sm:h-[340px] bg-[#1a1e29]" 
+          className="w-full h-[300px] sm:h-[380px] bg-[#1a1e29]" 
           style={{ zIndex: 1 }}
         />
 
         {/* Map Overlay Floating Badge */}
-        <div className="absolute top-3 left-3 z-[400] bg-[#0c0e14]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-700/80 text-[11px] font-mono text-zinc-200 flex items-center gap-2 pointer-events-none shadow-lg">
+        <div className="absolute top-3 left-3 z-[400] bg-[#0c0e14]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-700/80 text-[11px] font-mono text-zinc-200 hidden sm:flex items-center gap-2 pointer-events-none shadow-lg">
           <Compass className="w-3.5 h-3.5 text-amber-400" />
-          <span>Click hoặc kéo thả ghim ghim để chọn tọa độ</span>
+          <span>Click hoặc kéo ghim để chọn tọa độ</span>
         </div>
+
+        {/* Mapbox Layer Switcher Controls */}
+        <div className="absolute top-3 right-3 z-[400] flex items-center gap-1 bg-[#0c0e14]/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/80 shadow-lg">
+          <button
+            type="button"
+            onClick={() => switchMapStyle('satellite')}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'satellite' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title="Bản đồ ảnh Vệ tinh Mapbox siêu nét"
+          >
+            🛰️ Vệ tinh
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMapStyle('streets')}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'streets' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title="Bản đồ đường phố Mapbox"
+          >
+            🗺️ Đường phố
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMapStyle('dark')}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'dark' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title="Bản đồ giao diện tối Mapbox"
+          >
+            🌙 Tối
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMapStyle('osm')}
+            className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'osm' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title="Bản đồ mở OpenStreetMap (Miễn phí)"
+          >
+            🌐 OSM
+          </button>
+        </div>
+      </div>
+
+      {/* Mapbox Token Config Strip */}
+      <div className="p-3 rounded-xl bg-[#10131d] border border-zinc-800 text-xs flex flex-col gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-zinc-300">
+            <Key className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-semibold">Mapbox Access Token (API Key):</span>
+            <span className="font-mono text-[11px] text-zinc-400 truncate max-w-[180px] sm:max-w-[320px]">
+              {mapboxToken ? `${mapboxToken.slice(0, 20)}...${mapboxToken.slice(-10)}` : 'Chưa có Token'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTokenInput(!showTokenInput)}
+            className="text-[11px] text-amber-400 hover:underline cursor-pointer font-medium"
+          >
+            {showTokenInput ? 'Đóng cài đặt Token' : 'Thay đổi Token'}
+          </button>
+        </div>
+
+        {showTokenInput && (
+          <div className="pt-2 border-t border-zinc-800 flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={mapboxToken}
+              onChange={(e) => handleSaveToken(e.target.value)}
+              placeholder="Dán token pk.eyJ... từ tài khoản Mapbox của bạn"
+              className="flex-1 px-3 py-1.5 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs font-mono text-white focus:outline-none focus:border-amber-400"
+            />
+            <button
+              type="button"
+              onClick={() => handleSaveToken(mapboxToken)}
+              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer shrink-0"
+            >
+              Lưu & Áp Dụng Token
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 4. Coordinate Details & Manual Inputs */}
