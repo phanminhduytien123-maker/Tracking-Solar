@@ -135,7 +135,7 @@ export default function InstallationLocationTab({
         const place = addr.amenity || addr.building || addr.road || addr.suburb || addr.neighbourhood || addr.quarter || 'Điểm đã chọn';
         const district = addr.city_district || addr.district || addr.county || addr.town || '';
         const city = addr.city || addr.state || 'Việt Nam';
-        
+
         const friendlyName = [place, district, city].filter(Boolean).join(', ');
         setLocationName(friendlyName || data.display_name.split(',').slice(0, 3).join(','));
         setWardName(district ? `${district}, ${city}` : city);
@@ -329,7 +329,7 @@ export default function InstallationLocationTab({
 
   return (
     <div className="space-y-4 text-zinc-100">
-      
+
       {/* 1. Header & Overview Banner */}
       <div className="p-4 sm:p-5 rounded-xl bg-[#131722] border border-zinc-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -425,9 +425,9 @@ export default function InstallationLocationTab({
 
       {/* 3. Interactive Leaflet Map Container */}
       <div className="relative rounded-xl overflow-hidden border border-zinc-700 shadow-xl">
-        <div 
-          ref={mapContainerRef} 
-          className="w-full h-[300px] sm:h-[380px] bg-[#1a1e29]" 
+        <div
+          ref={mapContainerRef}
+          className="w-full h-[300px] sm:h-[380px] bg-[#1a1e29]"
           style={{ zIndex: 1 }}
         />
 
@@ -441,9 +441,8 @@ export default function InstallationLocationTab({
           <button
             type="button"
             onClick={() => switchMapStyle('satellite')}
-            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'satellite' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${mapStyle === 'satellite' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              }`}
             title="Bản đồ ảnh Vệ tinh"
           >
             Vệ tinh
@@ -451,9 +450,8 @@ export default function InstallationLocationTab({
           <button
             type="button"
             onClick={() => switchMapStyle('streets')}
-            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'streets' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${mapStyle === 'streets' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              }`}
             title="Bản đồ đường phố"
           >
             Đường phố
@@ -461,9 +459,8 @@ export default function InstallationLocationTab({
           <button
             type="button"
             onClick={() => switchMapStyle('dark')}
-            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'dark' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${mapStyle === 'dark' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              }`}
             title="Bản đồ giao diện tối"
           >
             Tối
@@ -471,9 +468,8 @@ export default function InstallationLocationTab({
           <button
             type="button"
             onClick={() => switchMapStyle('osm')}
-            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'osm' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${mapStyle === 'osm' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              }`}
             title="Bản đồ OSM"
           >
             OSM
@@ -485,7 +481,7 @@ export default function InstallationLocationTab({
       <div className="p-3 rounded-lg bg-[#131722] border border-zinc-700/80 text-xs flex flex-col gap-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 text-zinc-300">
-            <span className="font-semibold">Mapbox Access Token (API Key):</span>
+            <span className="font-semibold">Mapbox API:</span>
             <span className="font-mono text-[11px] text-zinc-400 truncate max-w-[180px] sm:max-w-[320px]">
               {mapboxToken ? `${mapboxToken.slice(0, 20)}...${mapboxToken.slice(-10)}` : 'Chưa có Token'}
             </span>
@@ -495,7 +491,7 @@ export default function InstallationLocationTab({
             onClick={() => setShowTokenInput(!showTokenInput)}
             className="text-[11px] text-zinc-300 hover:text-white underline cursor-pointer font-medium"
           >
-            {showTokenInput ? 'Đóng cài đặt Token' : 'Thay đổi Token'}
+            {showTokenInput ? 'Đóng cài đặt Token' : 'Thay đổi API Key'}
           </button>
         </div>
 
@@ -521,10 +517,10 @@ export default function InstallationLocationTab({
 
       {/* 4. Coordinate Details & Manual Inputs */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-4 rounded-xl bg-[#131722] border border-zinc-700/80">
-        
+
         {/* Selected Location Name Display */}
         <div className="sm:col-span-6 space-y-1">
-          <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Địa danh / Phường / Huyện:</label>
+          <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">PHƯỜNG, THÀNH PHỐ:</label>
           <input
             type="text"
             value={locationName}
@@ -573,11 +569,10 @@ export default function InstallationLocationTab({
                 key={preset.id}
                 type="button"
                 onClick={() => updateCoordinates(preset.lat, preset.lon, preset.name, preset.ward)}
-                className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                  isCurrent
-                    ? 'bg-zinc-800 text-white border-white shadow-md'
-                    : 'bg-[#131722] hover:bg-zinc-800/60 border-zinc-800 text-zinc-300'
-                }`}
+                className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${isCurrent
+                  ? 'bg-zinc-800 text-white border-white shadow-md'
+                  : 'bg-[#131722] hover:bg-zinc-800/60 border-zinc-800 text-zinc-300'
+                  }`}
               >
                 <div className="min-w-0">
                   <span className="font-bold text-xs block truncate text-white">{preset.name}</span>
