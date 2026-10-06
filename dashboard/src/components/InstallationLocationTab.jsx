@@ -1,21 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  MapPin, 
-  Search, 
-  Crosshair, 
-  Check, 
-  Sparkles, 
-  RotateCcw, 
-  Zap, 
-  Gauge, 
-  Sun, 
-  CloudSun, 
-  Compass,
-  CheckCircle2,
-  AlertCircle,
-  Layers,
-  Key
-} from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DEFAULT_PRESET_LOCATIONS, HCMC_COORDINATES } from '../services/weatherService';
@@ -51,7 +34,7 @@ export default function InstallationLocationTab({
   // Helper to build robust tile layer configuration
   const getTileConfig = (style, token) => {
     if (style === 'satellite') {
-      // Google Maps Satellite + Road Labels Hybrid (Ultra-crisp, 100% reliable worldwide, zero token errors)
+      // Google Maps Satellite + Road Labels Hybrid
       return {
         url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
         options: {
@@ -190,31 +173,31 @@ export default function InstallationLocationTab({
       if (!mapContainerRef.current) return;
 
       if (!mapInstanceRef.current) {
-        // Custom SVG Pin Icon
+        // Crisp Minimalist Pin Icon
         const customIcon = L.divIcon({
           className: 'custom-solar-pin',
           html: `<div style="
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #f59e0b, #ef4444);
-            border: 2.5px solid #ffffff;
+            width: 30px;
+            height: 30px;
+            background: #18181b;
+            border: 2px solid #ffffff;
             border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.6);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
           ">
             <div style="
-              width: 12px;
-              height: 12px;
+              width: 8px;
+              height: 8px;
               background: #ffffff;
               border-radius: 50%;
               transform: rotate(45deg);
             "></div>
           </div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 36]
+          iconSize: [30, 30],
+          iconAnchor: [15, 30]
         });
 
         // Initialize Map
@@ -345,42 +328,38 @@ export default function InstallationLocationTab({
   };
 
   return (
-    <div className="space-y-5 text-zinc-100">
+    <div className="space-y-4 text-zinc-100">
       
       {/* 1. Header & Overview Banner */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-zinc-900/80 to-[#12151f] border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
-            <MapPin className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white uppercase tracking-wide flex items-center gap-2">
-              <span>TỌA ĐỘ LẮP ĐẶT HỆ THỐNG SOLAR TRACKING</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-normal border border-amber-400/30">
-                GPS / Open-Meteo
-              </span>
+      <div className="p-4 sm:p-5 rounded-xl bg-[#131722] border border-zinc-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wide">
+              TỌA ĐỘ LẮP ĐẶT HỆ THỐNG SOLAR TRACKING
             </h3>
-            <p className="text-xs text-zinc-300 mt-0.5 leading-relaxed">
-              Lựa chọn tọa độ kinh độ / vĩ độ thực tế của giàn pin để đồng bộ góc mặt trời thiên văn, chỉ số bức xạ (W/m²) và thời tiết thời gian thực.
-            </p>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono font-semibold border border-zinc-700">
+              GPS / OPEN-METEO
+            </span>
           </div>
+          <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+            Lựa chọn tọa độ kinh độ / vĩ độ thực tế của giàn pin để đồng bộ góc mặt trời thiên văn, chỉ số bức xạ (W/m²) và thời tiết thời gian thực.
+          </p>
         </div>
 
         {/* Current Active Location Pill */}
-        <div className="px-3.5 py-2 rounded-xl bg-zinc-900/90 border border-zinc-700 text-xs font-mono shrink-0 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <div>
-            <div className="font-bold text-white">{selectedLat.toFixed(4)}°N, {selectedLon.toFixed(4)}°E</div>
-            <div className="text-[10px] text-zinc-400 font-sans truncate max-w-[160px]">{locationName}</div>
+        <div className="px-3.5 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs font-mono shrink-0">
+          <div className="font-bold text-white flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>{selectedLat.toFixed(4)}°N, {selectedLon.toFixed(4)}°E</span>
           </div>
+          <div className="text-[10px] text-zinc-400 font-sans truncate max-w-[180px] mt-0.5">{locationName}</div>
         </div>
       </div>
 
       {/* Success Feedback Banner */}
       {saveSuccessMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-500/60 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-semibold">{saveSuccessMsg}</span>
+        <div className="p-3 rounded-lg bg-[#10241b] border border-emerald-800/80 text-emerald-300 text-xs font-semibold animate-in fade-in duration-200">
+          {saveSuccessMsg}
         </div>
       )}
 
@@ -389,18 +368,17 @@ export default function InstallationLocationTab({
         <div className="flex flex-col sm:flex-row gap-2">
           {/* Search Input */}
           <form onSubmit={handleSearchSubmit} className="flex-1 relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm kiếm địa chỉ, quận huyện, tỉnh thành (VD: Tôn Đức Thắng Q7, Ninh Thuận...)"
-              className="w-full pl-9 pr-24 py-2.5 rounded-xl bg-[#12151f] border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+              className="w-full px-3.5 pr-24 py-2.5 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition-colors"
             />
             <button
               type="submit"
               disabled={isSearching}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-600 transition-colors cursor-pointer disabled:opacity-50"
             >
               {isSearching ? 'Đang tìm...' : 'Tìm kiếm'}
             </button>
@@ -411,17 +389,16 @@ export default function InstallationLocationTab({
             type="button"
             onClick={handleGetGPS}
             disabled={isGeolocating}
-            className="px-3.5 py-2.5 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-700 text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+            className="px-3.5 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
             title="Lấy vị trí GPS từ thiết bị hiện tại"
           >
-            <Crosshair className={`w-3.5 h-3.5 text-amber-400 ${isGeolocating ? 'animate-spin' : ''}`} />
             <span>{isGeolocating ? 'Đang định vị...' : 'Vị trí GPS của tôi'}</span>
           </button>
         </div>
 
         {/* Search Results Dropdown */}
         {searchResults.length > 0 && (
-          <div className="p-2 rounded-xl bg-[#12151f] border border-zinc-700 space-y-1 max-h-48 overflow-y-auto">
+          <div className="p-2 rounded-lg bg-[#0a0c12] border border-zinc-700 space-y-1 max-h-48 overflow-y-auto">
             <span className="text-[11px] font-bold text-zinc-400 px-2 uppercase tracking-wider block">
               Kết quả tìm kiếm ({searchResults.length}):
             </span>
@@ -434,7 +411,7 @@ export default function InstallationLocationTab({
                   setSearchResults([]);
                   setSearchQuery('');
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-xs text-zinc-200 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-zinc-800 text-xs text-zinc-200 flex items-center justify-between gap-2 transition-colors cursor-pointer"
               >
                 <span className="truncate">{item.display_name}</span>
                 <span className="text-[10px] text-zinc-400 font-mono shrink-0">
@@ -447,7 +424,7 @@ export default function InstallationLocationTab({
       </div>
 
       {/* 3. Interactive Leaflet Map Container */}
-      <div className="relative rounded-2xl overflow-hidden border border-zinc-700 shadow-xl">
+      <div className="relative rounded-xl overflow-hidden border border-zinc-700 shadow-xl">
         <div 
           ref={mapContainerRef} 
           className="w-full h-[300px] sm:h-[380px] bg-[#1a1e29]" 
@@ -455,61 +432,59 @@ export default function InstallationLocationTab({
         />
 
         {/* Map Overlay Floating Badge */}
-        <div className="absolute top-3 left-3 z-[400] bg-[#0c0e14]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-700/80 text-[11px] font-mono text-zinc-200 hidden sm:flex items-center gap-2 pointer-events-none shadow-lg">
-          <Compass className="w-3.5 h-3.5 text-amber-400" />
+        <div className="absolute top-3 left-3 z-[400] bg-[#0c0e14]/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-zinc-700/80 text-[11px] font-mono text-zinc-300 hidden sm:flex items-center pointer-events-none shadow-lg">
           <span>Click hoặc kéo ghim để chọn tọa độ</span>
         </div>
 
         {/* Mapbox Layer Switcher Controls */}
-        <div className="absolute top-3 right-3 z-[400] flex items-center gap-1 bg-[#0c0e14]/90 backdrop-blur-md p-1 rounded-xl border border-zinc-700/80 shadow-lg">
+        <div className="absolute top-3 right-3 z-[400] flex items-center gap-1 bg-[#0c0e14]/90 backdrop-blur-md p-1 rounded-lg border border-zinc-700/80 shadow-lg">
           <button
             type="button"
             onClick={() => switchMapStyle('satellite')}
-            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'satellite' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'satellite' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             }`}
-            title="Bản đồ ảnh Vệ tinh Mapbox siêu nét"
+            title="Bản đồ ảnh Vệ tinh"
           >
-            🛰️ Vệ tinh
+            Vệ tinh
           </button>
           <button
             type="button"
             onClick={() => switchMapStyle('streets')}
-            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'streets' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'streets' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             }`}
-            title="Bản đồ đường phố Mapbox"
+            title="Bản đồ đường phố"
           >
-            🗺️ Đường phố
+            Đường phố
           </button>
           <button
             type="button"
             onClick={() => switchMapStyle('dark')}
-            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'dark' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'dark' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             }`}
-            title="Bản đồ giao diện tối Mapbox"
+            title="Bản đồ giao diện tối"
           >
-            🌙 Tối
+            Tối
           </button>
           <button
             type="button"
             onClick={() => switchMapStyle('osm')}
-            className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-              mapStyle === 'osm' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            className={`px-2.5 py-1 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+              mapStyle === 'osm' ? 'bg-zinc-700 text-white border border-zinc-500 shadow' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
             }`}
-            title="Bản đồ mở OpenStreetMap (Miễn phí)"
+            title="Bản đồ OSM"
           >
-            🌐 OSM
+            OSM
           </button>
         </div>
       </div>
 
       {/* Mapbox Token Config Strip */}
-      <div className="p-3 rounded-xl bg-[#10131d] border border-zinc-800 text-xs flex flex-col gap-2">
+      <div className="p-3 rounded-lg bg-[#131722] border border-zinc-700/80 text-xs flex flex-col gap-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 text-zinc-300">
-            <Key className="w-4 h-4 text-amber-400 shrink-0" />
             <span className="font-semibold">Mapbox Access Token (API Key):</span>
             <span className="font-mono text-[11px] text-zinc-400 truncate max-w-[180px] sm:max-w-[320px]">
               {mapboxToken ? `${mapboxToken.slice(0, 20)}...${mapboxToken.slice(-10)}` : 'Chưa có Token'}
@@ -518,7 +493,7 @@ export default function InstallationLocationTab({
           <button
             type="button"
             onClick={() => setShowTokenInput(!showTokenInput)}
-            className="text-[11px] text-amber-400 hover:underline cursor-pointer font-medium"
+            className="text-[11px] text-zinc-300 hover:text-white underline cursor-pointer font-medium"
           >
             {showTokenInput ? 'Đóng cài đặt Token' : 'Thay đổi Token'}
           </button>
@@ -531,12 +506,12 @@ export default function InstallationLocationTab({
               value={mapboxToken}
               onChange={(e) => handleSaveToken(e.target.value)}
               placeholder="Dán token pk.eyJ... từ tài khoản Mapbox của bạn"
-              className="flex-1 px-3 py-1.5 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs font-mono text-white focus:outline-none focus:border-amber-400"
+              className="flex-1 px-3 py-1.5 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
             />
             <button
               type="button"
               onClick={() => handleSaveToken(mapboxToken)}
-              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs cursor-pointer shrink-0"
+              className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-100 font-bold text-xs cursor-pointer shrink-0"
             >
               Lưu & Áp Dụng Token
             </button>
@@ -554,7 +529,7 @@ export default function InstallationLocationTab({
             type="text"
             value={locationName}
             onChange={(e) => setLocationName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white focus:outline-none focus:border-zinc-400"
             placeholder="Tên địa danh hoặc trạm giàn pin"
           />
         </div>
@@ -567,7 +542,7 @@ export default function InstallationLocationTab({
             step="0.0001"
             value={selectedLat}
             onChange={(e) => updateCoordinates(e.target.value, selectedLon)}
-            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-zinc-400"
           />
         </div>
 
@@ -579,16 +554,15 @@ export default function InstallationLocationTab({
             step="0.0001"
             value={selectedLon}
             onChange={(e) => updateCoordinates(selectedLat, e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+            className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-zinc-400"
           />
         </div>
       </div>
 
       {/* 5. Preset Solar Power Plants & Cities in Vietnam */}
       <div className="space-y-2">
-        <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Trạm Điện mặt trời & Địa danh tiêu biểu tại Việt Nam:</span>
+        <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+          Trạm Điện mặt trời & Địa danh tiêu biểu tại Việt Nam:
         </span>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -599,19 +573,18 @@ export default function InstallationLocationTab({
                 key={preset.id}
                 type="button"
                 onClick={() => updateCoordinates(preset.lat, preset.lon, preset.name, preset.ward)}
-                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                   isCurrent
-                    ? 'bg-amber-500/20 border-amber-400/80 text-white shadow-md'
-                    : 'bg-[#131722] hover:bg-white/10 border-zinc-800 text-zinc-300'
+                    ? 'bg-zinc-800 text-white border-white shadow-md'
+                    : 'bg-[#131722] hover:bg-zinc-800/60 border-zinc-800 text-zinc-300'
                 }`}
               >
                 <div className="min-w-0">
-                  <span className="font-bold text-xs block truncate">{preset.name}</span>
+                  <span className="font-bold text-xs block truncate text-white">{preset.name}</span>
                   <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">
                     {preset.lat.toFixed(2)}°, {preset.lon.toFixed(2)}°
                   </span>
                 </div>
-                {isCurrent && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
               </button>
             );
           })}
@@ -623,19 +596,17 @@ export default function InstallationLocationTab({
         <button
           type="button"
           onClick={() => updateCoordinates(HCMC_COORDINATES.lat, HCMC_COORDINATES.lon, HCMC_COORDINATES.locationName, HCMC_COORDINATES.ward)}
-          className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+          className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Đặt lại mặc định (Phường Nhiêu Lộc, TP.HCM)</span>
+          Đặt lại mặc định (Phường Nhiêu Lộc, TP.HCM)
         </button>
 
         <button
           type="button"
           onClick={handleSaveLocation}
-          className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-zinc-950 transition-all cursor-pointer shadow-lg active:scale-95 flex items-center justify-center gap-2"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-600 transition-all cursor-pointer active:scale-95"
         >
-          <Check className="w-4 h-4" />
-          <span>Lưu & Áp Dụng Tọa Độ Này</span>
+          Lưu & Áp Dụng Tọa Độ Này
         </button>
       </div>
 

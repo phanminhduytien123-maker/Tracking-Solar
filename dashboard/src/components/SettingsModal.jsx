@@ -1,23 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Check, 
-  Copy, 
-  Users, 
-  UserCheck, 
-  UserX, 
-  ShieldCheck, 
-  Clock, 
-  Lock, 
-  RotateCcw, 
-  AlertTriangle, 
-  Search, 
-  Activity, 
-  CheckCircle2, 
-  RefreshCw,
-  ShieldAlert,
-  MapPin
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { getStoredUsers, fetchCloudUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
 import InstallationLocationTab from './InstallationLocationTab';
 
@@ -169,7 +151,7 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWiFi Connected! IP: " + WiFi.localIP().toString());
+  Serial.println("\\nWiFi Connected! IP: " + WiFi.localIP().toString());
 
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
@@ -292,29 +274,29 @@ void loop() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl modal-sheet-container">
-      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-white/20">
+      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-zinc-700/80 bg-[#0d1017]">
         
         {/* Mobile Grab Handle */}
         <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between py-4 px-5 sm:px-6 border-b border-white/10 bg-white/10 backdrop-blur-md">
+        <div className="flex items-center justify-between py-4 px-5 sm:px-6 border-b border-zinc-800 bg-[#121620]">
           <div>
             <h2 className="text-base sm:text-lg font-bold tracking-tight uppercase text-white">
-              CẤU HÌNH NGUỒN DỮ LIỆU
+              CẤU HÌNH HỆ THỐNG
             </h2>
-            <span className="text-xs text-zinc-300 font-medium">Kết nối Firebase Realtime Database & Vi điều khiển ESP32</span>
+            <span className="text-xs text-zinc-400 font-medium">Nguồn dữ liệu, GPS tọa độ, Quản lý người dùng & Mã nhúng ESP32</span>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent hover:border-white/10"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer border border-transparent hover:border-zinc-700"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-white/10 bg-white/5 px-4 sm:px-6 pt-2 gap-2 text-sm overflow-x-auto">
+        <div className="flex border-b border-zinc-800 bg-[#0d1017] px-4 sm:px-6 pt-2 gap-2 text-sm overflow-x-auto">
           <button
             onClick={() => setActiveTab('config')}
             className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
@@ -327,14 +309,13 @@ void loop() {
           </button>
           <button
             onClick={() => setActiveTab('location')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
               activeTab === 'location'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <MapPin className="w-4 h-4 text-amber-400" />
-            <span>Tọa độ lắp đặt</span>
+            Tọa độ lắp đặt
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -344,10 +325,9 @@ void loop() {
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <Users className="w-4 h-4" />
             <span>Quản lý người dùng</span>
             {usersList.some(u => u.status !== 'active') && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             )}
           </button>
           <button
@@ -589,22 +569,16 @@ void loop() {
               
               {/* Action Feedback Toast */}
               {userActionFeedback && (
-                <div className={`p-3 rounded-xl border flex items-center justify-between gap-2 text-xs font-semibold animate-in fade-in duration-150 ${
+                <div className={`p-3 rounded-lg border flex items-center justify-between gap-2 text-xs font-semibold animate-in fade-in duration-150 ${
                   userActionFeedback.type === 'success'
-                    ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+                    ? 'bg-[#10241b] text-emerald-300 border-emerald-800/80'
                     : userActionFeedback.type === 'warning'
-                    ? 'bg-amber-500/20 text-amber-200 border-amber-400/40'
+                    ? 'bg-[#2a1d0d] text-amber-300 border-amber-800/80'
                     : userActionFeedback.type === 'danger'
-                    ? 'bg-rose-500/20 text-rose-200 border-rose-400/40'
-                    : 'bg-sky-500/20 text-sky-200 border-sky-400/40'
+                    ? 'bg-[#2a0e14] text-rose-300 border-rose-800/80'
+                    : 'bg-[#131722] text-zinc-300 border-zinc-700'
                 }`}>
-                  <div className="flex items-center gap-2">
-                    {userActionFeedback.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />}
-                    {userActionFeedback.type === 'warning' && <Clock className="w-4 h-4 text-amber-300 shrink-0" />}
-                    {userActionFeedback.type === 'danger' && <AlertTriangle className="w-4 h-4 text-rose-300 shrink-0" />}
-                    {userActionFeedback.type === 'info' && <Activity className="w-4 h-4 text-sky-300 shrink-0" />}
-                    <span>{userActionFeedback.message}</span>
-                  </div>
+                  <span>{userActionFeedback.message}</span>
                   <button 
                     onClick={() => setUserActionFeedback(null)} 
                     className="text-white/60 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer"
@@ -617,58 +591,42 @@ void loop() {
               {/* Top Stats Overview Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Stat 1: Total accounts */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-zinc-400 font-medium block">Tổng người dùng</span>
-                    <span className="text-lg font-bold text-white mt-0.5 block">{usersList.length} tài khoản</span>
-                  </div>
-                  <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-300 border border-zinc-700">
-                    <Users className="w-4 h-4" />
-                  </div>
+                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
+                  <span className="text-xs text-zinc-400 font-medium block">Tổng người dùng</span>
+                  <span className="text-lg font-bold text-white mt-0.5 block">{usersList.length} tài khoản</span>
                 </div>
 
                 {/* Stat 2: Online */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-zinc-400 font-medium block">Đang trực tuyến</span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span className="text-lg font-bold text-emerald-400">
-                        {usersList.filter(u => u.isOnline || (currentUser?.username === u.username)).length} đang online
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-9 h-9 rounded-lg bg-emerald-950/60 flex items-center justify-center text-emerald-400 border border-emerald-800">
-                    <Activity className="w-4 h-4" />
+                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
+                  <span className="text-xs text-zinc-400 font-medium block">Đang trực tuyến</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-lg font-bold text-emerald-400">
+                      {usersList.filter(u => u.isOnline || (currentUser?.username === u.username)).length} đang online
+                    </span>
                   </div>
                 </div>
 
                 {/* Stat 3: Locked */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-zinc-400 font-medium block">Tài khoản bị khóa</span>
-                    <span className={`text-lg font-bold mt-0.5 block ${
-                      usersList.some(u => u.status !== 'active') ? 'text-rose-400' : 'text-zinc-400'
-                    }`}>
-                      {usersList.filter(u => u.status !== 'active').length} bị khóa
-                    </span>
-                  </div>
-                  <div className="w-9 h-9 rounded-lg bg-rose-950/60 flex items-center justify-center text-rose-400 border border-rose-800">
-                    <Lock className="w-4 h-4" />
-                  </div>
+                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
+                  <span className="text-xs text-zinc-400 font-medium block">Tài khoản bị khóa</span>
+                  <span className={`text-lg font-bold mt-0.5 block ${
+                    usersList.some(u => u.status !== 'active') ? 'text-rose-400' : 'text-zinc-400'
+                  }`}>
+                    {usersList.filter(u => u.status !== 'active').length} bị khóa
+                  </span>
                 </div>
               </div>
 
               {/* Search & Refresh Actions Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
                   <input
                     type="text"
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
                     placeholder="Tìm theo tên tài khoản, họ tên, vai trò..."
-                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+                    className="w-full px-3.5 pr-8 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
                   />
                   {userSearchQuery && (
                     <button
@@ -682,10 +640,9 @@ void loop() {
                 <button
                   type="button"
                   onClick={handleRefreshUsers}
-                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-600 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-600 transition-all cursor-pointer active:scale-95 shrink-0"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-zinc-300" />
-                  <span>Đồng bộ trạng thái</span>
+                  Đồng bộ trạng thái
                 </button>
               </div>
 
@@ -725,16 +682,10 @@ void loop() {
                         }`}
                       >
                         {/* Header: User Info & Online Tag */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-white/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-zinc-800">
                           <div className="flex items-center gap-3">
                             {/* Role Avatar */}
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${
-                              user.role === 'admin'
-                                ? 'bg-amber-500/20 border-amber-400/40 text-amber-300'
-                                : user.role === 'operator'
-                                ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
-                                : 'bg-sky-500/20 border-sky-400/40 text-sky-300'
-                            }`}>
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 shrink-0">
                               {user.username.slice(0, 2).toUpperCase()}
                             </div>
                             
@@ -744,7 +695,7 @@ void loop() {
                                   {user.displayName}
                                 </span>
                                 {isCurrentUser && (
-                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/20 text-white border border-white/30">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700">
                                     Phiên hiện tại
                                   </span>
                                 )}
@@ -760,12 +711,12 @@ void loop() {
                           {/* Online Presence Badge */}
                           <div className="flex items-center gap-2 shrink-0">
                             {isOnline ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold bg-[#10241b] text-emerald-300 border border-emerald-800/80">
                                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                                 <span>Đang online</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
                                 <span className="w-2 h-2 rounded-full bg-zinc-500"></span>
                                 <span>Offline ({user.lastActive})</span>
                               </span>
@@ -779,19 +730,16 @@ void loop() {
                             <span className="text-zinc-400 font-medium">Trạng thái:</span>
                             {user.status === 'active' && (
                               <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700 inline-flex items-center gap-1.5">
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Hoạt động bình thường</span>
+                                <span>● Hoạt động bình thường</span>
                               </span>
                             )}
                             {isLocked1H && (
                               <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700 inline-flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-amber-400" />
                                 <span>Tạm khóa 1 giờ (còn ~{remainingMins} phút)</span>
                               </span>
                             )}
                             {isLockedPerm && (
                               <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700 inline-flex items-center gap-1.5">
-                                <Lock className="w-3.5 h-3.5 text-rose-400" />
                                 <span>Đã khóa vĩnh viễn</span>
                               </span>
                             )}
@@ -804,10 +752,9 @@ void loop() {
                         </div>
 
                         {/* Action Buttons Row */}
-                        <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-end gap-2">
+                        <div className="pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-end gap-2">
                           {user.role === 'admin' ? (
-                            <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-amber-300/90 flex items-center gap-1.5 font-medium">
-                              <ShieldCheck className="w-4 h-4 text-amber-400" />
+                            <div className="px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 font-medium">
                               <span>Tài khoản Quản trị viên (Không thể khóa)</span>
                             </div>
                           ) : (
@@ -817,11 +764,10 @@ void loop() {
                                 <button
                                   type="button"
                                   onClick={() => handleLock1H(user)}
-                                  className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
                                   title="Khóa tạm thời tài khoản trong 1 giờ"
                                 >
-                                  <Clock className="w-3.5 h-3.5 text-amber-300" />
-                                  <span>Khóa 1 giờ</span>
+                                  Khóa 1 giờ
                                 </button>
                               )}
 
@@ -830,11 +776,10 @@ void loop() {
                                 <button
                                   type="button"
                                   onClick={() => handleLockPerm(user)}
-                                  className="px-3 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                                  className="px-3 py-1.5 rounded-lg bg-red-950/70 hover:bg-red-900 border border-red-800/80 text-red-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
                                   title="Khóa vĩnh viễn tài khoản người dùng"
                                 >
-                                  <Lock className="w-3.5 h-3.5 text-rose-300" />
-                                  <span>Khóa vĩnh viễn</span>
+                                  Khóa vĩnh viễn
                                 </button>
                               )}
 
@@ -843,11 +788,10 @@ void loop() {
                                 <button
                                   type="button"
                                   onClick={() => handleRestore(user)}
-                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
+                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
                                   title="Khôi phục trạng thái hoạt động bình thường"
                                 >
-                                  <RotateCcw className="w-3.5 h-3.5 text-white" />
-                                  <span>Khôi phục tài khoản</span>
+                                  Khôi phục tài khoản
                                 </button>
                               )}
                             </>
@@ -861,7 +805,7 @@ void loop() {
             </div>
           )}
 
-          {/* TAB 3: ESP32-1 TRACKER CODE */}
+          {/* TAB 4: ESP32-1 TRACKER CODE */}
           {activeTab === 'esp32_trk' && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -870,19 +814,18 @@ void loop() {
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32TrackerCode, 'trk')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white border border-zinc-600 cursor-pointer transition-all active:scale-95"
+                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-600 cursor-pointer transition-all active:scale-95"
                 >
-                  {copiedTab === 'trk' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-zinc-300" />}
-                  <span>{copiedTab === 'trk' ? 'Đã sao chép!' : 'Sao chép mã'}</span>
+                  {copiedTab === 'trk' ? 'Đã sao chép!' : 'Sao chép mã'}
                 </button>
               </div>
-              <pre className="p-4 rounded-xl bg-[#080a0f] border border-zinc-800 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
                 {esp32TrackerCode}
               </pre>
             </div>
           )}
 
-          {/* TAB 3: ESP32-2 FIXED PANEL CODE */}
+          {/* TAB 5: ESP32-2 FIXED PANEL CODE */}
           {activeTab === 'esp32_fix' && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -891,26 +834,25 @@ void loop() {
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32FixedCode, 'fix')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white border border-zinc-600 cursor-pointer transition-all active:scale-95"
+                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-600 cursor-pointer transition-all active:scale-95"
                 >
-                  {copiedTab === 'fix' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-zinc-300" />}
-                  <span>{copiedTab === 'fix' ? 'Đã sao chép!' : 'Sao chép mã'}</span>
+                  {copiedTab === 'fix' ? 'Đã sao chép!' : 'Sao chép mã'}
                 </button>
               </div>
-              <pre className="p-4 rounded-xl bg-[#080a0f] border border-zinc-800 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
                 {esp32FixedCode}
               </pre>
             </div>
           )}
 
-          {/* TAB 4: RAW JSON LIVE */}
+          {/* TAB 6: RAW JSON LIVE */}
           {activeTab === 'json' && (
             <div className="space-y-3">
               <div className="flex justify-between items-center text-xs text-zinc-400">
                 <span>Dữ liệu Telemetry JSON trực tiếp:</span>
                 <span className="font-mono text-zinc-400">{new Date().toLocaleTimeString()}</span>
               </div>
-              <pre className="p-4 rounded-xl bg-[#080a0f] border border-zinc-800 text-xs font-mono text-zinc-200 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-200 overflow-x-auto max-h-[380px] leading-relaxed">
                 {JSON.stringify(latestTelemetry || {}, null, 2)}
               </pre>
             </div>
@@ -935,4 +877,5 @@ void loop() {
     </div>
   );
 }
+
 
