@@ -179,7 +179,7 @@ export default function SignInPage({ onLoginSuccess }) {
           });
         }, 700);
       } else {
-        setPinError('Mã Passcode không chính xác. Gợi ý: 0101');
+        setPinError('Mã Passcode không chính xác, vui lòng thử lại.');
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 500);
         setPinDigits(['', '', '', '']);
