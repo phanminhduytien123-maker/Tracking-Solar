@@ -20,11 +20,7 @@ import {
   Sunset, 
   RefreshCw, 
   X, 
-  MapPin, 
-  Zap,
-  SlidersHorizontal,
-  ChevronRight,
-  Info
+  MapPin
 } from 'lucide-react';
 
 // Render appropriate Lucide icon component dynamically
@@ -56,17 +52,6 @@ export default function WeatherWidget({
   const [isOpenModal, setIsOpenModal] = useState(false);
   const current = weatherData?.current || {};
   const condition = current.condition || { label: 'Đang tải...', icon: 'CloudSun' };
-
-  const weatherPresets = [
-    { id: null, label: 'API Thời Tiết Thực Tế', desc: 'Dữ liệu trực tiếp từ Open-Meteo API', icon: 'Zap' },
-    { id: 'clear', label: 'Nắng Gắt Sài Gòn', desc: 'Trời quang, bức xạ cực đại ~1000 W/m²', icon: 'Sun' },
-    { id: 'partly_cloudy', label: 'Nắng Mây Đan Xen', desc: 'Quang thông thay đổi, test Fuzzy-PID', icon: 'CloudSun' },
-    { id: 'clouds', label: 'Trời Âm U / Mây Dày', desc: 'Bức xạ khuếch tán, test thuật toán PSO', icon: 'Cloud' },
-    { id: 'rain', label: 'Mưa Rào Nhiệt Đới', desc: 'Mưa rào làm sạch bụi bề mặt tấm pin', icon: 'CloudRain' },
-    { id: 'thunderstorm', label: 'Giông Sét Sấm Chớp', desc: 'Mưa dông lớn, kích hoạt bảo vệ E-Stop', icon: 'CloudLightning' },
-    { id: 'golden_hour', label: 'Hoàng Hôn Chiều Tà', desc: 'Mặt trời lặn, pin quay về hướng Đông', icon: 'Sunset' },
-    { id: 'night', label: 'Đêm Trăng Sao', desc: 'Chế độ nghỉ ban đêm tiết kiệm điện', icon: 'Moon' },
-  ];
 
   return (
     <>
@@ -301,62 +286,6 @@ export default function WeatherWidget({
                   </div>
                 </div>
               )}
-
-              {/* ĐỒ ÁN TỐT NGHIỆP: TRACKING SOLAR Correlation Card */}
-              <div className="p-4 rounded-xl bg-zinc-900/70 border border-zinc-800 text-xs text-zinc-300 space-y-2">
-                <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-                  <Zap className="w-4 h-4" />
-                  <span>Ý Nghĩa Đối Với Đồ Án Hệ Thống Pin Mặt Trời (DATN)</span>
-                </div>
-                <p className="leading-relaxed text-zinc-400">
-                  Dữ liệu thời tiết thực tế từ trạm khí tượng Quận 1 cung cấp thông số quang thông và độ che phủ mây ({current.cloudCover}%). 
-                  Khi trời quang đãng, bộ điều khiển <b>Fuzzy-PID</b> bám sát vệt sáng mặt trời; khi mây che phủ bất đối xứng, thuật toán <b>PSO (Particle Swarm Optimization)</b> kích hoạt quét tìm điểm phát điện cực đại toàn cục.
-                </p>
-              </div>
-
-              {/* Weather Simulation & Demo Controls */}
-              <div className="border-t border-[#202738] pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    Mô Phỏng / Thử Nghiệm Hiệu Ứng Nền (Presentation Mode)
-                  </h4>
-                  {customOverrideType && (
-                    <button
-                      onClick={() => setCustomOverrideType(null)}
-                      className="text-xs text-sky-400 hover:text-sky-300 underline cursor-pointer"
-                    >
-                      Quay lại API Thực Tế
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {weatherPresets.map((preset) => {
-                    const isSelected = customOverrideType === preset.id;
-                    return (
-                      <button
-                        key={preset.id || 'live'}
-                        onClick={() => setCustomOverrideType(preset.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
-                          isSelected 
-                            ? 'bg-sky-500/20 border-sky-400 text-white shadow-md shadow-sky-500/10' 
-                            : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:bg-zinc-800/80'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold truncate">{preset.label}</span>
-                          <RenderWeatherIcon iconName={preset.icon} className="w-4 h-4" />
-                        </div>
-                        <span className="text-[10px] text-zinc-400 line-clamp-2 leading-tight">
-                          {preset.desc}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
             </div>
 
             {/* Modal Footer */}
