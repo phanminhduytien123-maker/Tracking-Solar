@@ -2,21 +2,20 @@
 #define CONFIG_H
 
 // =========================================================================
-// CẤU HÌNH WIFI (Nhập SSID và Mật khẩu WiFi nhà bạn nếu muốn đẩy lên Firebase)
-// Nếu để trống hoặc chưa cấu hình, mạch vẫn chạy test Serial cục bộ bình thường
+// CẤU HÌNH WIFI NHÀ
 // =========================================================================
-#define WIFI_SSID     "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID     "Duy Loc 2.4GHz"
+#define WIFI_PASSWORD "0947202895"
 
 // =========================================================================
-// CẤU HÌNH FIREBASE REALTIME DATABASE (Đồng bộ với hệ thống Tracking Solar)
+// CẤU HÌNH FIREBASE REALTIME DATABASE (ĐỒNG BỘ TẤM CỐ ĐỊNH)
 // =========================================================================
 #define API_KEY       "AIzaSyD0i6DhiIncmRaEd6D3UZjLJ1EHNBzXces"
 #define DATABASE_URL  "https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
-// Node Firebase để đẩy dữ liệu test
+// Node Firebase đẩy trực tiếp dữ liệu tấm cố định
+#define FIREBASE_STATIC_PATH   "/solar/static"
 #define FIREBASE_TEST_PATH     "/solar/test_devkit"
-#define FIREBASE_TRACKING_PATH "/solar/tracking"
 
 // =========================================================================
 // SƠ ĐỒ CHÂN (PINOUT) CHO ESP32 DEVKIT V1 (30 pins / 36 pins)

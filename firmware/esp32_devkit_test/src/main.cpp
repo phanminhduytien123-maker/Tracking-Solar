@@ -365,22 +365,29 @@ void loop() {
     Serial.printf("[TEST DEVKIT] Áp Pin: %5.2f V | Rơi Shunt: %5.2f mV | Dòng: %6.2f mA (%7.4f A) | P: %6.3f W (%6.2f mW) | Năng Lượng: %8.5f Wh\n",
                   busVoltage, shuntVoltage, current_mA, current_A, power_W, power_W * 1000.0f, totalEnergyWh);
 
-    // Đẩy lên Firebase nếu WiFi sẵn sàng
+    // Đẩy lên Firebase nếu WiFi sẵn sàng (Đẩy trực tiếp vào Tấm Cố Định /solar/static)
     if (wifiEnabled && Firebase.ready()) {
       FirebaseJson json;
       json.set("voltage", busVoltage);
-      json.set("shunt_mV", shuntVoltage);
       json.set("current", current_A);
-      json.set("current_mA", current_mA);
       json.set("power", power_W);
       json.set("dailyEnergy", totalEnergyWh / 1000.0f); // kWh
+      json.set("fixedAzimuth", 180.0);
+      json.set("fixedElevation", 15.0);
+      json.set("shunt_mV", shuntVoltage);
+      json.set("current_mA", current_mA);
       json.set("totalEnergyWh", totalEnergyWh);
-      json.set("board", "ESP32 DevKit V1 (Test Node)");
+      json.set("status", "ONLINE_ACTIVE");
+      json.set("board", "ESP32 DevKit V1");
       json.set("ledMode", ledMode);
       json.set("lastUpdate", (double)millis());
 
-      // Gửi vào node test riêng
-      Firebase.RTDB.updateNode(&fbdo, FIREBASE_TEST_PATH, &json);
+      // Gửi vào node Tấm Cố Định
+      if (Firebase.RTDB.updateNode(&fbdo, FIREBASE_STATIC_PATH, &json)) {
+        // Gửi thành công
+      } else {
+        Serial.println("[FIREBASE LỖI]: " + fbdo.errorReason());
+      }
     }
   }
 }
