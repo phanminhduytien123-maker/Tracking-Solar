@@ -32,14 +32,16 @@ export function getCleanZeroTelemetry() {
         current: 0,
         power: 0,
         energyWh: 0,
-        energyKwh: 0
+        energyKwh: 0,
+        online: false
       },
       static: {
         voltage: 0,
         current: 0,
         power: 0,
         energyWh: 0,
-        energyKwh: 0
+        energyKwh: 0,
+        online: false
       },
       comparison: {
         percentGain: 0,
@@ -213,11 +215,24 @@ export class FirebaseSolarService {
     const ldrL = Number(tracking.ldrLeft || 0);
     const ldrR = Number(tracking.ldrRight || 0);
 
+    // Kiểm tra trạng thái kết nối độc lập của từng tấm pin
+    const isTrackingOnline = Boolean(
+      fbData.tracking && 
+      Object.keys(fbData.tracking).length > 0 &&
+      (fbData.tracking.voltage !== undefined || fbData.tracking.lastUpdate !== undefined || fbData.tracking.power !== undefined)
+    );
+
+    const isStaticOnline = Boolean(
+      fbData.static && 
+      Object.keys(fbData.static).length > 0 &&
+      (fbData.static.voltage !== undefined || fbData.static.lastUpdate !== undefined || fbData.static.power !== undefined)
+    );
+
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
-      rawTimestamp: tracking.lastUpdate || Date.now(),
+      rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || Date.now(),
       system: {
-        online: true,
+        online: isTrackingOnline || isStaticOnline,
         isMock: false,
         source: 'firebase',
         mode: tracking.mode || 'AUTO',
@@ -227,8 +242,8 @@ export class FirebaseSolarService {
         rainWindSafeMode: tracking.safeMode || false,
         pingMs: 15,
         ip: 'Firebase Cloud (Real-Time)',
-        firmware: 'ESP32-S3 Dual-Axis (Live)',
-        uptimeSeconds: Math.floor((Date.now() - (tracking.lastUpdate || Date.now())) / 1000),
+        firmware: 'ESP32 Live Telemetry',
+        uptimeSeconds: Math.floor((Date.now() - (tracking.lastUpdate || staticPanel.lastUpdate || Date.now())) / 1000),
         errors: {
           sensorLost: false,
           driverFault: tracking.estop || false,
@@ -242,14 +257,20 @@ export class FirebaseSolarService {
           current: parseFloat(trkCurr.toFixed(3)),
           power: parseFloat(trkPower.toFixed(2)),
           energyWh: parseFloat(trkEnergyWh.toFixed(1)),
-          energyKwh: parseFloat(trkEnergyKwh.toFixed(3))
+          energyKwh: parseFloat(trkEnergyKwh.toFixed(3)),
+          online: isTrackingOnline,
+          lastUpdate: tracking.lastUpdate || null,
+          board: tracking.board || (isTrackingOnline ? 'ESP32-S3 Tracker' : null)
         },
         static: {
           voltage: parseFloat(staVolt.toFixed(2)),
           current: parseFloat(staCurr.toFixed(3)),
           power: parseFloat(staPower.toFixed(2)),
           energyWh: parseFloat(staEnergyWh.toFixed(1)),
-          energyKwh: parseFloat(staEnergyKwh.toFixed(3))
+          energyKwh: parseFloat(staEnergyKwh.toFixed(3)),
+          online: isStaticOnline,
+          lastUpdate: staticPanel.lastUpdate || null,
+          board: staticPanel.board || (isStaticOnline ? 'ESP32 Static Node' : null)
         },
         comparison: {
           percentGain,

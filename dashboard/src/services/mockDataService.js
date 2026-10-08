@@ -284,6 +284,8 @@ export class MockTelemetryEngine {
           power: parseFloat(pTracking.toFixed(2)),
           energyWh: parseFloat(this.energyTrackingWh.toFixed(1)),
           energyKwh: parseFloat((this.energyTrackingWh / 1000).toFixed(3)),
+          online: true,
+          board: 'Mô phỏng Tracking'
         },
         static: {
           voltage: parseFloat(vStatic.toFixed(2)),
@@ -291,6 +293,8 @@ export class MockTelemetryEngine {
           power: parseFloat(pStatic.toFixed(2)),
           energyWh: parseFloat(this.energyStaticWh.toFixed(1)),
           energyKwh: parseFloat((this.energyStaticWh / 1000).toFixed(3)),
+          online: true,
+          board: 'Mô phỏng Static'
         },
         comparison: {
           percentGain,
