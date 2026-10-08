@@ -194,14 +194,17 @@ void connectWiFi() {
 }
 
 // -------------------------------------------------------------------------
-// Đọc cảm biến INA226 & Tính toán công suất
+// Đọc cảm biến INA226 & Tính toán công suất theo Định luật Ohm chính xác cao
 // -------------------------------------------------------------------------
 void readSensors() {
   if (inaFound) {
     busVoltage = ina226.getBusVoltage();        // Volts
     shuntVoltage = ina226.getShuntVoltage_mV(); // mV
-    current_mA = ina226.getCurrent_mA();        // mA
+    
+    // Tính dòng điện trực tiếp: I (mA) = V_shunt (mV) / R_shunt (Ohm)
+    current_mA = shuntVoltage / SHUNT_RESISTOR_OHM;
     if (current_mA < 0.0f) current_mA = 0.0f;   // Loại bỏ nhiễu âm
+    
     current_A = current_mA / 1000.0f;
     power_W = busVoltage * current_A;
 
@@ -209,8 +212,8 @@ void readSensors() {
     float dtHours = (float)SENSOR_READ_INTERVAL_MS / 3600000.0f;
     totalEnergyWh += (power_W * dtHours);
   } else {
-    // Nếu chưa cắm cảm biến thật, mô phỏng nhẹ để test giao diện
     busVoltage = 0.0f;
+    shuntVoltage = 0.0f;
     current_mA = 0.0f;
     current_A = 0.0f;
     power_W = 0.0f;
@@ -358,9 +361,9 @@ void loop() {
   if (millis() - lastTelemetry >= TELEMETRY_INTERVAL_MS) {
     lastTelemetry = millis();
 
-    // In ra Serial dạng bảng trực quan
-    Serial.printf("[TEST DEVKIT] Áp Pin: %6.2f V | Rơi Shunt: %6.2f mV | Dòng: %6.1f mA (%6.3f A) | P: %6.2f W | Năng Lượng: %7.4f Wh | LED Mode: %d\n",
-                  busVoltage, shuntVoltage, current_mA, current_A, power_W, totalEnergyWh, ledMode);
+    // In ra Serial dạng bảng trực quan độ phân giải cao
+    Serial.printf("[TEST DEVKIT] Áp Pin: %5.2f V | Rơi Shunt: %5.2f mV | Dòng: %6.2f mA (%7.4f A) | P: %6.3f W (%6.2f mW) | Năng Lượng: %8.5f Wh\n",
+                  busVoltage, shuntVoltage, current_mA, current_A, power_W, power_W * 1000.0f, totalEnergyWh);
 
     // Đẩy lên Firebase nếu WiFi sẵn sàng
     if (wifiEnabled && Firebase.ready()) {
