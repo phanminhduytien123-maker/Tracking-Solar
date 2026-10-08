@@ -111,6 +111,14 @@ export class FirebaseSolarService {
     this.onTelemetry = () => {};
     this.onStatusChange = () => {};
     this.onError = () => {};
+
+    // Heartbeat Tracking: Lưu mốc thời gian nhận gói tin mới nhất của từng tấm
+    this.lastTrackingRawUpdate = null;
+    this.lastTrackingReceivedTime = 0;
+    this.lastStaticRawUpdate = null;
+    this.lastStaticReceivedTime = 0;
+    this.latestRawData = null;
+    this.watchdogTimer = null;
   }
 
   init(config, callbacks = {}) {
@@ -141,15 +149,45 @@ export class FirebaseSolarService {
 
     this.onStatusChange({ connected: false, connecting: true });
 
+    // Khởi động bộ Watchdog quét liên tục mỗi 500ms để phát hiện mất kết nối quá 3s
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = setInterval(() => {
+      if (this.latestRawData && this.isConnected) {
+        const mappedTelemetry = this.mapFirebaseToTelemetry(this.latestRawData);
+        this.onTelemetry(mappedTelemetry);
+      }
+    }, 500);
+
     // Listen to device telemetry on /solar
     this.solarRef = ref(this.db, 'solar');
     onValue(
       this.solarRef,
       (snapshot) => {
         const data = snapshot.val();
+        const now = Date.now();
+        this.latestRawData = data;
+
         if (data && (data.tracking || data.static)) {
           this.isConnected = true;
           this.onStatusChange({ connected: true, connecting: false });
+
+          // Cập nhật mốc thời gian nhận dữ liệu mới cho Tấm Xoay
+          if (data.tracking) {
+            const trkUpdate = data.tracking.lastUpdate;
+            if (trkUpdate !== this.lastTrackingRawUpdate) {
+              this.lastTrackingRawUpdate = trkUpdate;
+              this.lastTrackingReceivedTime = now;
+            }
+          }
+
+          // Cập nhật mốc thời gian nhận dữ liệu mới cho Tấm Cố Định
+          if (data.static) {
+            const staUpdate = data.static.lastUpdate;
+            if (staUpdate !== this.lastStaticRawUpdate) {
+              this.lastStaticRawUpdate = staUpdate;
+              this.lastStaticReceivedTime = now;
+            }
+          }
 
           // Map Firebase schema into unified dashboard telemetry
           const mappedTelemetry = this.mapFirebaseToTelemetry(data);
@@ -174,6 +212,10 @@ export class FirebaseSolarService {
       off(this.solarRef);
       this.solarRef = null;
     }
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
     this.isConnected = false;
     this.onStatusChange({ connected: false, connecting: false });
   }
@@ -182,20 +224,46 @@ export class FirebaseSolarService {
     const tracking = fbData.tracking || {};
     const staticPanel = fbData.static || {};
     const algo = fbData.algorithm || {};
+    const now = Date.now();
+    const TIMEOUT_MS = 3000; // Đúng 3 giây không có gói tin mới -> MẤT KẾT NỐI
 
-    const trkVolt = Number(tracking.voltage || 0);
-    const trkCurr = Number(tracking.current || 0);
-    const trkPower = Number(tracking.power || (trkVolt * trkCurr));
+    // 1. Kiểm tra trạng thái kết nối thật của Tấm Xoay
+    let isTrackingOnline = false;
+    if (fbData.tracking && Object.keys(fbData.tracking).length > 0) {
+      const trkUpdate = Number(fbData.tracking.lastUpdate || 0);
+      if (trkUpdate > 1700000000000) {
+        isTrackingOnline = (now - trkUpdate) <= TIMEOUT_MS;
+      } else {
+        isTrackingOnline = (now - this.lastTrackingReceivedTime) <= TIMEOUT_MS;
+      }
+    }
+
+    // 2. Kiểm tra trạng thái kết nối thật của Tấm Cố Định
+    let isStaticOnline = false;
+    if (fbData.static && Object.keys(fbData.static).length > 0) {
+      const staUpdate = Number(fbData.static.lastUpdate || 0);
+      if (staUpdate > 1700000000000) {
+        isStaticOnline = (now - staUpdate) <= TIMEOUT_MS;
+      } else {
+        isStaticOnline = (now - this.lastStaticReceivedTime) <= TIMEOUT_MS;
+      }
+    }
+
+    // Dữ liệu Tấm Xoay (Nếu Offline -> trả về 0)
+    const trkVolt = isTrackingOnline ? Number(tracking.voltage || 0) : 0.0;
+    const trkCurr = isTrackingOnline ? Number(tracking.current || 0) : 0.0;
+    const trkPower = isTrackingOnline ? Number(tracking.power || (trkVolt * trkCurr)) : 0.0;
     const trkEnergyKwh = Number(tracking.dailyEnergy || 0);
     const trkEnergyWh = trkEnergyKwh * 1000;
 
-    const staVolt = Number(staticPanel.voltage || 0);
-    const staCurr = Number(staticPanel.current || 0);
-    const staPower = Number(staticPanel.power || (staVolt * staCurr));
+    // Dữ liệu Tấm Cố Định (Nếu Offline -> trả về 0)
+    const staVolt = isStaticOnline ? Number(staticPanel.voltage || 0) : 0.0;
+    const staCurr = isStaticOnline ? Number(staticPanel.current || 0) : 0.0;
+    const staPower = isStaticOnline ? Number(staticPanel.power || (staVolt * staCurr)) : 0.0;
     const staEnergyKwh = Number(staticPanel.dailyEnergy || 0);
     const staEnergyWh = staEnergyKwh * 1000;
 
-    const percentGain = staPower > 0.1 
+    const percentGain = (isTrackingOnline && isStaticOnline && staPower > 0.1)
       ? Number((((trkPower - staPower) / staPower) * 100).toFixed(1))
       : 0.0;
     const powerDelta = Number((trkPower - staPower).toFixed(2));
@@ -210,23 +278,10 @@ export class FirebaseSolarService {
     const elError = tgtElevation - curElevation;
     const totalError = Math.sqrt(azError * azError + elError * elError);
 
-    const ldrT = Number(tracking.ldrTop || 0);
-    const ldrB = Number(tracking.ldrBottom || 0);
-    const ldrL = Number(tracking.ldrLeft || 0);
-    const ldrR = Number(tracking.ldrRight || 0);
-
-    // Kiểm tra trạng thái kết nối độc lập của từng tấm pin
-    const isTrackingOnline = Boolean(
-      fbData.tracking && 
-      Object.keys(fbData.tracking).length > 0 &&
-      (fbData.tracking.voltage !== undefined || fbData.tracking.lastUpdate !== undefined || fbData.tracking.power !== undefined)
-    );
-
-    const isStaticOnline = Boolean(
-      fbData.static && 
-      Object.keys(fbData.static).length > 0 &&
-      (fbData.static.voltage !== undefined || fbData.static.lastUpdate !== undefined || fbData.static.power !== undefined)
-    );
+    const ldrT = isTrackingOnline ? Number(tracking.ldrTop || 0) : 0;
+    const ldrB = isTrackingOnline ? Number(tracking.ldrBottom || 0) : 0;
+    const ldrL = isTrackingOnline ? Number(tracking.ldrLeft || 0) : 0;
+    const ldrR = isTrackingOnline ? Number(tracking.ldrRight || 0) : 0;
 
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
