@@ -26,9 +26,12 @@ export default function VisualPanelsComparison({
         
         {/* Metric 1: Tấm Xoay */}
         <div className="p-2.5 rounded-xl panel-subtle text-center flex flex-col justify-between">
-          <span className="text-[10px] font-bold uppercase text-zinc-300 block truncate">
-            TẤM XOAY
-          </span>
+          <div className="flex items-center justify-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${tracking.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            <span className="text-[10px] font-bold uppercase text-zinc-300 block truncate">
+              TẤM XOAY
+            </span>
+          </div>
           <div className="my-1">
             <span className="text-xl font-bold font-mono text-white block leading-none">
               {tracking.power.toFixed(1)}
@@ -57,9 +60,12 @@ export default function VisualPanelsComparison({
 
         {/* Metric 3: Tấm Cố Định */}
         <div className="p-2.5 rounded-xl panel-subtle text-center flex flex-col justify-between">
-          <span className="text-[10px] font-bold uppercase text-zinc-300 block truncate">
-            CỐ ĐỊNH
-          </span>
+          <div className="flex items-center justify-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${stat.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            <span className="text-[10px] font-bold uppercase text-zinc-300 block truncate">
+              CỐ ĐỊNH
+            </span>
+          </div>
           <div className="my-1">
             <span className="text-xl font-bold font-mono text-white block leading-none">
               {stat.power.toFixed(1)}
@@ -80,11 +86,24 @@ export default function VisualPanelsComparison({
         <div className="lg:col-span-5 panel-card flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden group shadow-lg">
 
           {/* Top Header Row */}
-          <div className="pb-3 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
-              TẤM PIN TRACKING
-            </h2>
-            <span className="text-xs font-mono text-zinc-300 font-medium">Fuzzy-PID & PSO</span>
+          <div className="pb-3 border-b border-white/10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+              <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
+                TẤM PIN TRACKING
+              </h2>
+              {tracking.online ? (
+                <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm backdrop-blur-md">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>ĐÃ KẾT NỐI</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm backdrop-blur-md">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-rose-400"></span>
+                  <span>CHƯA KẾT NỐI</span>
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-mono text-zinc-300 font-medium whitespace-nowrap">Fuzzy-PID & PSO</span>
           </div>
 
           {/* 3D VISUAL PANEL CONTAINER */}
@@ -181,11 +200,24 @@ export default function VisualPanelsComparison({
         <div className="lg:col-span-5 panel-card flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden shadow-lg">
 
           {/* Top Header Row */}
-          <div className="pb-3 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
-              TẤM PIN CỐ ĐỊNH   
-            </h2>
-            <span className="text-xs font-mono text-zinc-300 font-medium">South 180° / 15°</span>
+          <div className="pb-3 border-b border-white/10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+              <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
+                TẤM PIN CỐ ĐỊNH   
+              </h2>
+              {stat.online ? (
+                <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm backdrop-blur-md">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>ĐÃ KẾT NỐI</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm backdrop-blur-md">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-rose-400"></span>
+                  <span>CHƯA KẾT NỐI</span>
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-mono text-zinc-300 font-medium whitespace-nowrap">South 180° / 15°</span>
           </div>
 
           {/* Static Solar Panel Image Container */}
