@@ -11,7 +11,7 @@
 // CẤU HÌNH FIREBASE REALTIME DATABASE (ĐỒNG BỘ TẤM CỐ ĐỊNH)
 // =========================================================================
 #define API_KEY       "AIzaSyD0i6DhiIncmRaEd6D3UZjLJ1EHNBzXces"
-#define DATABASE_URL  "https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app/"
+#define DATABASE_URL  "final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app"
 
 // Node Firebase đẩy trực tiếp dữ liệu tấm cố định
 #define FIREBASE_STATIC_PATH   "/solar/static"

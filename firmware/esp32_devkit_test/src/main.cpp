@@ -180,6 +180,9 @@ void connectWiFi() {
     Serial.printf("  -> IP ESP32: %s\n", WiFi.localIP().toString().c_str());
     Serial.printf("  -> RSSI: %d dBm\n", WiFi.RSSI());
 
+    // Đồng bộ thời gian để khởi tạo SSL chuẩn xác
+    configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
+
     // Khởi tạo Firebase
     fbConfig.api_key = API_KEY;
     fbConfig.database_url = DATABASE_URL;
