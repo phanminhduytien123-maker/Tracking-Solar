@@ -566,6 +566,7 @@ export default function App() {
             intradayData={intradayData}
             history30Days={history30Days}
             onClearCharts={handleClearCharts}
+            isAdmin={authSession?.role === 'admin'}
           />
         </section>
 
