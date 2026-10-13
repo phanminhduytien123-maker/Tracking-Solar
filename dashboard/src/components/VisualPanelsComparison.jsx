@@ -119,17 +119,17 @@ export default function VisualPanelsComparison({
               {isSleeping ? (
                 <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/50 shadow-sm backdrop-blur-md">
                   <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-indigo-300 animate-pulse"></span>
-                  <span>🌙 ĐANG NGỦ ĐÔNG ({wakeAt})</span>
+                  <span>Trk: 🌙 NGỦ ĐÔNG ({wakeAt})</span>
                 </span>
               ) : tracking.online ? (
                 <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm backdrop-blur-md">
                   <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>ĐÃ KẾT NỐI</span>
+                  <span>Trk: ON (ĐÃ KẾT NỐI)</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm backdrop-blur-md">
                   <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-rose-400"></span>
-                  <span>CHƯA KẾT NỐI</span>
+                  <span>Trk: OFF (CHƯA KẾT NỐI)</span>
                 </span>
               )}
             </div>

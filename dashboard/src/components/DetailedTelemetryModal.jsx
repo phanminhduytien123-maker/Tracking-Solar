@@ -537,9 +537,21 @@ export default function DetailedTelemetryModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Tấm xoay */}
                 <div className="p-4 rounded-2xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                  <span className="text-xs font-bold text-white block uppercase tracking-wide pb-2 border-b border-zinc-800">
-                    TẤM PIN TRACKING (2-TRỤC)
-                  </span>
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                    <span className="text-xs font-bold text-white block uppercase tracking-wide">
+                      TẤM PIN TRACKING (2-TRỤC)
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold ${
+                      trk.isSleeping 
+                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
+                        : (trk.online ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40')
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        trk.isSleeping ? 'bg-indigo-400 animate-pulse' : (trk.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400')
+                      }`} />
+                      {trk.isSleeping ? `Trk: 🌙 Ngủ (${trk.wakeAt || '03:00'})` : (trk.online ? 'Trk: ON' : 'Trk: OFF')}
+                    </span>
+                  </div>
                   <div className="space-y-2 font-mono text-sm">
                     <div className="flex justify-between">
                       <span className="text-zinc-400 font-sans">Điện áp:</span>
