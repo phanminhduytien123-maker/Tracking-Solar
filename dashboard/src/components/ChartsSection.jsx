@@ -12,7 +12,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { BarChart3, TrendingUp, Maximize2, X } from 'lucide-react';
+import { BarChart3, TrendingUp, Maximize2, X, RotateCcw } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -26,8 +26,8 @@ ChartJS.register(
   Filler
 );
 
-export default function ChartsSection({ intradayData, history30Days }) {
-  const [historyRange, setHistoryRange] = useState(30); // 7, 14, 30
+export default function ChartsSection({ intradayData, history30Days, onClearCharts }) {
+  const [historyRange, setHistoryRange] = useState(1); // 1, 7, 14, 30
   const [expandedChart, setExpandedChart] = useState(null); // 'intraday' | 'history' | null
 
   // Close on Escape key
@@ -209,6 +209,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         borderRadius: 4,
         barPercentage: 0.65,
         categoryPercentage: 0.75,
+        maxBarThickness: 48,
         yAxisID: 'y',
         order: 2
       },
@@ -220,6 +221,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
         borderRadius: 4,
         barPercentage: 0.65,
         categoryPercentage: 0.75,
+        maxBarThickness: 48,
         yAxisID: 'y',
         order: 3
       }
@@ -326,7 +328,9 @@ export default function ChartsSection({ intradayData, history30Days }) {
     }
   };
 
-  // Compute 30-day aggregates
+  // Compute aggregates & peak powers dynamically
+  const maxTrackingPower = intradayTrackingPower.length > 0 ? Math.max(0, ...intradayTrackingPower) : 0;
+  const maxStaticPower = intradayStaticPower.length > 0 ? Math.max(0, ...intradayStaticPower) : 0;
   const totalTrkKwh = filteredHistory.reduce((acc, cur) => acc + cur.trackingKwh, 0);
   const totalStaKwh = filteredHistory.reduce((acc, cur) => acc + cur.staticKwh, 0);
   const avgGain = totalStaKwh > 0 ? (((totalTrkKwh - totalStaKwh) / totalStaKwh) * 100).toFixed(1) : 0;
@@ -354,6 +358,21 @@ export default function ChartsSection({ intradayData, history30Days }) {
               <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
                 06:00 - 18:00 (WATT)
               </span>
+              {onClearCharts && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Bạn có chắc chắn muốn đặt lại dữ liệu của các sơ đồ về 0?')) {
+                      onClearCharts();
+                    }
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/15 border border-transparent hover:border-white/20 transition-all cursor-pointer"
+                  title="Xóa/Đặt lại dữ liệu biểu đồ về 0"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -377,14 +396,14 @@ export default function ChartsSection({ intradayData, history30Days }) {
           <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
             <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
             <div>
-              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Tracking: 78.4W</span>
+              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Tracking: {maxTrackingPower.toFixed(1)}W</span>
               <span className="text-white/30 mx-2.5">|</span>
-              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">Cố định: 52.1W</span>
+              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">Cố định: {maxStaticPower.toFixed(1)}W</span>
             </div>
           </div>
         </div>
 
-        {/* 2. ĐỒ THỊ 30 NGÀY SO SÁNH SẢN LƯỢNG (30-DAY BAR CHART + GAIN LINE) */}
+        {/* 2. ĐỒ THỊ SO SÁNH SẢN LƯỢNG (BAR CHART + GAIN LINE) */}
         <div 
           onClick={() => setExpandedChart('history')}
           className="panel-card flex flex-col justify-between shadow-xl cursor-pointer hover:border-white/40 group transition-all"
@@ -405,7 +424,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
                 className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md"
                 onClick={(e) => e.stopPropagation()}
               >
-                {[7, 14, 30].map(days => (
+                {[1, 7, 14, 30].map(days => (
                   <button
                     key={days}
                     onClick={(e) => {
@@ -422,6 +441,22 @@ export default function ChartsSection({ intradayData, history30Days }) {
                   </button>
                 ))}
               </div>
+
+              {onClearCharts && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Bạn có chắc chắn muốn đặt lại dữ liệu của các sơ đồ về 0?')) {
+                      onClearCharts();
+                    }
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-white/15 border border-transparent hover:border-white/20 transition-all cursor-pointer"
+                  title="Xóa/Đặt lại dữ liệu biểu đồ về 0"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -495,7 +530,7 @@ export default function ChartsSection({ intradayData, history30Days }) {
               <div className="flex items-center gap-3">
                 {expandedChart === 'history' && (
                   <div className="flex items-center gap-1 bg-black/30 p-1.5 rounded-xl border border-white/20 backdrop-blur-md">
-                    {[7, 14, 30].map(days => (
+                    {[1, 7, 14, 30].map(days => (
                       <button
                         key={days}
                         onClick={() => setHistoryRange(days)}
@@ -537,9 +572,9 @@ export default function ChartsSection({ intradayData, history30Days }) {
                 <>
                   <span className="font-semibold text-zinc-300">Công suất cực đại hôm nay:</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: 78.4W</span>
+                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: {maxTrackingPower.toFixed(1)}W</span>
                     <span className="text-white/30">|</span>
-                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: 52.1W</span>
+                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: {maxStaticPower.toFixed(1)}W</span>
                   </div>
                 </>
               ) : (

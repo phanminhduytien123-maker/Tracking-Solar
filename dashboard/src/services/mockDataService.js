@@ -8,25 +8,14 @@ export function generate30DaysHistory() {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-    
-    // Seasonal & weather fluctuation (clear vs partly cloudy days)
-    const weatherFactor = 0.78 + 0.22 * Math.sin(i * 0.45 + 1.2);
-    const noise = (Math.random() - 0.5) * 0.08;
-    const factor = Math.max(0.65, Math.min(1.0, weatherFactor + noise));
-
-    // Daily energy in kWh (e.g. 50W - 100W prototype scale)
-    const staticKwh = parseFloat((0.36 * factor + (Math.random() * 0.03)).toFixed(3));
-    // Tracking panel gains 28% to 42% more energy over static
-    const gainPercent = 28 + (14 * factor) + (Math.random() * 3 - 1.5);
-    const trackingKwh = parseFloat((staticKwh * (1 + gainPercent / 100)).toFixed(3));
 
     history.push({
       date: dateStr,
       fullDate: d.toISOString().split('T')[0],
-      staticKwh,
-      trackingKwh,
-      gainPercent: parseFloat(gainPercent.toFixed(1)),
-      diffKwh: parseFloat((trackingKwh - staticKwh).toFixed(3))
+      staticKwh: 0.0,
+      trackingKwh: 0.0,
+      gainPercent: 0.0,
+      diffKwh: 0.0
     });
   }
   return history;
@@ -34,32 +23,14 @@ export function generate30DaysHistory() {
 
 export function generateIntradayProfile() {
   const points = [];
-  // 06:00 to 18:00 hourly profile baseline
+  // 06:00 to 18:00 hourly profile baseline (khởi tạo về 0, nhận dữ liệu đo thật từ hệ thống)
   for (let hour = 6; hour <= 18; hour += 0.5) {
     const hStr = `${Math.floor(hour).toString().padStart(2, '0')}:${hour % 1 === 0 ? '00' : '30'}`;
-    const tNorm = (hour - 6) / 12; // 0 to 1
-    const sunElevation = Math.sin(tNorm * Math.PI); // 0 -> 1 -> 0
-    
-    if (sunElevation <= 0) {
-      points.push({ time: hStr, pTracking: 0, pStatic: 0, gain: 0 });
-      continue;
-    }
-
-    // Static panel has cos(theta) misalignment especially in morning & late afternoon
-    // Assume static panel fixed South at 15 deg tilt
-    const staticFactor = Math.pow(sunElevation, 1.8);
-    const trackingFactor = Math.pow(sunElevation, 0.95);
-
-    const maxPower = 80; // Watts
-    const pStatic = Math.max(0, parseFloat((maxPower * staticFactor * 0.88).toFixed(1)));
-    const pTracking = Math.max(0, parseFloat((maxPower * trackingFactor * 0.98).toFixed(1)));
-    const gain = pStatic > 0 ? parseFloat((((pTracking - pStatic) / pStatic) * 100).toFixed(1)) : 0;
-
     points.push({
       time: hStr,
-      pTracking,
-      pStatic,
-      gain
+      pTracking: 0.0,
+      pStatic: 0.0,
+      gain: 0.0
     });
   }
   return points;
@@ -84,9 +55,9 @@ export class MockTelemetryEngine {
     this.psoGbest = 0.9845;
     this.psoStatus = 'CONVERGED'; // 'OPTIMIZING' | 'CONVERGED' | 'IDLE'
 
-    // Cumulative energy accumulated in Wh
-    this.energyTrackingWh = 485.4;
-    this.energyStaticWh = 346.2;
+    // Cumulative energy accumulated in Wh (bắt đầu từ 0)
+    this.energyTrackingWh = 0.0;
+    this.energyStaticWh = 0.0;
 
     this.lastTickTime = Date.now();
   }

@@ -120,7 +120,7 @@ export default function App() {
     return dataSource === 'firebase' ? getCleanZeroTelemetry() : mockEngineRef.current.getNextState();
   });
   const [intradayData, setIntradayData] = useState(() => generateIntradayProfile());
-  const [history30Days] = useState(() => generate30DaysHistory());
+  const [history30Days, setHistory30Days] = useState(() => generate30DaysHistory());
 
   // Save settings to localStorage
   useEffect(() => {
@@ -286,12 +286,44 @@ export default function App() {
     return () => clearInterval(timer);
   }, [dataSource, refreshRate]);
 
+  // Action: Clear / Reset Chart Data
+  const handleClearCharts = () => {
+    setIntradayData(generateIntradayProfile());
+    setHistory30Days(generate30DaysHistory());
+  };
+
+  // Sync today's accumulated energy to the latest day entry in history30Days
+  useEffect(() => {
+    const trkKwh = Number(telemetry?.ina219?.tracking?.energyKwh || 0);
+    const staKwh = Number(telemetry?.ina219?.static?.energyKwh || 0);
+    if (trkKwh > 0 || staKwh > 0) {
+      setHistory30Days((prev) => {
+        if (!prev || prev.length === 0) return prev;
+        const lastIdx = prev.length - 1;
+        const today = prev[lastIdx];
+        if (today.trackingKwh === trkKwh && today.staticKwh === staKwh) return prev;
+        const diffKwh = parseFloat((trkKwh - staKwh).toFixed(3));
+        const gain = staKwh > 0 ? parseFloat((((trkKwh - staKwh) / staKwh) * 100).toFixed(1)) : 0;
+        const updated = [...prev];
+        updated[lastIdx] = {
+          ...today,
+          trackingKwh: trkKwh,
+          staticKwh: staKwh,
+          gainPercent: gain,
+          diffKwh
+        };
+        return updated;
+      });
+    }
+  }, [telemetry?.ina219?.tracking?.energyKwh, telemetry?.ina219?.static?.energyKwh]);
+
   // Action: Clear Firebase Data
   const handleClearFirebase = async () => {
     if (window.confirm('Bạn có chắc chắn muốn xoá sạch toàn bộ dữ liệu trên Firebase không?')) {
       await firebaseServiceRef.current.clearAllData();
       setTelemetry(getCleanZeroTelemetry());
-      alert('Đã xoá sạch dữ liệu trên Firebase!');
+      handleClearCharts();
+      alert('Đã xoá sạch dữ liệu trên Firebase và làm mới các sơ đồ!');
     }
   };
 
@@ -514,6 +546,7 @@ export default function App() {
           <ChartsSection 
             intradayData={intradayData}
             history30Days={history30Days}
+            onClearCharts={handleClearCharts}
           />
         </section>
 
