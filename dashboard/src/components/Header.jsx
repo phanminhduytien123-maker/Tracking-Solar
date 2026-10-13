@@ -59,11 +59,11 @@ export default function Header({
 
   return (
     <header className="border-b border-zinc-200 bg-white text-zinc-950 sticky top-0 z-40 shadow-xs relative">
-      {/* Top Main Bar */}
-      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 relative">
+      {/* Top Main Bar: Edge-to-edge layout with ample space */}
+      <div className="w-full px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4 relative">
         
-        {/* Left: Mobile Title / Desktop Logo + Weather Widget */}
-        <div className="flex items-center gap-3 shrink min-w-0">
+        {/* Left: Logo + Brand Title + Weather Widget */}
+        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 min-w-0">
           {/* Mobile Title */}
           <h1 className="sm:hidden text-base font-sans font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
             TRACKING SOLAR
@@ -73,12 +73,22 @@ export default function Header({
           <img 
             src="/tdt_logo.png" 
             alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="hidden sm:block h-10 md:h-11 w-auto object-contain"
+            className="hidden sm:block h-10 md:h-11 w-auto object-contain shrink-0"
           />
 
-          {/* Weather Widget right beside Logo */}
+          {/* Desktop Brand Title placed cleanly next to Logo */}
+          <div className="hidden sm:flex flex-col border-l border-zinc-300 pl-3 shrink-0">
+            <h1 className="text-xl md:text-2xl font-sans font-black tracking-tight text-zinc-950 uppercase leading-none">
+              TRACKING SOLAR
+            </h1>
+            <span className="text-[10px] md:text-[11px] font-semibold text-zinc-500 tracking-wider uppercase mt-0.5">
+              Hệ thống điều khiển 2 trục
+            </span>
+          </div>
+
+          {/* Weather Widget right beside Logo & Title */}
           {weatherData && (
-            <div className="hidden sm:block">
+            <div className="hidden md:block shrink-0">
               <WeatherWidget 
                 weatherData={weatherData}
                 isLoading={isLoadingWeather}
@@ -89,13 +99,6 @@ export default function Header({
               />
             </div>
           )}
-        </div>
-
-        {/* Center (Desktop): Title TRACKING SOLAR Centered */}
-        <div className="hidden sm:flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
-          <h1 className="text-2xl lg:text-[26px] font-sans font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
-            TRACKING SOLAR
-          </h1>
         </div>
 
         {/* Mobile Right: Logo */}
@@ -222,12 +225,13 @@ export default function Header({
         <div className="bg-red-900 border-t border-b border-red-700 px-4 sm:px-6 py-2 text-xs text-white font-mono flex items-center justify-between">
           <div className="flex items-center gap-2 overflow-x-auto py-0.5">
             <AlertTriangle className="w-4 h-4 text-red-200 shrink-0" />
-            <span className="font-bold uppercase tracking-wider text-xs">CẢNH BÁO:</span>
+            <span className="font-bold uppercase tracking-wider text-xs">CẢNH BÁO SỰ CỐ:</span>
             <div className="flex items-center gap-2 whitespace-nowrap text-xs">
-              {system?.estop && <span className="font-bold text-white">[EMERGENCY STOP]</span>}
-              {system?.errors?.limitSwitchMinTriggered && <span>[LIMIT MIN]</span>}
-              {system?.errors?.limitSwitchMaxTriggered && <span>[LIMIT MAX]</span>}
-              {system?.errors?.sensorLost && <span>[MẤT CẢM BIẾN]</span>}
+              {system?.estop && <span className="font-bold text-white">[DỪNG KHẨN CẤP E-STOP]</span>}
+              {system?.errors?.driverFault && <span>[LỖI DRIVER ĐỘNG CƠ]</span>}
+              {system?.errors?.sensorLost && <span>[MẤT KẾT NỐI CẢM BIẾN]</span>}
+              {system?.errors?.limitSwitchMinTriggered && <span>[SỰ CỐ CTHT MIN]</span>}
+              {system?.errors?.limitSwitchMaxTriggered && <span>[SỰ CỐ CTHT MAX]</span>}
             </div>
           </div>
           {system?.estop && (

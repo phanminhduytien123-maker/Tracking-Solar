@@ -609,7 +609,7 @@ export default function App() {
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="max-w-[1720px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-3.5 sm:space-y-5 pb-24 sm:pb-8 flex-1 relative z-10">
+      <main className="w-full px-3 sm:px-6 lg:px-8 py-3 sm:py-5 space-y-3.5 sm:space-y-5 pb-24 sm:pb-8 flex-1 relative z-10">
 
         {/* HERO: TRỰC QUAN 2 TẤM PIN MẶT TRỜI + GÓC ĐỘNG CƠ + CÔNG SUẤT + % GAIN */}
         <section aria-label="So sánh trực quan 2 tấm pin mặt trời">
@@ -688,8 +688,8 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-4 sm:px-6 text-center text-xs text-white/70 relative z-10">
-        <div className="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-2">
+      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-3 sm:px-6 lg:px-8 text-center text-xs text-white/70 relative z-10">
+        <div className="w-full flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-white tracking-wide text-xs sm:text-sm">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2:  VÕ HỒNG PHÁT</span>
           </div>
