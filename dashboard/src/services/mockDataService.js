@@ -314,8 +314,8 @@ export class MockTelemetryEngine {
         errors: {
           sensorLost: false,
           driverFault: this.estop,
-          limitSwitchMinTriggered: lsAzHome,
-          limitSwitchMaxTriggered: lsEl90,
+          limitSwitchMinTriggered: false,
+          limitSwitchMaxTriggered: false,
           earlyWake: false,
           zenithClamp: this.epsilon >= 89.0,
           psoTimeout: false,

@@ -429,13 +429,13 @@ export class FirebaseSolarService {
         uptimeSeconds: Math.floor((Date.now() - (tracking.lastUpdate || staticPanel.lastUpdate || Date.now())) / 1000),
         rtcOffsetMs: Number(tracking.rtcOffsetMs || 0),
         errors: {
-          sensorLost: false,
-          driverFault: tracking.estop || false,
-          limitSwitchMinTriggered: tracking.limitMin || Math.abs(curPhi) <= 0.3,
-          limitSwitchMaxTriggered: tracking.limitMax || curEpsilon >= 89.5,
-          earlyWake: tracking.earlyWake || false,
+          sensorLost: Boolean(tracking.sensorLost),
+          driverFault: Boolean(tracking.estop || tracking.driverFault),
+          limitSwitchMinTriggered: Boolean(tracking.limitMinFault),
+          limitSwitchMaxTriggered: Boolean(tracking.limitMaxFault),
+          earlyWake: Boolean(tracking.earlyWake),
           zenithClamp: curEpsilon >= 89.0,
-          psoTimeout: algo.psoTimeout || false,
+          psoTimeout: Boolean(algo.psoTimeout),
           stepLossWarn: Math.abs(azStepLoss) > 50 || Math.abs(elStepLoss) > 50
         }
       },
