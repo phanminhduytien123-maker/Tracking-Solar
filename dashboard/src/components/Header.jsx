@@ -62,7 +62,7 @@ export default function Header({
       {/* Top Main Bar: Edge-to-edge layout with ample space */}
       <div className="w-full px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4 relative">
         
-        {/* Left: Logo + Brand Title + Weather Widget */}
+        {/* Left: Mobile Title / Desktop Logo + Weather Widget */}
         <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 min-w-0">
           {/* Mobile Title */}
           <h1 className="sm:hidden text-base font-sans font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
@@ -76,17 +76,7 @@ export default function Header({
             className="hidden sm:block h-10 md:h-11 w-auto object-contain shrink-0"
           />
 
-          {/* Desktop Brand Title placed cleanly next to Logo */}
-          <div className="hidden sm:flex flex-col border-l border-zinc-300 pl-3 shrink-0">
-            <h1 className="text-xl md:text-2xl font-sans font-black tracking-tight text-zinc-950 uppercase leading-none">
-              TRACKING SOLAR
-            </h1>
-            <span className="text-[10px] md:text-[11px] font-semibold text-zinc-500 tracking-wider uppercase mt-0.5">
-              Hệ thống điều khiển 2 trục
-            </span>
-          </div>
-
-          {/* Weather Widget right beside Logo & Title */}
+          {/* Weather Widget right beside Logo */}
           {weatherData && (
             <div className="hidden md:block shrink-0">
               <WeatherWidget 
@@ -101,6 +91,13 @@ export default function Header({
           )}
         </div>
 
+        {/* Center (Desktop): Title TRACKING SOLAR exactly in the middle */}
+        <div className="hidden sm:flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
+          <h1 className="text-xl md:text-2xl lg:text-[26px] font-sans font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
+            TRACKING SOLAR
+          </h1>
+        </div>
+
         {/* Mobile Right: Logo */}
         <div className="sm:hidden flex items-center justify-end shrink-0 max-w-[48%]">
           <img 
@@ -112,23 +109,6 @@ export default function Header({
 
         {/* Desktop Right: Status Badges & Quick Controls */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
-          
-          {/* Node Heartbeat & Status Badges */}
-          <div className="flex items-center gap-2">
-            {/* ESP32 Tracker Node Badge */}
-            <div 
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs font-mono"
-              title={system?.isSleeping ? `Tấm Xoay đang ngủ đông ban đêm (Dự kiến thức: ${system?.wakeAt || '03:00'})` : (system?.online ? 'ESP32 Tracker: Đã kết nối' : 'ESP32 Tracker: Mất tín hiệu')}
-            >
-              <span className={`w-2 h-2 rounded-full ${
-                system?.isSleeping 
-                  ? 'bg-indigo-500 animate-pulse' 
-                  : (system?.online ? 'bg-emerald-600 animate-pulse' : 'bg-rose-500')
-              }`}></span>
-              <span className="font-bold text-xs text-zinc-900">
-                {system?.isSleeping ? `Trk: 🌙Ngủ (${system?.wakeAt || '03:00'})` : (system?.online ? 'Trk: ON' : 'Trk: OFF')}
-              </span>
-            </div>
 
             {/* Cloud / Source Badge (Admin Only) */}
             {isAdmin && (
@@ -152,7 +132,6 @@ export default function Header({
                 </span>
               </div>
             )}
-          </div>
 
           {/* RTC Clock & Date Badge with RTC Offset */}
           <div 
