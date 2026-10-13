@@ -15,6 +15,7 @@ export default function Header({
   system = {}, 
   mode = 'AUTO', 
   dataSource = 'firebase',
+  firebaseConnected = false,
   currentUser = null,
   onLogout,
   onOpenManualModal, 
@@ -111,10 +112,21 @@ export default function Header({
           
           {/* Cloud / Source Badge (Admin Only) */}
           {isAdmin && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800">
+            <div 
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800"
+              title={
+                dataSource === 'firebase'
+                  ? (firebaseConnected 
+                      ? (system.online ? 'Firebase Cloud: Đang truyền dữ liệu ESP32 trực tiếp' : 'Firebase Cloud: Đã kết nối RTDB (Đang chờ gói tin ESP32)')
+                      : 'Firebase Cloud: Đang kết nối...')
+                  : (system.online ? 'Hệ thống đang hoạt động' : 'Chưa có kết nối')
+              }
+            >
               <span className={`w-2 h-2 rounded-full ${
-                system.online ? 'bg-emerald-600' : 'bg-zinc-400'
-              }`}></span>
+                (dataSource === 'firebase' ? firebaseConnected : system.online)
+                  ? 'bg-emerald-600'
+                  : 'bg-zinc-400'
+              } ${system.online ? 'animate-pulse' : ''}`}></span>
               <span className="font-bold text-xs text-zinc-900">
                 {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
               </span>

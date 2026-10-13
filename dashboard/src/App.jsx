@@ -533,6 +533,7 @@ export default function App() {
         system={telemetry.system}
         mode={telemetry.system.mode}
         dataSource={dataSource}
+        firebaseConnected={firebaseConnected}
         currentUser={authSession}
         onLogout={handleLogout}
         onOpenManualModal={() => setIsManualModalOpen(true)}
