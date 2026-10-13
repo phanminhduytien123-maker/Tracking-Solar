@@ -292,6 +292,24 @@ export default function App() {
     setHistory30Days(generate30DaysHistory());
   };
 
+  // Automatic Midnight (00:00) Reset Scheduler: tự động đặt lại dữ liệu đồ thị về 0 lúc 0h mỗi ngày
+  useEffect(() => {
+    let lastDay = new Date().getDate();
+
+    const midnightCheckTimer = setInterval(() => {
+      const now = new Date();
+      const currentDay = now.getDate();
+      if (currentDay !== lastDay) {
+        lastDay = currentDay;
+        console.log('[Auto-Reset 00:00] Sang ngày mới, tự động đặt lại dữ liệu đồ thị về 0!');
+        setIntradayData(generateIntradayProfile());
+        setHistory30Days(generate30DaysHistory());
+      }
+    }, 5000);
+
+    return () => clearInterval(midnightCheckTimer);
+  }, []);
+
   // Sync today's accumulated energy to the latest day entry in history30Days
   useEffect(() => {
     const trkKwh = Number(telemetry?.ina219?.tracking?.energyKwh || 0);

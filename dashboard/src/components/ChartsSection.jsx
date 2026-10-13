@@ -26,8 +26,15 @@ ChartJS.register(
   Filler
 );
 
+const RANGE_OPTIONS = [
+  { value: 1, label: 'Hôm nay' },
+  { value: 7, label: '7N' },
+  { value: 14, label: '14N' },
+  { value: 30, label: '30N' }
+];
+
 export default function ChartsSection({ intradayData, history30Days, onClearCharts }) {
-  const [historyRange, setHistoryRange] = useState(1); // 1, 7, 14, 30
+  const [historyRange, setHistoryRange] = useState(1); // 1 ('Hôm nay'), 7, 14, 30
   const [expandedChart, setExpandedChart] = useState(null); // 'intraday' | 'history' | null
 
   // Close on Escape key
@@ -178,8 +185,8 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
     }
   };
 
-  // 2. CHART 2 CONFIG: 30-DAY CUMULATIVE ENERGY
-  const historyLabels = filteredHistory.map(d => d.date);
+  // 2. CHART 2 CONFIG: CUMULATIVE ENERGY (Hôm nay / 7N / 14N / 30N)
+  const historyLabels = filteredHistory.map(d => (historyRange === 1 ? 'Hôm nay' : d.date));
   const historyTracking = filteredHistory.map(d => d.trackingKwh);
   const historyStatic = filteredHistory.map(d => d.staticKwh);
   const historyGain = filteredHistory.map(d => d.gainPercent);
@@ -414,7 +421,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
             <div className="flex items-center gap-2.5">
               <BarChart3 className="w-5 h-5 text-emerald-400" />
               <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-                Sản Lượng Năng Lượng Tích Lũy ({historyRange} Ngày)
+                Sản Lượng Năng Lượng Tích Lũy ({historyRange === 1 ? 'Hôm Nay' : `${historyRange} Ngày`})
               </span>
             </div>
             
@@ -424,20 +431,20 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                 className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md"
                 onClick={(e) => e.stopPropagation()}
               >
-                {[1, 7, 14, 30].map(days => (
+                {RANGE_OPTIONS.map(opt => (
                   <button
-                    key={days}
+                    key={opt.value}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setHistoryRange(days);
+                      setHistoryRange(opt.value);
                     }}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      historyRange === days
+                    className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      historyRange === opt.value
                         ? 'bg-white text-zinc-950 shadow-md font-black'
                         : 'text-zinc-300 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    {days}N
+                    {opt.label}
                   </button>
                 ))}
               </div>
@@ -479,7 +486,9 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
 
           {/* Footer with Aggregate Metrics */}
           <div className="panel-footer text-xs sm:text-sm text-zinc-200 flex justify-between items-center font-medium">
-            <span className="font-semibold text-zinc-300">Tổng {historyRange} ngày:</span>
+            <span className="font-semibold text-zinc-300">
+              {historyRange === 1 ? 'Tổng hôm nay:' : `Tổng ${historyRange} ngày:`}
+            </span>
             <div>
               <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
               <span className="text-white/30 mx-2.5">|</span>
@@ -515,7 +524,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                   <h2 className="text-base sm:text-xl font-black tracking-wide uppercase text-white">
                     {expandedChart === 'intraday' 
                       ? 'CÔNG SUẤT TỨC THỜI TRONG NGÀY (CHI TIẾT PHÓNG TO)'
-                      : `SẢN LƯỢNG NĂNG LƯỢNG TÍCH LŨY (${historyRange} NGÀY)`
+                      : `SẢN LƯỢNG NĂNG LƯỢNG TÍCH LŨY (${historyRange === 1 ? 'HÔM NAY' : `${historyRange} NGÀY`})`
                     }
                   </h2>
                   <span className="text-xs text-zinc-300 font-medium hidden sm:inline-block">
@@ -530,17 +539,17 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
               <div className="flex items-center gap-3">
                 {expandedChart === 'history' && (
                   <div className="flex items-center gap-1 bg-black/30 p-1.5 rounded-xl border border-white/20 backdrop-blur-md">
-                    {[1, 7, 14, 30].map(days => (
+                    {RANGE_OPTIONS.map(opt => (
                       <button
-                        key={days}
-                        onClick={() => setHistoryRange(days)}
-                        className={`px-3.5 py-1 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer ${
-                          historyRange === days
+                        key={opt.value}
+                        onClick={() => setHistoryRange(opt.value)}
+                        className={`px-3 sm:px-3.5 py-1 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                          historyRange === opt.value
                             ? 'bg-white text-zinc-950 shadow-md font-black'
                             : 'text-zinc-300 hover:text-white hover:bg-white/10'
                         }`}
                       >
-                        {days}N
+                        {opt.label}
                       </button>
                     ))}
                   </div>
@@ -579,7 +588,9 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                 </>
               ) : (
                 <>
-                  <span className="font-semibold text-zinc-300">Tổng năng lượng {historyRange} ngày:</span>
+                  <span className="font-semibold text-zinc-300">
+                    {historyRange === 1 ? 'Tổng năng lượng hôm nay:' : `Tổng năng lượng ${historyRange} ngày:`}
+                  </span>
                   <div className="flex items-center gap-3">
                     <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: {totalTrkKwh.toFixed(2)} kWh</span>
                     <span className="text-white/30">|</span>
