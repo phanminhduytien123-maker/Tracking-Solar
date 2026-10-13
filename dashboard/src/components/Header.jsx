@@ -110,33 +110,57 @@ export default function Header({
         {/* Desktop Right: Status Badges & Quick Controls */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
           
-          {/* Cloud / Source Badge (Admin Only) */}
-          {isAdmin && (
+          {/* Node Heartbeat & Status Badges */}
+          <div className="flex items-center gap-2">
+            {/* ESP32 Tracker Node Badge */}
             <div 
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800"
-              title={
-                dataSource === 'firebase'
-                  ? (firebaseConnected 
-                      ? (system.online ? 'Firebase Cloud: Đang truyền dữ liệu ESP32 trực tiếp' : 'Firebase Cloud: Đã kết nối RTDB (Đang chờ gói tin ESP32)')
-                      : 'Firebase Cloud: Đang kết nối...')
-                  : (system.online ? 'Hệ thống đang hoạt động' : 'Chưa có kết nối')
-              }
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs font-mono"
+              title={system?.isSleeping ? `Tấm Xoay đang ngủ đông ban đêm (Dự kiến thức: ${system?.wakeAt || '03:00'})` : (system?.online ? 'ESP32 Tracker: Đã kết nối' : 'ESP32 Tracker: Mất tín hiệu')}
             >
               <span className={`w-2 h-2 rounded-full ${
-                (dataSource === 'firebase' ? firebaseConnected : system.online)
-                  ? 'bg-emerald-600'
-                  : 'bg-zinc-400'
-              } ${system.online ? 'animate-pulse' : ''}`}></span>
+                system?.isSleeping 
+                  ? 'bg-indigo-500 animate-pulse' 
+                  : (system?.online ? 'bg-emerald-600 animate-pulse' : 'bg-rose-500')
+              }`}></span>
               <span className="font-bold text-xs text-zinc-900">
-                {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
+                {system?.isSleeping ? `Trk: 🌙Ngủ (${system?.wakeAt || '03:00'})` : (system?.online ? 'Trk: ON' : 'Trk: OFF')}
               </span>
             </div>
-          )}
 
-          {/* Clock & Date Badge (Always visible for all users) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-mono">
+            {/* Cloud / Source Badge (Admin Only) */}
+            {isAdmin && (
+              <div 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800"
+                title={
+                  dataSource === 'firebase'
+                    ? (firebaseConnected 
+                        ? (system.online ? 'Firebase Cloud: Đang truyền dữ liệu ESP32 trực tiếp' : 'Firebase Cloud: Đã kết nối RTDB (Đang chờ gói tin ESP32)')
+                        : 'Firebase Cloud: Đang kết nối...')
+                    : (system.online ? 'Hệ thống đang hoạt động' : 'Chưa có kết nối')
+                }
+              >
+                <span className={`w-2 h-2 rounded-full ${
+                  (dataSource === 'firebase' ? firebaseConnected : system.online)
+                    ? 'bg-emerald-600'
+                    : 'bg-zinc-400'
+                } ${system.online ? 'animate-pulse' : ''}`}></span>
+                <span className="font-bold text-xs text-zinc-900">
+                  {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* RTC Clock & Date Badge with RTC Offset */}
+          <div 
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-mono cursor-help"
+            title={`Thời gian đồng bộ RTC DS3231 của thiết bị. Độ lệch so với Server: ${system?.rtcOffsetMs !== undefined ? `${system.rtcOffsetMs} ms` : '±0 ms'}`}
+          >
             <Clock className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="font-bold text-xs text-zinc-950">{formattedTime}</span>
+            <span className="font-bold text-xs text-zinc-950">RTC {formattedTime}</span>
+            <span className="hidden lg:inline text-[10px] text-zinc-500 font-semibold font-mono">
+              (Δ {system?.rtcOffsetMs !== undefined ? `${system.rtcOffsetMs}ms` : '0ms'})
+            </span>
             <span className="hidden md:inline text-zinc-400">|</span>
             <span className="hidden md:inline text-zinc-700 font-sans font-medium">{formattedDate}</span>
           </div>
