@@ -149,6 +149,14 @@ export class FirebaseSolarService {
 
     this.onStatusChange({ connected: false, connecting: true });
 
+    // Official Firebase RTDB connection listener (.info/connected)
+    this.connectedRef = ref(this.db, '.info/connected');
+    onValue(this.connectedRef, (snap) => {
+      const isOnline = snap.val() === true;
+      this.isConnected = isOnline;
+      this.onStatusChange({ connected: isOnline, connecting: !isOnline });
+    });
+
     // Khởi động bộ Watchdog quét liên tục mỗi 500ms để phát hiện mất kết nối quá 3s
     if (this.watchdogTimer) clearInterval(this.watchdogTimer);
     this.watchdogTimer = setInterval(() => {
@@ -211,6 +219,10 @@ export class FirebaseSolarService {
     if (this.solarRef) {
       off(this.solarRef);
       this.solarRef = null;
+    }
+    if (this.connectedRef) {
+      off(this.connectedRef);
+      this.connectedRef = null;
     }
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
