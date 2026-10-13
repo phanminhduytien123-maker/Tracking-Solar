@@ -26,7 +26,7 @@ export function getCleanZeroTelemetry() {
         limitSwitchMaxTriggered: false
       }
     },
-    ina219: {
+    INA226: {
       tracking: {
         voltage: 0,
         current: 0,
@@ -108,9 +108,9 @@ export class FirebaseSolarService {
     this.solarRef = null;
     this.controlRef = null;
     this.isConnected = false;
-    this.onTelemetry = () => {};
-    this.onStatusChange = () => {};
-    this.onError = () => {};
+    this.onTelemetry = () => { };
+    this.onStatusChange = () => { };
+    this.onError = () => { };
 
     // Heartbeat Tracking: Lưu mốc thời gian nhận gói tin mới nhất của từng tấm
     this.lastTrackingRawUpdate = null;
@@ -123,9 +123,9 @@ export class FirebaseSolarService {
 
   init(config, callbacks = {}) {
     this.config = config;
-    this.onTelemetry = callbacks.onTelemetry || (() => {});
-    this.onStatusChange = callbacks.onStatusChange || (() => {});
-    this.onError = callbacks.onError || (() => {});
+    this.onTelemetry = callbacks.onTelemetry || (() => { });
+    this.onStatusChange = callbacks.onStatusChange || (() => { });
+    this.onError = callbacks.onError || (() => { });
 
     if (!config.databaseURL || !config.apiKey) {
       console.warn('[Firebase] Incomplete Firebase configuration');
@@ -265,15 +265,17 @@ export class FirebaseSolarService {
     const trkVolt = isTrackingOnline ? Number(tracking.voltage || 0) : 0.0;
     const trkCurr = isTrackingOnline ? Number(tracking.current || 0) : 0.0;
     const trkPower = isTrackingOnline ? Number(tracking.power || (trkVolt * trkCurr)) : 0.0;
-    const trkEnergyKwh = Number(tracking.dailyEnergy || 0);
-    const trkEnergyWh = trkEnergyKwh * 1000;
+    const trkEnergyRaw = Number(tracking.dailyEnergyWh !== undefined ? tracking.dailyEnergyWh : (tracking.dailyEnergy || 0));
+    const trkEnergyWh = tracking.dailyEnergyWh !== undefined ? Number(tracking.dailyEnergyWh) : (trkEnergyRaw < 1.0 && trkEnergyRaw > 0 ? trkEnergyRaw * 1000 : trkEnergyRaw);
+    const trkEnergyKwh = trkEnergyWh / 1000;
 
     // Dữ liệu Tấm Cố Định (Nếu Offline -> trả về 0)
     const staVolt = isStaticOnline ? Number(staticPanel.voltage || 0) : 0.0;
     const staCurr = isStaticOnline ? Number(staticPanel.current || 0) : 0.0;
     const staPower = isStaticOnline ? Number(staticPanel.power || (staVolt * staCurr)) : 0.0;
-    const staEnergyKwh = Number(staticPanel.dailyEnergy || 0);
-    const staEnergyWh = staEnergyKwh * 1000;
+    const staEnergyRaw = Number(staticPanel.dailyEnergyWh !== undefined ? staticPanel.dailyEnergyWh : (staticPanel.dailyEnergy || 0));
+    const staEnergyWh = staticPanel.dailyEnergyWh !== undefined ? Number(staticPanel.dailyEnergyWh) : (staEnergyRaw < 1.0 && staEnergyRaw > 0 ? staEnergyRaw * 1000 : staEnergyRaw);
+    const staEnergyKwh = staEnergyWh / 1000;
 
     const percentGain = (isTrackingOnline && isStaticOnline && staPower > 0.1)
       ? Number((((trkPower - staPower) / staPower) * 100).toFixed(1))
@@ -318,7 +320,7 @@ export class FirebaseSolarService {
           limitSwitchMaxTriggered: tracking.limitMax || false
         }
       },
-      ina219: {
+      INA226: {
         tracking: {
           voltage: parseFloat(trkVolt.toFixed(2)),
           current: parseFloat(trkCurr.toFixed(3)),

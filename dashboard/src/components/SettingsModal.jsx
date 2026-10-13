@@ -99,12 +99,12 @@ export default function SettingsModal({
 // ESP32-S3 #1: DUAL-AXIS SOLAR TRACKER (FUZZY-PID & PSO)
 // Arduino IDE Libraries:
 // 1. Firebase ESP Client by Mobizt
-// 2. Adafruit INA219
+// 2. Adafruit  INA226
 // 3. ArduinoJson
 // =========================================================================
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
-#include <Adafruit_INA219.h>
+#include <Adafruit_ INA226.h>
 #include <addons/TokenHelper.h>
 #include <addons/RTDBHelper.h>
 
@@ -118,7 +118,7 @@ FirebaseData fbdo;
 FirebaseData fbdoStream;
 FirebaseAuth auth;
 FirebaseConfig config;
-Adafruit_INA219 ina219_trk(0x40);
+Adafruit_ INA226  INA226_trk(0x40);
 
 #define LDR_TOP 4
 #define LDR_BOTTOM 5
@@ -143,7 +143,7 @@ void streamTimeoutCallback(bool timeout) {
 
 void setup() {
   Serial.begin(115200);
-  ina219_trk.begin();
+   INA226_trk.begin();
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to WiFi");
@@ -168,8 +168,8 @@ void loop() {
   if (millis() - lastSend > 1000) {
     lastSend = millis();
 
-    float voltage = ina219_trk.getBusVoltage_V();
-    float current = ina219_trk.getCurrent_mA() / 1000.0;
+    float voltage =  INA226_trk.getBusVoltage_V();
+    float current =  INA226_trk.getCurrent_mA() / 1000.0;
     float power = voltage * current;
     totalEnergyWh += (power * (1.0 / 3600.0));
 
@@ -208,7 +208,7 @@ void loop() {
 // =========================================================================
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
-#include <Adafruit_INA219.h>
+#include <Adafruit_ INA226.h>
 
 #define WIFI_SSID "YOUR_WIFI_NAME"
 #define WIFI_PASSWORD "YOUR_WIFI_PASS"
@@ -219,14 +219,14 @@ void loop() {
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-Adafruit_INA219 ina219_sta(0x41);
+Adafruit_ INA226  INA226_sta(0x41);
 
 float totalEnergyWh = 0.0;
 unsigned long lastSend = 0;
 
 void setup() {
   Serial.begin(115200);
-  ina219_sta.begin();
+   INA226_sta.begin();
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
@@ -246,8 +246,8 @@ void loop() {
   if (millis() - lastSend > 1000) {
     lastSend = millis();
 
-    float voltage = ina219_sta.getBusVoltage_V();
-    float current = ina219_sta.getCurrent_mA() / 1000.0;
+    float voltage =  INA226_sta.getBusVoltage_V();
+    float current =  INA226_sta.getCurrent_mA() / 1000.0;
     float power = voltage * current;
     totalEnergyWh += (power * (1.0 / 3600.0));
 
@@ -275,7 +275,7 @@ void loop() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl modal-sheet-container">
       <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-zinc-700/80 bg-[#0d1017]">
-        
+
         {/* Mobile Grab Handle */}
         <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
 
@@ -299,31 +299,28 @@ void loop() {
         <div className="flex border-b border-zinc-800 bg-[#0d1017] px-4 sm:px-6 pt-2 gap-2 text-sm overflow-x-auto">
           <button
             onClick={() => setActiveTab('config')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
-              activeTab === 'config'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'config'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Nguồn dữ liệu
           </button>
           <button
             onClick={() => setActiveTab('location')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
-              activeTab === 'location'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'location'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Tọa độ lắp đặt
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${
-              activeTab === 'users'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${activeTab === 'users'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             <span>Quản lý người dùng</span>
             {usersList.some(u => u.status !== 'active') && (
@@ -332,31 +329,28 @@ void loop() {
           </button>
           <button
             onClick={() => setActiveTab('esp32_trk')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
-              activeTab === 'esp32_trk'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'esp32_trk'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Code ESP32 Tấm xoay
           </button>
           <button
             onClick={() => setActiveTab('esp32_fix')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
-              activeTab === 'esp32_fix'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'esp32_fix'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Code ESP32 Tấm cố định
           </button>
           <button
             onClick={() => setActiveTab('json')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${
-              activeTab === 'json'
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'json'
                 ? 'border-white text-white font-bold'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Dữ liệu thô (JSON)
           </button>
@@ -364,27 +358,26 @@ void loop() {
 
         {/* Body Content */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 max-h-[72vh] text-sm">
-          
+
           {/* TAB 1: CONFIG */}
           {activeTab === 'config' && (
             <div className="space-y-5">
-              
+
               {/* Mode Selector */}
               <div>
                 <label className="text-xs uppercase text-zinc-300 font-bold tracking-wider block mb-2.5">
                   CHỌN CHẾ ĐỘ NGUỒN DỮ LIỆU
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  
+
                   {/* FIREBASE CLOUD */}
                   <button
                     type="button"
                     onClick={() => setDataSource('firebase')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      dataSource === 'firebase'
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'firebase'
                         ? 'bg-zinc-800/90 text-white border-white shadow-md'
                         : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                    }`}
+                      }`}
                   >
                     <div className="font-bold text-sm text-white tracking-wide">
                       FIREBASE CLOUD
@@ -398,11 +391,10 @@ void loop() {
                   <button
                     type="button"
                     onClick={() => setDataSource('mock')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      dataSource === 'mock'
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'mock'
                         ? 'bg-zinc-800/90 text-white border-white shadow-md'
                         : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                    }`}
+                      }`}
                   >
                     <div className="font-bold text-sm text-white tracking-wide">
                       GIẢ LẬP DỮ LIỆU
@@ -416,11 +408,10 @@ void loop() {
                   <button
                     type="button"
                     onClick={() => setDataSource('esp32_ws')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      dataSource === 'esp32_ws'
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'esp32_ws'
                         ? 'bg-zinc-800/90 text-white border-white shadow-md'
                         : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                    }`}
+                      }`}
                   >
                     <div className="font-bold text-sm text-white tracking-wide">
                       WEBSOCKET ESP32
@@ -439,9 +430,8 @@ void loop() {
                     <span className="font-bold text-sm text-zinc-100 uppercase tracking-wide">
                       Thông số kết nối Firebase RTDB
                     </span>
-                    <span className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                      firebaseConnected ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                    }`}>
+                    <span className={`px-2.5 py-1 rounded text-xs font-semibold ${firebaseConnected ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                      }`}>
                       {firebaseConnected ? '● Đã kết nối' : '○ Chưa nhận dữ liệu'}
                     </span>
                   </div>
@@ -555,7 +545,7 @@ void loop() {
           {/* TAB 2: TỌA ĐỘ LẮP ĐẶT HỆ THỐNG */}
           {activeTab === 'location' && (
             <div className="animate-in fade-in duration-200">
-              <InstallationLocationTab 
+              <InstallationLocationTab
                 currentLocation={currentLocation}
                 onSelectLocation={onSelectLocation}
                 weatherData={weatherData}
@@ -566,21 +556,20 @@ void loop() {
           {/* TAB 3: QUẢN LÝ NGƯỜI DÙNG */}
           {activeTab === 'users' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              
+
               {/* Action Feedback Toast */}
               {userActionFeedback && (
-                <div className={`p-3 rounded-lg border flex items-center justify-between gap-2 text-xs font-semibold animate-in fade-in duration-150 ${
-                  userActionFeedback.type === 'success'
+                <div className={`p-3 rounded-lg border flex items-center justify-between gap-2 text-xs font-semibold animate-in fade-in duration-150 ${userActionFeedback.type === 'success'
                     ? 'bg-[#10241b] text-emerald-300 border-emerald-800/80'
                     : userActionFeedback.type === 'warning'
-                    ? 'bg-[#2a1d0d] text-amber-300 border-amber-800/80'
-                    : userActionFeedback.type === 'danger'
-                    ? 'bg-[#2a0e14] text-rose-300 border-rose-800/80'
-                    : 'bg-[#131722] text-zinc-300 border-zinc-700'
-                }`}>
+                      ? 'bg-[#2a1d0d] text-amber-300 border-amber-800/80'
+                      : userActionFeedback.type === 'danger'
+                        ? 'bg-[#2a0e14] text-rose-300 border-rose-800/80'
+                        : 'bg-[#131722] text-zinc-300 border-zinc-700'
+                  }`}>
                   <span>{userActionFeedback.message}</span>
-                  <button 
-                    onClick={() => setUserActionFeedback(null)} 
+                  <button
+                    onClick={() => setUserActionFeedback(null)}
                     className="text-white/60 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer"
                   >
                     ✕
@@ -610,9 +599,8 @@ void loop() {
                 {/* Stat 3: Locked */}
                 <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
                   <span className="text-xs text-zinc-400 font-medium block">Tài khoản bị khóa</span>
-                  <span className={`text-lg font-bold mt-0.5 block ${
-                    usersList.some(u => u.status !== 'active') ? 'text-rose-400' : 'text-zinc-400'
-                  }`}>
+                  <span className={`text-lg font-bold mt-0.5 block ${usersList.some(u => u.status !== 'active') ? 'text-rose-400' : 'text-zinc-400'
+                    }`}>
                     {usersList.filter(u => u.status !== 'active').length} bị khóa
                   </span>
                 </div>
@@ -666,20 +654,19 @@ void loop() {
                     const isLocked = isLocked1H || isLockedPerm;
 
                     // Remaining time for 1h lock
-                    const remainingMins = user.lockedUntil && Date.now() < user.lockedUntil 
+                    const remainingMins = user.lockedUntil && Date.now() < user.lockedUntil
                       ? Math.max(1, Math.ceil((user.lockedUntil - Date.now()) / 60000))
                       : null;
 
                     return (
-                      <div 
-                        key={user.id} 
-                        className={`p-4 rounded-xl border transition-all ${
-                          isLockedPerm
+                      <div
+                        key={user.id}
+                        className={`p-4 rounded-xl border transition-all ${isLockedPerm
                             ? 'bg-rose-950/20 border-rose-800/60 hover:border-rose-700'
                             : isLocked1H
-                            ? 'bg-amber-950/20 border-amber-800/60 hover:border-amber-700'
-                            : 'bg-[#131722] border-zinc-700/80 hover:border-zinc-500'
-                        }`}
+                              ? 'bg-amber-950/20 border-amber-800/60 hover:border-amber-700'
+                              : 'bg-[#131722] border-zinc-700/80 hover:border-zinc-500'
+                          }`}
                       >
                         {/* Header: User Info & Online Tag */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-zinc-800">
@@ -688,7 +675,7 @@ void loop() {
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 shrink-0">
                               {user.username.slice(0, 2).toUpperCase()}
                             </div>
-                            
+
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-white text-sm">
@@ -810,7 +797,7 @@ void loop() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-zinc-300">
-                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Xoay</b> (2 trục + INA219 + LDR + Firebase):
+                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Xoay</b> (2 trục +  INA226 + LDR + Firebase):
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32TrackerCode, 'trk')}
@@ -830,7 +817,7 @@ void loop() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-zinc-300">
-                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Cố Định</b> (INA219 + Firebase):
+                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Cố Định</b> ( INA226 + Firebase):
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32FixedCode, 'fix')}

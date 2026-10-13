@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-export default function DetailedTelemetryModal({ 
-  isOpen, 
-  onClose, 
+export default function DetailedTelemetryModal({
+  isOpen,
+  onClose,
   telemetry = {}
 }) {
   const [activeTab, setActiveTab] = useState('sensors'); // 'sensors' | 'fuzzy_pso' | 'electrical' | 'motors'
 
   if (!isOpen) return null;
 
-  const ina = telemetry?.ina219 || {};
+  const ina = telemetry?.INA226 || {};
   const trk = ina.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
   const sta = ina.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
 
@@ -29,10 +29,10 @@ export default function DetailedTelemetryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl modal-sheet-container">
-      
+
       {/* Modal Card */}
       <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-white/20">
-        
+
         {/* Mobile Grab Handle */}
         <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
 
@@ -57,23 +57,21 @@ export default function DetailedTelemetryModal({
           <button
             type="button"
             onClick={() => setActiveTab('sensors')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${
-              activeTab === 'sensors'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${activeTab === 'sensors'
+              ? 'border-white text-white font-bold'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
           >
-            Cảm biến quang trở (LDR)
+            Cảm biến TEMT6000
           </button>
-          
+
           <button
             type="button"
             onClick={() => setActiveTab('fuzzy_pso')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${
-              activeTab === 'fuzzy_pso'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${activeTab === 'fuzzy_pso'
+              ? 'border-white text-white font-bold'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
           >
             Thuật toán Fuzzy & PSO
           </button>
@@ -81,23 +79,21 @@ export default function DetailedTelemetryModal({
           <button
             type="button"
             onClick={() => setActiveTab('electrical')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${
-              activeTab === 'electrical'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${activeTab === 'electrical'
+              ? 'border-white text-white font-bold'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
           >
-            Đo lường điện INA219
+            Đo lường điện  INA226
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('motors')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${
-              activeTab === 'motors'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm ${activeTab === 'motors'
+              ? 'border-white text-white font-bold'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
           >
             Góc quay động cơ
           </button>
@@ -105,12 +101,12 @@ export default function DetailedTelemetryModal({
 
         {/* Tab Content Body */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-4 max-h-[72vh] sm:max-h-[68vh] text-sm">
-          
+
           {/* TAB 1: SENSORS (4 LDRs) */}
           {activeTab === 'sensors' && (
             <div className="space-y-4">
               <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
-                Ma trận 4 cảm biến quang trở (LDR Matrix)
+                Ma trận 4 cảm biến quang trở
               </span>
 
               {/* LDR Cross Visualizer */}
@@ -202,7 +198,7 @@ export default function DetailedTelemetryModal({
           {activeTab === 'electrical' && (
             <div className="space-y-4">
               <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
-                Bảng so sánh năng lượng INA219
+                Bảng so sánh năng lượng  INA226
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -226,7 +222,7 @@ export default function DetailedTelemetryModal({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-400 font-sans">Năng lượng ngày:</span>
-                      <span className="font-bold text-white">{trk.energyKwh.toFixed(3)} kWh</span>
+                      <span className="font-bold text-white">{trk.energyWh.toFixed(1)} Wh</span>
                     </div>
                   </div>
                 </div>
@@ -251,7 +247,7 @@ export default function DetailedTelemetryModal({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-400 font-sans">Năng lượng ngày:</span>
-                      <span className="font-bold text-white">{sta.energyKwh.toFixed(3)} kWh</span>
+                      <span className="font-bold text-white">{sta.energyWh.toFixed(1)} Wh</span>
                     </div>
                   </div>
                 </div>
@@ -268,14 +264,14 @@ export default function DetailedTelemetryModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-2.5 text-sm">
-                  <span className="text-xs font-bold text-white block pb-2 border-b border-zinc-800">TRỤC NGANG (AZIMUTH)</span>
+                  <span className="text-xs font-bold text-white block pb-2 border-b border-zinc-800">Phương vị (quay quanh Z)</span>
                   <div className="flex justify-between"><span className="text-zinc-400">Góc hiện tại:</span><span className="font-mono font-bold text-white">{az.currentAngle.toFixed(1)}°</span></div>
                   <div className="flex justify-between"><span className="text-zinc-400">Góc mục tiêu:</span><span className="font-mono font-bold text-white">{az.targetAngle.toFixed(1)}°</span></div>
                   <div className="flex justify-between"><span className="text-zinc-400">Xung Encoder:</span><span className="font-mono font-bold text-white">{az.encoderPulses} pulses</span></div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-2.5 text-sm">
-                  <span className="text-xs font-bold text-white block pb-2 border-b border-zinc-800">TRỤC ĐỨNG (ELEVATION)</span>
+                  <span className="text-xs font-bold text-white block pb-2 border-b border-zinc-800">Độ ngửa</span>
                   <div className="flex justify-between"><span className="text-zinc-400">Góc hiện tại:</span><span className="font-mono font-bold text-white">{el.currentAngle.toFixed(1)}°</span></div>
                   <div className="flex justify-between"><span className="text-zinc-400">Góc mục tiêu:</span><span className="font-mono font-bold text-white">{el.targetAngle.toFixed(1)}°</span></div>
                   <div className="flex justify-between"><span className="text-zinc-400">Xung Encoder:</span><span className="font-mono font-bold text-white">{el.encoderPulses} pulses</span></div>

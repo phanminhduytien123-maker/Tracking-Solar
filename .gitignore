@@ -42,4 +42,8 @@ Thumbs.db
 # Root raw video
 /Login_BG.mp4
 
+# Python cache
+__pycache__/
+*.pyc
+
 

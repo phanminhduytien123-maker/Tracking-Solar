@@ -3,7 +3,7 @@
 export function generate30DaysHistory() {
   const history = [];
   const today = new Date();
-  
+
   for (let i = 29; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
@@ -14,8 +14,11 @@ export function generate30DaysHistory() {
       fullDate: d.toISOString().split('T')[0],
       staticKwh: 0.0,
       trackingKwh: 0.0,
+      staticWh: 0.0,
+      trackingWh: 0.0,
       gainPercent: 0.0,
-      diffKwh: 0.0
+      diffKwh: 0.0,
+      diffWh: 0.0
     });
   }
   return history;
@@ -23,8 +26,8 @@ export function generate30DaysHistory() {
 
 export function generateIntradayProfile() {
   const points = [];
-  // 06:00 to 18:00 hourly profile baseline (khởi tạo về 0, nhận dữ liệu đo thật từ hệ thống)
-  for (let hour = 6; hour <= 18; hour += 0.5) {
+  // 05:00 to 19:00 hourly profile baseline (khởi tạo về 0, nhận dữ liệu đo thật từ hệ thống)
+  for (let hour = 5; hour <= 19; hour += 0.5) {
     const hStr = `${Math.floor(hour).toString().padStart(2, '0')}:${hour % 1 === 0 ? '00' : '30'}`;
     points.push({
       time: hStr,
@@ -40,7 +43,7 @@ export class MockTelemetryEngine {
   constructor() {
     this.mode = 'AUTO'; // 'AUTO' | 'MANUAL' | 'CALIBRATION' | 'PARK'
     this.estop = false;
-    
+
     // Motor positions
     this.azimuth = 164.5; // deg (0 - 360)
     this.elevation = 48.2; // deg (0 - 90)
@@ -127,7 +130,7 @@ export class MockTelemetryEngine {
     if (this.mode === 'AUTO') {
       this.targetAzimuth = parseFloat(theoreticalSunAzimuth.toFixed(1));
       this.targetElevation = parseFloat(theoreticalSunElevation.toFixed(1));
-      
+
       // Motor tracking dynamics (smooth convergence towards target)
       const azDiff = this.targetAzimuth - this.azimuth;
       const elDiff = this.targetElevation - this.elevation;
@@ -185,7 +188,7 @@ export class MockTelemetryEngine {
       }
     }
 
-    // INA219 Power telemetry (Tracking Panel vs Static Panel)
+    //  INA226 Power telemetry (Tracking Panel vs Static Panel)
     let vTracking = 0;
     let iTracking = 0;
     let pTracking = 0;
@@ -195,7 +198,7 @@ export class MockTelemetryEngine {
 
     if (isDaytime) {
       const sunIntensity = Math.sin(dayProgress * Math.PI);
-      
+
       // Tracking panel operates at near-perpendicular irradiance (cos factor ~ 0.99)
       const trackingAlignment = Math.max(0.7, Math.cos((totalError * Math.PI) / 180));
       vTracking = 18.2 + sunIntensity * 1.6 + (Math.random() - 0.5) * 0.08;
@@ -222,7 +225,7 @@ export class MockTelemetryEngine {
     }
 
     // Calculate % Gain
-    const percentGain = pStatic > 0.5 
+    const percentGain = pStatic > 0.5
       ? parseFloat((((pTracking - pStatic) / pStatic) * 100).toFixed(1))
       : 0.0;
 
@@ -248,7 +251,7 @@ export class MockTelemetryEngine {
           limitSwitchMaxTriggered: lsAzMax || lsElMax,
         }
       },
-      ina219: {
+      INA226: {
         tracking: {
           voltage: parseFloat(vTracking.toFixed(2)),
           current: parseFloat(iTracking.toFixed(2)),

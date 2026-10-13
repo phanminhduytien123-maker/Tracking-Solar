@@ -1,21 +1,21 @@
 import React from 'react';
 import { Zap, TrendingUp, Compass, SunMedium } from 'lucide-react';
 
-export default function KpiCards({ ina219 }) {
-  const tracking = ina219?.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const stat = ina219?.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const comparison = ina219?.comparison || { percentGain: 0, powerDelta: 0, energyDeltaWh: 0 };
+export default function KpiCards({ INA226 }) {
+  const tracking = INA226?.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
+  const stat = INA226?.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
+  const comparison = INA226?.comparison || { percentGain: 0, powerDelta: 0, energyDeltaWh: 0 };
 
   const isPositiveGain = comparison.percentGain >= 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 lg:gap-4">
-      
+
       {/* 1. TẤM PIN TRACKING (Fuzzy-PID + PSO) */}
       <div className="panel-card flex flex-col justify-between overflow-hidden relative">
         {/* Subtle decorative top border highlight */}
         <div className="h-[2px] w-full bg-zinc-400 opacity-60"></div>
-        
+
         <div className="p-4 sm:p-5">
           {/* Card Header */}
           <div className="flex items-center justify-between pb-3 border-b border-[#1c1f28]">
@@ -28,7 +28,7 @@ export default function KpiCards({ ina219 }) {
                   Tấm Pin Tracking
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  Fuzzy-PID + PSO (INA219 #1)
+                  Fuzzy-PID + PSO ( INA226 #1)
                 </span>
               </div>
             </div>
@@ -76,7 +76,7 @@ export default function KpiCards({ ina219 }) {
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between">
           <span>Tích lũy ngày:</span>
-          <span className="text-zinc-200 font-medium">{tracking.energyKwh.toFixed(3)} kWh</span>
+          <span className="text-zinc-200 font-medium">{tracking.energyWh.toFixed(1)} Wh</span>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export default function KpiCards({ ina219 }) {
                   Tấm Pin Cố Định
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  Cố định South 15° (INA219 #2)
+                  Cố định South 15° ( INA226 #2)
                 </span>
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function KpiCards({ ina219 }) {
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between">
           <span>Tích lũy ngày:</span>
-          <span className="text-zinc-300 font-medium">{stat.energyKwh.toFixed(3)} kWh</span>
+          <span className="text-zinc-300 font-medium">{stat.energyWh.toFixed(1)} Wh</span>
         </div>
       </div>
 

@@ -17,10 +17,10 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-4">
-      
+
       {/* LEFT: NEMA 23 STEPPER 2-AXIS POSITION WIDGET (7 COLS) */}
       <div className="lg:col-span-7 panel-card flex flex-col justify-between">
-        
+
         {/* Header */}
         <div className="panel-header flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -36,14 +36,14 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
         {/* Content Body */}
         <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* TRỤC NGANG (AZIMUTH) */}
+
+          {/* Phương vị (quay quanh Z) */}
           <div className="panel-subtle p-3.5 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-2 border-b border-[#1f222d]">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-zinc-300"></span>
-                  <span className="text-xs font-semibold uppercase text-zinc-100">Trục Ngang (Azimuth)</span>
+                  <span className="text-xs font-semibold uppercase text-zinc-100">Phương vị (quay quanh Z)</span>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-400">0° - 360°</span>
               </div>
@@ -66,7 +66,7 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
               {/* Progress / Angle Bar */}
               <div className="w-full bg-[#101217] rounded-full h-1.5 overflow-hidden border border-[#202430]">
-                <div 
+                <div
                   className="bg-zinc-200 h-full transition-all duration-300"
                   style={{ width: `${Math.min(100, (az.currentAngle / 360) * 100)}%` }}
                 ></div>
@@ -99,13 +99,13 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             </div>
           </div>
 
-          {/* TRỤC ĐỨNG (ELEVATION) */}
+          {/* Độ ngửa */}
           <div className="panel-subtle p-3.5 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-2 border-b border-[#1f222d]">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-zinc-300"></span>
-                  <span className="text-xs font-semibold uppercase text-zinc-100">Trục Đứng (Elevation)</span>
+                  <span className="text-xs font-semibold uppercase text-zinc-100">Độ ngửa</span>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-400">0° - 90°</span>
               </div>
@@ -128,7 +128,7 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
               {/* Progress / Angle Bar */}
               <div className="w-full bg-[#101217] rounded-full h-1.5 overflow-hidden border border-[#202430]">
-                <div 
+                <div
                   className="bg-zinc-200 h-full transition-all duration-300"
                   style={{ width: `${Math.min(100, (el.currentAngle / 90) * 100)}%` }}
                 ></div>
@@ -172,7 +172,7 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
       {/* RIGHT: CỤM 4 CẢM BIẾN TEMT6000 & SUN TARGET COMPASS (5 COLS) */}
       <div className="lg:col-span-5 panel-card flex flex-col justify-between">
-        
+
         {/* Header */}
         <div className="panel-header flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -188,9 +188,9 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
 
         {/* Body Visual Compass Layout */}
         <div className="p-4 flex flex-col items-center justify-center flex-1">
-          
+
           <div className="relative w-full max-w-[280px] h-[220px] flex items-center justify-center">
-            
+
             {/* Compass Center Target Ring */}
             <div className="absolute w-32 h-32 rounded-full border border-dashed border-[#2d3240] flex items-center justify-center pointer-events-none">
               <div className="w-20 h-20 rounded-full border border-[#222632] flex items-center justify-center">
@@ -199,7 +199,7 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             </div>
 
             {/* Dynamic Sun Centroid Dot */}
-            <div 
+            <div
               className="absolute w-4 h-4 rounded-full bg-white shadow-lg pointer-events-none transition-all duration-300 flex items-center justify-center"
               style={{
                 transform: `translate(${centroidX}px, ${centroidY}px)`,

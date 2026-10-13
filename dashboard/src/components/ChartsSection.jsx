@@ -137,10 +137,10 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         padding: 14,
         boxPadding: 6,
         callbacks: {
-          label: function(context) {
+          label: function (context) {
             return ` ${context.dataset.label}: ${context.parsed.y.toFixed(1)} W`;
           },
-          footer: function(items) {
+          footer: function (items) {
             if (items.length >= 2) {
               const trk = items[0].parsed.y;
               const sta = items[1].parsed.y;
@@ -175,11 +175,12 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         ticks: {
           color: '#cbd5e1',
           font: { family: 'Plus Jakarta Sans', size: 12, weight: '700' },
-          callback: function(value) {
+          callback: function (value) {
             return `${value} W`;
           }
         },
-        suggestedMax: 90,
+        suggestedMax: 40,
+        max: 40,
         beginAtZero: true
       }
     }
@@ -187,8 +188,8 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
 
   // 2. CHART 2 CONFIG: CUMULATIVE ENERGY (Hôm nay / 7N / 14N / 30N)
   const historyLabels = filteredHistory.map(d => (historyRange === 1 ? 'Hôm nay' : d.date));
-  const historyTracking = filteredHistory.map(d => d.trackingKwh);
-  const historyStatic = filteredHistory.map(d => d.staticKwh);
+  const historyTracking = filteredHistory.map(d => (d.trackingWh !== undefined && d.trackingWh !== 0 ? d.trackingWh : Number(d.trackingKwh || 0) * 1000));
+  const historyStatic = filteredHistory.map(d => (d.staticWh !== undefined && d.staticWh !== 0 ? d.staticWh : Number(d.staticKwh || 0) * 1000));
   const historyGain = filteredHistory.map(d => d.gainPercent);
 
   const historyChartData = {
@@ -210,7 +211,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
       },
       {
         type: 'bar',
-        label: 'Tracking (kWh)',
+        label: 'Tracking (Wh)',
         data: historyTracking,
         backgroundColor: '#38bdf8', // Cyan Blue
         borderRadius: 4,
@@ -222,7 +223,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
       },
       {
         type: 'bar',
-        label: 'Cố định (kWh)',
+        label: 'Cố định (Wh)',
         data: historyStatic,
         backgroundColor: '#f59e0b', // Solar Amber
         borderRadius: 4,
@@ -267,20 +268,20 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         padding: 14,
         boxPadding: 6,
         callbacks: {
-          label: function(context) {
+          label: function (context) {
             if (context.dataset.type === 'line') {
               return ` ${context.dataset.label}: +${context.parsed.y.toFixed(1)}%`;
             }
-            return ` ${context.dataset.label}: ${context.parsed.y.toFixed(3)} kWh`;
+            return ` ${context.dataset.label}: ${context.parsed.y.toFixed(1)} Wh`;
           },
-          footer: function(items) {
-            const trkItem = items.find(i => i.dataset.label === 'Tracking (kWh)');
-            const staItem = items.find(i => i.dataset.label === 'Cố định (kWh)');
+          footer: function (items) {
+            const trkItem = items.find(i => i.dataset.label === 'Tracking (Wh)');
+            const staItem = items.find(i => i.dataset.label === 'Cố định (Wh)');
             if (trkItem && staItem) {
               const trk = trkItem.parsed.y;
               const sta = staItem.parsed.y;
               const diff = trk - sta;
-              return ` Năng lượng vượt trội: +${diff.toFixed(3)} kWh`;
+              return ` Năng lượng vượt trội: +${diff.toFixed(1)} Wh`;
             }
             return '';
           }
@@ -309,8 +310,8 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         ticks: {
           color: '#cbd5e1',
           font: { family: 'Plus Jakarta Sans', size: 12, weight: '700' },
-          callback: function(value) {
-            return `${value} kWh`;
+          callback: function (value) {
+            return `${value} Wh`;
           }
         },
         beginAtZero: true
@@ -325,7 +326,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         ticks: {
           color: '#10b981',
           font: { family: 'Plus Jakarta Sans', size: 12, weight: '700' },
-          callback: function(value) {
+          callback: function (value) {
             return `${value}%`;
           }
         },
@@ -338,32 +339,32 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
   // Compute aggregates & peak powers dynamically
   const maxTrackingPower = intradayTrackingPower.length > 0 ? Math.max(0, ...intradayTrackingPower) : 0;
   const maxStaticPower = intradayStaticPower.length > 0 ? Math.max(0, ...intradayStaticPower) : 0;
-  const totalTrkKwh = filteredHistory.reduce((acc, cur) => acc + cur.trackingKwh, 0);
-  const totalStaKwh = filteredHistory.reduce((acc, cur) => acc + cur.staticKwh, 0);
-  const avgGain = totalStaKwh > 0 ? (((totalTrkKwh - totalStaKwh) / totalStaKwh) * 100).toFixed(1) : 0;
+  const totalTrkWh = filteredHistory.reduce((acc, cur) => acc + (cur.trackingWh !== undefined && cur.trackingWh !== 0 ? cur.trackingWh : Number(cur.trackingKwh || 0) * 1000), 0);
+  const totalStaWh = filteredHistory.reduce((acc, cur) => acc + (cur.staticWh !== undefined && cur.staticWh !== 0 ? cur.staticWh : Number(cur.staticKwh || 0) * 1000), 0);
+  const avgGain = totalStaWh > 0 ? (((totalTrkWh - totalStaWh) / totalStaWh) * 100).toFixed(1) : 0;
 
   return (
     <>
       <div id="section-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-4 scroll-mt-16">
-        
+
         {/* 1. ĐỒ THỊ THỜI GIAN THỰC (REAL-TIME LINE CHART) */}
-        <div 
+        <div
           onClick={() => setExpandedChart('intraday')}
           className="panel-card flex flex-col justify-between shadow-xl cursor-pointer hover:border-white/40 group transition-all"
         >
-          
+
           {/* Header */}
           <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
             <div className="flex items-center gap-2.5">
               <TrendingUp className="w-5 h-5 text-sky-400" />
               <span className="text-sm sm:text-base font-extrabold tracking-wide uppercase text-white">
-                Công Suất Tức Thời Trong Ngày 
+                Công Suất Tức Thời Trong Ngày
               </span>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
-                06:00 - 18:00 (WATT)
+                05:00 - 19:00 (WATT)
               </span>
               {isAdmin && onClearCharts && (
                 <button
@@ -411,11 +412,11 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         </div>
 
         {/* 2. ĐỒ THỊ SO SÁNH SẢN LƯỢNG (BAR CHART + GAIN LINE) */}
-        <div 
+        <div
           onClick={() => setExpandedChart('history')}
           className="panel-card flex flex-col justify-between shadow-xl cursor-pointer hover:border-white/40 group transition-all"
         >
-          
+
           {/* Header with Range Filter */}
           <div className="panel-header flex items-center justify-between py-3.5 px-4 sm:px-5">
             <div className="flex items-center gap-2.5">
@@ -424,10 +425,10 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                 Sản Lượng Năng Lượng Tích Lũy ({historyRange === 1 ? 'Hôm Nay' : `${historyRange} Ngày`})
               </span>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* Range Switcher Buttons */}
-              <div 
+              <div
                 className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15 backdrop-blur-md"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -438,11 +439,10 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                       e.stopPropagation();
                       setHistoryRange(opt.value);
                     }}
-                    className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                      historyRange === opt.value
+                    className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${historyRange === opt.value
                         ? 'bg-white text-zinc-950 shadow-md font-black'
                         : 'text-zinc-300 hover:text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -490,9 +490,9 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
               {historyRange === 1 ? 'Tổng hôm nay:' : `Tổng ${historyRange} ngày:`}
             </span>
             <div>
-              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkKwh.toFixed(2)} kWh</span>
+              <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-base">Trk: {totalTrkWh.toFixed(1)} Wh</span>
               <span className="text-white/30 mx-2.5">|</span>
-              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaKwh.toFixed(2)} kWh</span>
+              <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-base">CĐ: {totalStaWh.toFixed(1)} Wh</span>
               <span className="text-white/30 mx-2.5">|</span>
               <span className="text-emerald-300 font-black font-mono text-sm sm:text-base">+{avgGain}%</span>
             </div>
@@ -503,15 +503,15 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
 
       {/* ENLARGED MODAL / LIGHTBOX VIEW */}
       {expandedChart && (
-        <div 
+        <div
           onClick={() => setExpandedChart(null)}
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/80 backdrop-blur-2xl transition-all animate-fadeIn"
         >
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             className="panel-card w-full max-w-6xl max-h-[92vh] flex flex-col justify-between shadow-2xl border-white/30 overflow-hidden relative"
           >
-            
+
             {/* Modal Header */}
             <div className="panel-header flex items-center justify-between py-4 px-5 sm:px-7">
               <div className="flex items-center gap-3">
@@ -522,15 +522,15 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                 )}
                 <div>
                   <h2 className="text-base sm:text-xl font-black tracking-wide uppercase text-white">
-                    {expandedChart === 'intraday' 
+                    {expandedChart === 'intraday'
                       ? 'CÔNG SUẤT TỨC THỜI TRONG NGÀY (CHI TIẾT PHÓNG TO)'
                       : `SẢN LƯỢNG NĂNG LƯỢNG TÍCH LŨY (${historyRange === 1 ? 'HÔM NAY' : `${historyRange} NGÀY`})`
                     }
                   </h2>
                   <span className="text-xs text-zinc-300 font-medium hidden sm:inline-block">
-                    {expandedChart === 'intraday' 
-                      ? 'Dữ liệu đo đạc thực tế từ cảm biến INA219 (06:00 - 18:00)'
-                      : 'So sánh sản lượng điện tích luỹ kWh và tỉ lệ phần trăm cải thiện % Gain'
+                    {expandedChart === 'intraday'
+                      ? 'Dữ liệu đo đạc thực tế từ cảm biến INA226 (05:00 - 19:00)'
+                      : 'So sánh sản lượng điện tích luỹ Wh và tỉ lệ phần trăm cải thiện % Gain'
                     }
                   </span>
                 </div>
@@ -543,11 +543,10 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                       <button
                         key={opt.value}
                         onClick={() => setHistoryRange(opt.value)}
-                        className={`px-3 sm:px-3.5 py-1 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                          historyRange === opt.value
+                        className={`px-3 sm:px-3.5 py-1 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${historyRange === opt.value
                             ? 'bg-white text-zinc-950 shadow-md font-black'
                             : 'text-zinc-300 hover:text-white hover:bg-white/10'
-                        }`}
+                          }`}
                       >
                         {opt.label}
                       </button>
@@ -592,9 +591,9 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                     {historyRange === 1 ? 'Tổng năng lượng hôm nay:' : `Tổng năng lượng ${historyRange} ngày:`}
                   </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: {totalTrkKwh.toFixed(2)} kWh</span>
+                    <span className="text-sky-300 font-extrabold font-mono text-sm sm:text-lg">Tracking: {totalTrkWh.toFixed(1)} Wh</span>
                     <span className="text-white/30">|</span>
-                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: {totalStaKwh.toFixed(2)} kWh</span>
+                    <span className="text-amber-300 font-extrabold font-mono text-sm sm:text-lg">Cố định: {totalStaWh.toFixed(1)} Wh</span>
                     <span className="text-white/30">|</span>
                     <span className="text-emerald-300 font-black font-mono text-sm sm:text-lg">Hiệu quả tăng: +{avgGain}%</span>
                   </div>

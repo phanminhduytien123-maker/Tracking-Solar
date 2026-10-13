@@ -9,10 +9,10 @@ import WeatherBackground from './components/WeatherBackground';
 import MobileBottomNav from './components/MobileBottomNav';
 import SignInPage from './components/SignInPage';
 
-import { 
-  MockTelemetryEngine, 
-  generate30DaysHistory, 
-  generateIntradayProfile 
+import {
+  MockTelemetryEngine,
+  generate30DaysHistory,
+  generateIntradayProfile
 } from './services/mockDataService';
 import { ESP32CommunicationService } from './services/esp32Service';
 import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebaseService';
@@ -25,7 +25,7 @@ export default function App() {
   const [authSession, setAuthSession] = useState(() => {
     const saved = localStorage.getItem('solar_auth_session');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return null;
   });
@@ -53,7 +53,7 @@ export default function App() {
             setAuthSession(null);
             alert(status.reason || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên.');
           }
-        } catch (e) {}
+        } catch (e) { }
       };
 
       // Check immediately on mount and every 3 seconds
@@ -72,7 +72,7 @@ export default function App() {
   const [firebaseConfig, setFirebaseConfig] = useState(() => {
     const saved = localStorage.getItem('solar_firebase_config');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return {
       databaseURL: 'https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app/',
@@ -101,7 +101,7 @@ export default function App() {
   const [selectedLocation, setSelectedLocation] = useState(() => {
     const saved = localStorage.getItem('solar_custom_location');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
     return HCMC_COORDINATES;
   });
@@ -222,16 +222,16 @@ export default function App() {
             // Update real-time intraday curve with live data
             const now = new Date();
             const currentHour = now.getHours();
-            if (currentHour >= 6 && currentHour <= 18) {
+            if (currentHour >= 5 && currentHour <= 19) {
               const timeSlot = `${currentHour.toString().padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
               setIntradayData((prev) => {
                 return prev.map((item) => {
                   if (item.time === timeSlot) {
                     return {
                       ...item,
-                      pTracking: fbTelemetry.ina219.tracking.power,
-                      pStatic: fbTelemetry.ina219.static.power,
-                      gain: fbTelemetry.ina219.comparison?.percentGain || 0
+                      pTracking: fbTelemetry.INA226.tracking.power,
+                      pStatic: fbTelemetry.INA226.static.power,
+                      gain: fbTelemetry.INA226.comparison?.percentGain || 0
                     };
                   }
                   return item;
@@ -264,16 +264,16 @@ export default function App() {
         // Update real-time intraday curve
         const now = new Date();
         const currentHour = now.getHours();
-        if (currentHour >= 6 && currentHour <= 18) {
+        if (currentHour >= 5 && currentHour <= 19) {
           const timeSlot = `${currentHour.toString().padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
           setIntradayData((prev) => {
             return prev.map((item) => {
               if (item.time === timeSlot) {
                 return {
                   ...item,
-                  pTracking: nextState.ina219.tracking.power,
-                  pStatic: nextState.ina219.static.power,
-                  gain: nextState.ina219.comparison?.percentGain || 0
+                  pTracking: nextState.INA226.tracking.power,
+                  pStatic: nextState.INA226.static.power,
+                  gain: nextState.INA226.comparison?.percentGain || 0
                 };
               }
               return item;
@@ -312,28 +312,35 @@ export default function App() {
 
   // Sync today's accumulated energy to the latest day entry in history30Days
   useEffect(() => {
-    const trkKwh = Number(telemetry?.ina219?.tracking?.energyKwh || 0);
-    const staKwh = Number(telemetry?.ina219?.static?.energyKwh || 0);
-    if (trkKwh > 0 || staKwh > 0) {
+    const trkWh = Number(telemetry?.INA226?.tracking?.energyWh || (telemetry?.INA226?.tracking?.energyKwh || 0) * 1000);
+    const staWh = Number(telemetry?.INA226?.static?.energyWh || (telemetry?.INA226?.static?.energyKwh || 0) * 1000);
+    const trkKwh = Number((trkWh / 1000).toFixed(3));
+    const staKwh = Number((staWh / 1000).toFixed(3));
+
+    if (trkWh > 0 || staWh > 0) {
       setHistory30Days((prev) => {
         if (!prev || prev.length === 0) return prev;
         const lastIdx = prev.length - 1;
         const today = prev[lastIdx];
-        if (today.trackingKwh === trkKwh && today.staticKwh === staKwh) return prev;
-        const diffKwh = parseFloat((trkKwh - staKwh).toFixed(3));
-        const gain = staKwh > 0 ? parseFloat((((trkKwh - staKwh) / staKwh) * 100).toFixed(1)) : 0;
+        if (today.trackingWh === trkWh && today.staticWh === staWh) return prev;
+        const diffWh = parseFloat((trkWh - staWh).toFixed(1));
+        const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
+        const gain = staWh > 0 ? parseFloat((((trkWh - staWh) / staWh) * 100).toFixed(1)) : 0;
         const updated = [...prev];
         updated[lastIdx] = {
           ...today,
           trackingKwh: trkKwh,
           staticKwh: staKwh,
+          trackingWh: trkWh,
+          staticWh: staWh,
           gainPercent: gain,
-          diffKwh
+          diffKwh,
+          diffWh
         };
         return updated;
       });
     }
-  }, [telemetry?.ina219?.tracking?.energyKwh, telemetry?.ina219?.static?.energyKwh]);
+  }, [telemetry?.INA226?.tracking?.energyWh, telemetry?.INA226?.static?.energyWh, telemetry?.INA226?.tracking?.energyKwh, telemetry?.INA226?.static?.energyKwh]);
 
   // Action: Clear Firebase Data
   const handleClearFirebase = async () => {
@@ -495,11 +502,11 @@ export default function App() {
   // Compute adaptive weather theme for frosted glass panels
   const currentWeather = weatherData?.current || {};
   const effectiveWeatherType = customWeatherType || currentWeather?.condition?.type || 'partly_cloudy';
-  const isDay = customWeatherType 
-    ? (!customWeatherType.includes('night')) 
+  const isDay = customWeatherType
+    ? (!customWeatherType.includes('night'))
     : (currentWeather?.isDay ?? 1);
-  const timePhase = customWeatherType 
-    ? (customWeatherType === 'golden_hour' ? 'golden_hour' : isDay ? 'day' : 'night') 
+  const timePhase = customWeatherType
+    ? (customWeatherType === 'golden_hour' ? 'golden_hour' : isDay ? 'day' : 'night')
     : (currentWeather?.timePhase || (isDay ? 'day' : 'night'));
 
   const isRainy = ['rain', 'drizzle', 'thunderstorm'].includes(effectiveWeatherType);
@@ -517,19 +524,19 @@ export default function App() {
   }
 
   return (
-    <div 
+    <div
       data-weather-theme={weatherTheme}
       className={`min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white relative font-sans overflow-x-hidden theme-${weatherTheme}`}
     >
-      
+
       {/* 0. DYNAMIC ATMOSPHERIC WEATHER BACKGROUND (SAIGON DISTRICT 1 LIVE API) */}
-      <WeatherBackground 
-        weatherData={weatherData} 
-        customOverrideType={customWeatherType} 
+      <WeatherBackground
+        weatherData={weatherData}
+        customOverrideType={customWeatherType}
       />
 
       {/* 1. HEADER & SYSTEM STATUS */}
-      <Header 
+      <Header
         system={telemetry.system}
         mode={telemetry.system.mode}
         dataSource={dataSource}
@@ -549,11 +556,11 @@ export default function App() {
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
       <main className="max-w-[1720px] w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 space-y-3.5 sm:space-y-5 pb-24 sm:pb-8 flex-1 relative z-10">
-        
+
         {/* HERO: TRỰC QUAN 2 TẤM PIN MẶT TRỜI + GÓC ĐỘNG CƠ + CÔNG SUẤT + % GAIN */}
         <section aria-label="So sánh trực quan 2 tấm pin mặt trời">
-          <VisualPanelsComparison 
-            ina219={telemetry.ina219}
+          <VisualPanelsComparison
+            INA226={telemetry.INA226}
             motors={telemetry.motors}
             onOpenDetails={() => setIsDetailsModalOpen(true)}
             onOpenManual={() => setIsManualModalOpen(true)}
@@ -562,7 +569,7 @@ export default function App() {
 
         {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN THU ĐƯỢC (HÔM NAY & 30 NGÀY) */}
         <section aria-label="Biểu đồ sản lượng điện">
-          <ChartsSection 
+          <ChartsSection
             intradayData={intradayData}
             history30Days={history30Days}
             onClearCharts={handleClearCharts}
@@ -574,14 +581,14 @@ export default function App() {
 
       {/* 3. MODALS */}
       {/* Modal Chi Tiết Cảm Biến LDR & Thuật Toán Fuzzy-PID, PSO */}
-      <DetailedTelemetryModal 
+      <DetailedTelemetryModal
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         telemetry={telemetry}
       />
 
       {/* Modal Điều Khiển Thủ Công (Jog / Chuyển Chế Độ / E-Stop) */}
-      <ManualControlModal 
+      <ManualControlModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         system={telemetry.system}
@@ -596,7 +603,7 @@ export default function App() {
       />
 
       {/* Modal Cài Đặt Hệ Thống & Tọa Độ Lắp Đặt & Quản Lý Người Dùng & Mã Nguồn ESP32 */}
-      <SettingsModal 
+      <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         currentUser={authSession}
@@ -634,7 +641,7 @@ export default function App() {
       </footer>
 
       {/* 5. MOBILE BOTTOM NAVIGATION BAR (Hiển thị cố định đáy màn hình điện thoại) */}
-      <MobileBottomNav 
+      <MobileBottomNav
         currentUser={authSession}
         dataSource={dataSource}
         firebaseConnected={firebaseConnected}
@@ -659,54 +666,48 @@ export default function App() {
             </button>
             <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === null ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === null ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-sky-300" />
               <span>API Thực tế</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === 'clear' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'clear' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <Sun className="w-3.5 h-3.5 text-amber-300" />
               <span>Nắng</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('clouds'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === 'clouds' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'clouds' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <Cloud className="w-3.5 h-3.5 text-slate-300" />
               <span>Mây</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('rain'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === 'rain' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'rain' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <CloudRain className="w-3.5 h-3.5 text-sky-400" />
               <span>Mưa</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('thunderstorm'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === 'thunderstorm' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'thunderstorm' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
               <span>Giông</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('night'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-                customWeatherType === 'night' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'night' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
             >
               <Moon className="w-3.5 h-3.5 text-indigo-300" />
               <span>Đêm</span>

@@ -2,13 +2,13 @@ import React from 'react';
 import { TrendingUp, Info } from 'lucide-react';
 
 export default function VisualPanelsComparison({
-  ina219,
+  INA226,
   motors,
   onOpenDetails
 }) {
-  const tracking = ina219?.tracking || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
-  const stat = ina219?.static || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
-  const comparison = ina219?.comparison || { percentGain: 0, powerDelta: 0 };
+  const tracking = INA226?.tracking || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
+  const stat = INA226?.static || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
+  const comparison = INA226?.comparison || { percentGain: 0, powerDelta: 0 };
 
   const az = motors?.azimuth || { currentAngle: 180, targetAngle: 180 };
   const el = motors?.elevation || { currentAngle: 45, targetAngle: 45 };
@@ -23,7 +23,7 @@ export default function VisualPanelsComparison({
 
       {/* MOBILE QUICK KPI STRIP */}
       <div className="lg:hidden grid grid-cols-3 gap-2 p-2.5 rounded-2xl panel-card shadow-lg">
-        
+
         {/* Metric 1: Tấm Xoay */}
         <div className="p-2.5 rounded-xl panel-subtle text-center flex flex-col justify-between">
           <div className="flex items-center justify-center gap-1.5">
@@ -203,7 +203,7 @@ export default function VisualPanelsComparison({
           <div className="pb-3 border-b border-white/10 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
               <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
-                TẤM PIN CỐ ĐỊNH   
+                TẤM PIN CỐ ĐỊNH
               </h2>
               {stat.online ? (
                 <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm backdrop-blur-md">
