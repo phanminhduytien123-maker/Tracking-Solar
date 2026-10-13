@@ -33,7 +33,7 @@ const RANGE_OPTIONS = [
   { value: 30, label: '30N' }
 ];
 
-export default function ChartsSection({ intradayData, history30Days, onClearCharts }) {
+export default function ChartsSection({ intradayData, history30Days, onClearCharts, isAdmin = false }) {
   const [historyRange, setHistoryRange] = useState(1); // 1 ('Hôm nay'), 7, 14, 30
   const [expandedChart, setExpandedChart] = useState(null); // 'intraday' | 'history' | null
 
@@ -365,7 +365,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
               <span className="text-xs font-bold text-white/90 bg-white/10 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md shadow-sm">
                 06:00 - 18:00 (WATT)
               </span>
-              {onClearCharts && (
+              {isAdmin && onClearCharts && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -449,7 +449,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                 ))}
               </div>
 
-              {onClearCharts && (
+              {isAdmin && onClearCharts && (
                 <button
                   type="button"
                   onClick={(e) => {
