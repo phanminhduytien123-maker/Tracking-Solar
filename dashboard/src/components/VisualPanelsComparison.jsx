@@ -6,17 +6,30 @@ export default function VisualPanelsComparison({
   motors,
   onOpenDetails
 }) {
-  const tracking = INA226?.tracking || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
-  const stat = INA226?.static || { voltage: 0, current: 0, power: 0, energyKwh: 0 };
-  const comparison = INA226?.comparison || { percentGain: 0, powerDelta: 0 };
+  const tracking = INA226?.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
+  const stat = INA226?.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
+  const comparison = INA226?.comparison || { percentGain: 0, powerDelta: 0, hasValidGain: false };
 
-  const az = motors?.azimuth || { currentAngle: 180, targetAngle: 180 };
-  const el = motors?.elevation || { currentAngle: 45, targetAngle: 45 };
+  const az = motors?.azimuth || { currentAngle: 180, targetAngle: 180, phi: 0 };
+  const el = motors?.elevation || { currentAngle: 90, targetAngle: 90, epsilon: 90 };
+
+  // Quy ước góc: φ từ công tắc hành trình Azimuth, ε từ mặt phẳng STOW 90°
+  const phiAngle = az.phi !== undefined ? az.phi : (az.currentAngle !== undefined ? az.currentAngle - 180 : 0);
+  const compassAz = az.currentAngle !== undefined ? az.currentAngle : (180 + phiAngle);
+  const epsAngle = el.epsilon !== undefined ? el.epsilon : (el.currentAngle !== undefined ? el.currentAngle : 90);
 
   // Calculate 3D tilt angles for the tracking panel image
-  const azRelSouth = az.currentAngle - 180;
-  const rotateYDeg = Math.max(-32, Math.min(32, (azRelSouth / 90) * 28));
-  const rotateXDeg = Math.max(5, Math.min(45, 10 + (el.currentAngle / 90) * 30));
+  const rotateYDeg = Math.max(-32, Math.min(32, (phiAngle / 90) * 28));
+  const rotateXDeg = Math.max(5, Math.min(45, 10 + ((90 - epsAngle) / 90) * 30));
+
+  // Trạng thái ngủ đông ban đêm (DEEP_SLEEP)
+  const isSleeping = tracking.isSleeping || tracking.state === 'DEEP_SLEEP';
+  const wakeAt = tracking.wakeAt || '03:00';
+
+  // Ngưỡng tính % Gain từ tích phân năng lượng ngày (>= 5 Wh)
+  const hasValidGain = comparison.hasValidGain !== undefined 
+    ? comparison.hasValidGain 
+    : (stat.energyWh >= 5.0 || (stat.energyKwh && stat.energyKwh >= 0.005));
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -27,9 +40,15 @@ export default function VisualPanelsComparison({
         {/* Metric 1: Tấm Xoay */}
         <div className="p-2.5 rounded-xl panel-subtle text-center flex flex-col justify-between">
           <div className="flex items-center justify-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${tracking.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              isSleeping 
+                ? 'bg-indigo-400 animate-pulse' 
+                : tracking.online 
+                  ? 'bg-emerald-400 animate-pulse' 
+                  : 'bg-rose-400'
+            }`} />
             <span className="text-[10px] font-bold uppercase text-zinc-300 block truncate">
-              TẤM XOAY
+              {isSleeping ? 'NGỦ ĐÔNG' : 'TẤM XOAY'}
             </span>
           </div>
           <div className="my-1">
@@ -49,12 +68,18 @@ export default function VisualPanelsComparison({
             HIỆU SUẤT
           </span>
           <div className="my-1">
-            <span className="text-xl font-black font-mono text-white block leading-none">
-              {comparison.percentGain >= 0 ? `+${comparison.percentGain.toFixed(1)}` : comparison.percentGain.toFixed(1)}%
-            </span>
+            {hasValidGain ? (
+              <span className="text-xl font-black font-mono text-white block leading-none">
+                {comparison.percentGain >= 0 ? `+${comparison.percentGain.toFixed(1)}` : comparison.percentGain.toFixed(1)}%
+              </span>
+            ) : (
+              <span className="text-base font-bold font-mono text-zinc-300 block leading-none">
+                -- %
+              </span>
+            )}
           </div>
-          <span className="text-[10px] font-mono font-semibold text-zinc-200 block">
-            {comparison.powerDelta >= 0 ? `+${comparison.powerDelta.toFixed(1)}W` : `${comparison.powerDelta.toFixed(1)}W`}
+          <span className="text-[10px] font-mono font-semibold text-zinc-200 block truncate">
+            {hasValidGain ? 'Đã hiệu chuẩn (k=1.018)' : '< 5Wh tích lũy'}
           </span>
         </div>
 
@@ -91,7 +116,12 @@ export default function VisualPanelsComparison({
               <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase text-white">
                 TẤM PIN TRACKING
               </h2>
-              {tracking.online ? (
+              {isSleeping ? (
+                <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/50 shadow-sm backdrop-blur-md">
+                  <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-indigo-300 animate-pulse"></span>
+                  <span>🌙 ĐANG NGỦ ĐÔNG ({wakeAt})</span>
+                </span>
+              ) : tracking.online ? (
                 <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm backdrop-blur-md">
                   <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>ĐÃ KẾT NỐI</span>
@@ -131,15 +161,25 @@ export default function VisualPanelsComparison({
               />
             </div>
 
-            {/* Dynamic Motor Angles Tag */}
+            {/* Dynamic Motor Angles Tag: Hiển thị EL = ε và AZ la bàn = G + H + φ kèm φ từ công tắc */}
             <div className="mt-3 sm:mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3 z-10">
-              <div className="px-3.5 py-1.5 panel-subtle text-zinc-100 shadow-md flex items-center gap-2">
+              <div 
+                className="px-3 py-1.5 panel-subtle text-zinc-100 shadow-md flex items-center gap-1.5 cursor-help"
+                title={`Góc phương vị AZ = 180° + ${phiAngle >= 0 ? `+${phiAngle.toFixed(1)}` : phiAngle.toFixed(1)}° tính từ công tắc hành trình`}
+              >
                 <span className="text-zinc-300 text-xs font-bold tracking-wider">AZ:</span>
-                <span className="text-white text-sm sm:text-base font-bold font-mono">{az.currentAngle.toFixed(1)}°</span>
+                <span className="text-white text-sm sm:text-base font-bold font-mono">{compassAz.toFixed(1)}°</span>
+                <span className="text-[11px] font-mono text-zinc-300">
+                  (φ: {phiAngle >= 0 ? `+${phiAngle.toFixed(1)}` : phiAngle.toFixed(1)}°)
+                </span>
               </div>
-              <div className="px-3.5 py-1.5 panel-subtle text-zinc-100 shadow-md flex items-center gap-2">
+              <div 
+                className="px-3 py-1.5 panel-subtle text-zinc-100 shadow-md flex items-center gap-1.5 cursor-help"
+                title="Góc nâng EL = ε (cùng thang đo với góc độ cao mặt trời el_sun)"
+              >
                 <span className="text-zinc-300 text-xs font-bold tracking-wider">EL:</span>
-                <span className="text-white text-sm sm:text-base font-bold font-mono">{el.currentAngle.toFixed(1)}°</span>
+                <span className="text-white text-sm sm:text-base font-bold font-mono">{epsAngle.toFixed(1)}°</span>
+                <span className="text-[11px] font-mono text-zinc-300">(ε)</span>
               </div>
             </div>
           </div>
@@ -168,7 +208,7 @@ export default function VisualPanelsComparison({
           </div>
         </div>
 
-        {/* 2. CHÊNH LỆCH HIỆU SUẤT TRUNG TÂM (% GAIN) - 2 COLS */}
+        {/* 2. CHÊNH LỆCH HIỆU SUẤT TRUNG TÂM (% GAIN) - TÍCH PHÂN NĂNG LƯỢNG - 2 COLS */}
         <div className="hidden lg:flex lg:col-span-2 panel-card flex-col justify-between p-4 sm:p-5 text-center relative overflow-hidden shadow-lg">
 
           <div className="pb-2.5 border-b border-white/10">
@@ -177,21 +217,39 @@ export default function VisualPanelsComparison({
             </span>
           </div>
 
-          <div className="my-auto py-4 flex flex-col items-center justify-center">
-            <div className="w-12 h-12 rounded-full panel-subtle flex items-center justify-center text-white mb-3 shadow-md">
-              <TrendingUp className="w-6 h-6 text-white" />
+          <div className="my-auto py-3 flex flex-col items-center justify-center">
+            <div className="w-11 h-11 rounded-full panel-subtle flex items-center justify-center text-white mb-2 shadow-md">
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
-            <span className="text-3xl sm:text-4xl lg:text-4xl xl:text-5xl font-mono font-black text-white tracking-tight">
-              {comparison.percentGain >= 0 ? `+${comparison.percentGain.toFixed(1)}` : comparison.percentGain.toFixed(1)}%
-            </span>
-            <span className="text-sm sm:text-base font-mono text-zinc-200 mt-2 font-bold">
-              {comparison.powerDelta >= 0 ? `+${comparison.powerDelta.toFixed(1)}W` : `${comparison.powerDelta.toFixed(1)}W`}
+
+            {hasValidGain ? (
+              <>
+                <span className="text-3xl sm:text-4xl lg:text-4xl xl:text-5xl font-mono font-black text-white tracking-tight">
+                  {comparison.percentGain >= 0 ? `+${comparison.percentGain.toFixed(1)}` : comparison.percentGain.toFixed(1)}%
+                </span>
+                <span className="text-xs sm:text-sm font-mono text-zinc-200 mt-1.5 font-bold">
+                  {comparison.powerDelta >= 0 ? `+${comparison.powerDelta.toFixed(1)}W` : `${comparison.powerDelta.toFixed(1)}W`}
+                </span>
+              </>
+            ) : (
+              <div className="py-2">
+                <span className="text-2xl sm:text-3xl font-mono font-black text-zinc-300 block">
+                  -- %
+                </span>
+                <span className="text-[11px] font-sans text-zinc-300 mt-1 block">
+                  Đang tích lũy (&lt; 5 Wh)
+                </span>
+              </div>
+            )}
+            
+            <span className="text-[10px] font-mono text-zinc-300 mt-2 px-2 py-0.5 rounded-full bg-white/10 border border-white/15">
+              Đã hiệu chuẩn (k=1.018)
             </span>
           </div>
 
           <div className="pt-2.5 border-t border-white/10">
-            <span className="text-xs text-zinc-300 font-medium block">
-              Tối ưu Fuzzy-PID
+            <span className="text-[11px] text-zinc-300 font-medium block">
+              Tích phân năng lượng ΣE
             </span>
           </div>
         </div>

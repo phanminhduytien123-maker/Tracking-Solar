@@ -28,6 +28,7 @@ export default function SettingsModal({
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
+  const [isExperimentLocked, setIsExperimentLocked] = useState(() => localStorage.getItem('solar_experiment_locked') === 'true');
 
   // Sync initialTab if passed dynamically
   useEffect(() => {
@@ -470,8 +471,37 @@ void loop() {
                     </div>
                   </div>
 
+                  {/* Khóa thí nghiệm (30 ngày: 01/11 - 30/11) */}
+                  <div className="p-3.5 rounded-lg bg-[#0a0c12] border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-white block uppercase tracking-wide">
+                          Khóa chế độ thí nghiệm (30 ngày đo: 01/11 - 30/11)
+                        </span>
+                        <span className="text-[11px] text-zinc-400 block mt-0.5">
+                          Khóa thay đổi thông số &amp; Jog thủ công để bảo đảm dữ liệu đo đối chứng tính hợp lệ.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextVal = !isExperimentLocked;
+                          setIsExperimentLocked(nextVal);
+                          localStorage.setItem('solar_experiment_locked', nextVal ? 'true' : 'false');
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                          isExperimentLocked 
+                            ? 'bg-amber-500 text-black shadow-md' 
+                            : 'bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700'
+                        }`}
+                      >
+                        {isExperimentLocked ? '🔒 ĐANG KHÓA' : '🔓 ĐANG MỞ'}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Actions for Firebase */}
-                  <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-zinc-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-zinc-800">
                     <button
                       type="button"
                       onClick={onSendTestPacket}
@@ -481,10 +511,20 @@ void loop() {
                     </button>
                     <button
                       type="button"
-                      onClick={onClearFirebase}
+                      onClick={() => {
+                        if (isExperimentLocked) {
+                          alert('Khóa thí nghiệm đang BẬT! Không thể xóa dữ liệu trong giai đoạn đo 30 ngày đối chứng (01/11 - 30/11).');
+                          return;
+                        }
+                        if (window.confirm('CẢNH BÁO: Nguồn dữ liệu gốc được lưu an toàn trên thẻ SD của logger, Firebase chỉ là bản sao. Bạn có chắc chắn muốn xóa bản sao trên Firebase?')) {
+                          if (window.confirm('Xác nhận bước 2: Đặt lại toàn bộ dữ liệu trên node /solar? Thao tác này không thể hoàn tác!')) {
+                            onClearFirebase && onClearFirebase();
+                          }
+                        }
+                      }}
                       className="px-4 py-2 rounded-lg text-xs font-bold bg-red-950/70 hover:bg-red-900 text-red-200 border border-red-800/80 transition-all cursor-pointer active:scale-95"
                     >
-                      Xóa sạch dữ liệu trên Firebase (Reset)
+                      Xóa dữ liệu Firebase (Xác nhận 2 bước)
                     </button>
                   </div>
                 </div>

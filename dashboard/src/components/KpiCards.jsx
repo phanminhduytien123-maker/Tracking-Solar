@@ -148,7 +148,7 @@ export default function KpiCards({ INA226 }) {
         </div>
       </div>
 
-      {/* 3. THẺ HIỆU SUẤT CẢI THIỆN (% GAIN) */}
+      {/* 3. THẺ HIỆU SUẤT CẢI THIỆN (% GAIN TÍCH PHÂN NĂNG LƯỢNG) */}
       <div className="panel-card flex flex-col justify-between overflow-hidden relative border-[#2c3242]">
         <div className="h-[2px] w-full bg-zinc-200"></div>
 
@@ -164,25 +164,36 @@ export default function KpiCards({ INA226 }) {
                   Hiệu Suất Cải Thiện
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  % Gain = ((P_trk - P_sta) / P_sta) × 100%
+                  % Gain = ((ΣE_trk - k·ΣE_sta) / (k·ΣE_sta)) × 100%
                 </span>
               </div>
             </div>
             <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-[#181a22] text-zinc-200 border border-[#2c3140]">
-              DELTA TỰ ĐỘNG
+              ĐÃ HIỆU CHUẨN (k=1.018)
             </span>
           </div>
 
           {/* Big Gain Number */}
           <div className="mt-4 mb-4">
             <div className="text-[11px] font-mono uppercase text-zinc-400 tracking-wider">
-              Chênh lệch công suất (%)
+              Gia tăng sản lượng tích phân (%)
             </div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-zinc-100">
-                {isPositiveGain ? `+${comparison.percentGain.toFixed(1)}` : `${comparison.percentGain.toFixed(1)}`}%
-              </span>
-              <span className="text-xs font-mono text-zinc-400 font-medium">so với tấm tĩnh</span>
+              {comparison.hasValidGain !== false && (stat.energyWh >= 5.0 || comparison.percentGain !== 0) ? (
+                <>
+                  <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-zinc-100">
+                    {isPositiveGain ? `+${comparison.percentGain.toFixed(1)}` : `${comparison.percentGain.toFixed(1)}`}%
+                  </span>
+                  <span className="text-xs font-mono text-zinc-400 font-medium">so với tấm tĩnh</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-zinc-300">
+                    -- %
+                  </span>
+                  <span className="text-xs font-mono text-zinc-400 font-medium">(Đang tích lũy &lt; 5Wh)</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -205,8 +216,8 @@ export default function KpiCards({ INA226 }) {
 
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between items-center">
-          <span>Trạng thái thu hoạch:</span>
-          <span className="text-zinc-200 font-semibold">TỐI ƯU HÓA TỐT</span>
+          <span>Tích phân năng lượng:</span>
+          <span className="text-zinc-200 font-semibold">{comparison.hasValidGain !== false ? 'TÍNH THEO Wh TÍCH LŨY' : 'CHỜ ĐỦ NGƯỠNG 5Wh'}</span>
         </div>
       </div>
 

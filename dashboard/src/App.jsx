@@ -91,6 +91,9 @@ export default function App() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('config');
+  const [isExperimentLocked, setIsExperimentLocked] = useState(() => {
+    return localStorage.getItem('solar_experiment_locked') === 'true';
+  });
 
   const openSettingsTab = (tab = 'config') => {
     setSettingsInitialTab(tab);
@@ -430,6 +433,57 @@ export default function App() {
     }));
   };
 
+  const handleSetAlgorithm = (algorithm) => {
+    if (dataSource === 'mock') {
+      mockEngineRef.current.setAlgorithm(algorithm);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setAlgorithm(algorithm);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: { ...prev.system, activeAlgorithm: algorithm }
+    }));
+  };
+
+  const handleReHome = () => {
+    if (dataSource === 'mock') {
+      mockEngineRef.current.calibrate('home');
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.reHome();
+    }
+    alert('Đã gửi lệnh Home lại hệ thống! Động cơ sẽ quay về công tắc hành trình để xác lập gốc tọa độ chuẩn.');
+  };
+
+  const handleResetFault = () => {
+    if (dataSource === 'mock') {
+      mockEngineRef.current.setEstop(false);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.resetFault();
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        estop: false,
+        errors: {
+          ...prev.system.errors,
+          driverFault: false,
+          stepLossWarn: false
+        }
+      }
+    }));
+    alert('Đã reset cờ FAULT!');
+  };
+
+  const handleTestDir = (axis, dir) => {
+    if (dataSource === 'mock') {
+      mockEngineRef.current.jog(axis, dir * 1.0);
+    } else if (dataSource === 'firebase') {
+      firebaseServiceRef.current.testDir(axis, dir);
+    }
+    alert('Đã phát xung Test DIR tốc độ chậm, dòng thấp để kiểm tra cực tính quay an toàn!');
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -587,19 +641,25 @@ export default function App() {
         telemetry={telemetry}
       />
 
-      {/* Modal Điều Khiển Thủ Công (Jog / Chuyển Chế Độ / E-Stop) */}
+      {/* Modal Điều Khiển Thủ Công (Jog / Chuyển Chế Độ / E-Stop / Re-Home / Test DIR) */}
       <ManualControlModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         system={telemetry.system}
         mode={telemetry.system.mode}
+        activeAlgorithm={telemetry.system.activeAlgorithm}
         onSetMode={handleSetMode}
+        onSetAlgorithm={handleSetAlgorithm}
         onJog={handleJog}
         onCalibrate={handleCalibrate}
         onTriggerPso={handleTriggerPso}
         onPark={handlePark}
         onEstop={handleEstop}
+        onReHome={handleReHome}
+        onResetFault={handleResetFault}
+        onTestDir={handleTestDir}
         motors={telemetry.motors}
+        isExperimentLocked={isExperimentLocked}
       />
 
       {/* Modal Cài Đặt Hệ Thống & Tọa Độ Lắp Đặt & Quản Lý Người Dùng & Mã Nguồn ESP32 */}
