@@ -1,0 +1,194 @@
+// =========================================================================
+// FIRMWARE TEST 2 ĐỘNG CƠ BƯỚC NEMA 23 + DRIVER DM556 (BACKUP TỪ NGÀY HÔM QUA)
+// Bo mạch điều khiển: ESP32 DevKit V1 (ESP-WROOM-32)
+// =========================================================================
+
+#include <Arduino.h>
+
+// --- ĐỊNH NGHĨA CHÂN ĐIỀU KHIỂN ---
+#define M1_PUL_PIN  25  // Nối vào PUL1+ trên DM556 #1 (PUL1- vào GND)
+#define M1_DIR_PIN  26  // Nối vào DIR1+ trên DM556 #1 (DIR1- vào GND)
+
+#define M2_PUL_PIN  27  // Nối vào PUL2+ trên DM556 #2 (PUL2- vào GND)
+#define M2_DIR_PIN  14  // Nối vào DIR2+ trên DM556 #2 (DIR2- vào GND)
+
+const int FULL_REV_STEPS = 1600;
+int stepsPerPress = 400;
+int speedDelayUs  = 400;
+
+bool continuousRun = false;
+bool m1_continuous_dir = HIGH;
+bool m2_continuous_dir = HIGH;
+
+void runMotor(int pulPin, int dirPin, bool direction, int steps, int delayUs) {
+  digitalWrite(dirPin, direction ? HIGH : LOW);
+  delayMicroseconds(50);
+
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(pulPin, HIGH);
+    delayMicroseconds(delayUs);
+    digitalWrite(pulPin, LOW);
+    delayMicroseconds(delayUs);
+  }
+}
+
+void printMenu() {
+  Serial.println("\n=======================================================");
+  Serial.println("  DIEU KHIEN TEST 2 DONG CO BAP NEMA 23 + DRIVER DM556");
+  Serial.println("=======================================================");
+  Serial.println(" [C] : BAT / TAT QUAY LIEN TUC CA 2 DONG CO (Cung chieu)");
+  Serial.println(" [X] : BAT QUAY LIEN TUC 2 DONG CO NGUOC CHIEU NHAU");
+  Serial.println(" [S] hoac [Phim Space]: DUNG DONG CO NGAY LAP TUC");
+  Serial.println(" [A] : Dong co 1 - Quay NGUOC chieu (CCW)");
+  Serial.println(" [D] : Dong co 1 - Quay CUNG chieu  (CW)");
+  Serial.println(" [J] : Dong co 2 - Quay NGUOC chieu (CCW)");
+  Serial.println(" [L] : Dong co 2 - Quay CUNG chieu  (CW)");
+  Serial.println(" [1] : Auto test ĐC 1 (1 vong Thuan -> Nghi 1s -> 1 vong Nguoc)");
+  Serial.println(" [2] : Auto test ĐC 2 (1 vong Thuan -> Nghi 1s -> 1 vong Nguoc)");
+  Serial.println(" [+] / [-] : Tang / Giam so buoc");
+  Serial.println(" [>] / [<] : Tang / Giam toc do");
+  Serial.println("=======================================================\n");
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(M1_PUL_PIN, OUTPUT);
+  pinMode(M1_DIR_PIN, OUTPUT);
+  pinMode(M2_PUL_PIN, OUTPUT);
+  pinMode(M2_DIR_PIN, OUTPUT);
+
+  digitalWrite(M1_PUL_PIN, LOW);
+  digitalWrite(M1_DIR_PIN, LOW);
+  digitalWrite(M2_PUL_PIN, LOW);
+  digitalWrite(M2_DIR_PIN, LOW);
+
+  delay(1000);
+  printMenu();
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    if (cmd == '\r' || cmd == '\n') return;
+
+    if (cmd == ' ' || cmd == 's' || cmd == 'S') {
+      continuousRun = false;
+      Serial.println("\n>> [STOP] DA DUNG QUAY LIEN TUC CA 2 DONG CO!");
+      return;
+    }
+
+    switch (cmd) {
+      case 'c':
+      case 'C':
+        continuousRun = !continuousRun;
+        if (continuousRun) {
+          m1_continuous_dir = HIGH;
+          m2_continuous_dir = HIGH;
+          digitalWrite(M1_DIR_PIN, m1_continuous_dir);
+          digitalWrite(M2_DIR_PIN, m2_continuous_dir);
+          delayMicroseconds(50);
+          Serial.println("\n>> [RUN CONTINUOUS] DANG QUAY LIEN TUC CA 2 DONG CO (CUNG CHIEU THUAN)!");
+        } else {
+          Serial.println("\n>> [STOP] DA DUNG QUAY LIEN TUC!");
+        }
+        break;
+
+      case 'x':
+      case 'X':
+        continuousRun = true;
+        m1_continuous_dir = HIGH;
+        m2_continuous_dir = LOW;
+        digitalWrite(M1_DIR_PIN, m1_continuous_dir);
+        digitalWrite(M2_DIR_PIN, m2_continuous_dir);
+        delayMicroseconds(50);
+        Serial.println("\n>> [RUN CONTINUOUS] DANG QUAY LIEN TUC 2 DONG CO (DC1 THUAN, DC2 NGUOC)!");
+        break;
+
+      case 'a':
+      case 'A':
+        continuousRun = false;
+        Serial.printf(">> [ĐC 1] Quay NGUOC %d buoc...\n", stepsPerPress);
+        runMotor(M1_PUL_PIN, M1_DIR_PIN, LOW, stepsPerPress, speedDelayUs);
+        break;
+
+      case 'd':
+      case 'D':
+        continuousRun = false;
+        Serial.printf(">> [ĐC 1] Quay THUAN %d buoc...\n", stepsPerPress);
+        runMotor(M1_PUL_PIN, M1_DIR_PIN, HIGH, stepsPerPress, speedDelayUs);
+        break;
+
+      case 'j':
+      case 'J':
+        continuousRun = false;
+        Serial.printf(">> [ĐC 2] Quay NGUOC %d buoc...\n", stepsPerPress);
+        runMotor(M2_PUL_PIN, M2_DIR_PIN, LOW, stepsPerPress, speedDelayUs);
+        break;
+
+      case 'l':
+      case 'L':
+        continuousRun = false;
+        Serial.printf(">> [ĐC 2] Quay THUAN %d buoc...\n", stepsPerPress);
+        runMotor(M2_PUL_PIN, M2_DIR_PIN, HIGH, stepsPerPress, speedDelayUs);
+        break;
+
+      case '1':
+        continuousRun = false;
+        Serial.println(">> [AUTO ĐC 1] Dang quay THUAN 1 vong (1600 buoc)...");
+        runMotor(M1_PUL_PIN, M1_DIR_PIN, HIGH, FULL_REV_STEPS, speedDelayUs);
+        delay(1000);
+        Serial.println(">> [AUTO ĐC 1] Dang quay NGUOC 1 vong (1600 buoc)...");
+        runMotor(M1_PUL_PIN, M1_DIR_PIN, LOW, FULL_REV_STEPS, speedDelayUs);
+        break;
+
+      case '2':
+        continuousRun = false;
+        Serial.println(">> [AUTO ĐC 2] Dang quay THUAN 1 vong (1600 buoc)...");
+        runMotor(M2_PUL_PIN, M2_DIR_PIN, HIGH, FULL_REV_STEPS, speedDelayUs);
+        delay(1000);
+        Serial.println(">> [AUTO ĐC 2] Dang quay NGUOC 1 vong (1600 buoc)...");
+        runMotor(M2_PUL_PIN, M2_DIR_PIN, LOW, FULL_REV_STEPS, speedDelayUs);
+        break;
+
+      case '+':
+      case '=':
+        stepsPerPress += 100;
+        Serial.printf(">> TANG so buoc: %d\n", stepsPerPress);
+        break;
+
+      case '-':
+      case '_':
+        if (stepsPerPress > 100) stepsPerPress -= 100;
+        Serial.printf(">> GIAM so buoc: %d\n", stepsPerPress);
+        break;
+
+      case '>':
+      case '.':
+        if (speedDelayUs > 150) speedDelayUs -= 50;
+        Serial.printf(">> TANG TOC DO: delay = %dus\n", speedDelayUs);
+        break;
+
+      case '<':
+      case ',':
+        speedDelayUs += 50;
+        Serial.printf(">> GIAM TOC DO: delay = %dus\n", speedDelayUs);
+        break;
+
+      case '?':
+      case 'h':
+      case 'H':
+        printMenu();
+        break;
+    }
+  }
+
+  if (continuousRun) {
+    digitalWrite(M1_PUL_PIN, HIGH);
+    digitalWrite(M2_PUL_PIN, HIGH);
+    delayMicroseconds(speedDelayUs);
+    digitalWrite(M1_PUL_PIN, LOW);
+    digitalWrite(M2_PUL_PIN, LOW);
+    delayMicroseconds(speedDelayUs);
+  }
+}
