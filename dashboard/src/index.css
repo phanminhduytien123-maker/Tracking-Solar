@@ -121,20 +121,27 @@
   color: #f8fafc;
 }
 
-/* Đảm bảo toàn bộ chữ màu xám trong Dark mode có độ tương phản cao, dễ đọc */
-.dark .text-zinc-400,
-.dark .text-zinc-500,
-.dark .text-zinc-600 {
+/* Đảm bảo toàn bộ chữ màu xám bên trong lab-card và lab-table trong Dark mode có độ tương phản cao, dễ đọc */
+.dark .lab-card .text-zinc-400,
+.dark .lab-card .text-zinc-500,
+.dark .lab-card .text-zinc-600,
+.dark .lab-table .text-zinc-400,
+.dark .lab-table .text-zinc-500,
+.dark .lab-table .text-zinc-600 {
   color: #cbd5e1;
 }
 
-.dark .text-zinc-700,
-.dark .text-zinc-800 {
+.dark .lab-card .text-zinc-700,
+.dark .lab-card .text-zinc-800,
+.dark .lab-table .text-zinc-700,
+.dark .lab-table .text-zinc-800 {
   color: #f1f5f9;
 }
 
-.dark .text-zinc-900,
-.dark .text-zinc-950 {
+.dark .lab-card .text-zinc-900,
+.dark .lab-card .text-zinc-950,
+.dark .lab-table .text-zinc-900,
+.dark .lab-table .text-zinc-950 {
   color: #ffffff;
 }
 
