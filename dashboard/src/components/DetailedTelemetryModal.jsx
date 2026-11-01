@@ -36,8 +36,8 @@ export default function DetailedTelemetryModal({
   const errors = system.errors || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
-      <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-4xl max-h-[92vh] flex flex-col shadow-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs">
+      <div className="bg-white dark:bg-slate-900 border border-zinc-300 dark:border-slate-700 rounded-sm w-full max-w-4xl max-h-[92vh] flex flex-col shadow-xl">
         
         {/* Banner dữ liệu giả lập nếu có */}
         {isMockData && (
@@ -54,18 +54,18 @@ export default function DetailedTelemetryModal({
         )}
 
         {/* Tiêu đề Modal */}
-        <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
+        <div className="p-4 border-b border-zinc-200 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-zinc-950">
+            <h2 className="text-base font-bold text-zinc-950 dark:text-white">
               Thông số kỹ thuật chi tiết
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
               Bảng dữ liệu đo đạc chi tiết từ các cảm biến và khối chấp hành
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-zinc-500 hover:text-zinc-900 border border-zinc-300 rounded-sm cursor-pointer"
+            className="p-1.5 text-zinc-500 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer"
             title="Đóng cửa sổ"
           >
             <X className="w-4 h-4" />
@@ -73,20 +73,20 @@ export default function DetailedTelemetryModal({
         </div>
 
         {/* Thanh cờ trạng thái phía trên: Dạng một dòng chữ bình tĩnh */}
-        <div className="px-4 py-2 bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-600 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="px-4 py-2 bg-zinc-50 dark:bg-slate-800/80 border-b border-zinc-200 dark:border-slate-800 text-xs text-zinc-600 dark:text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
           <div>
             <span>Trạng thái máy: </span>
-            <span className="font-semibold text-zinc-900">{system.displayState || 'Bình thường'}</span>
+            <span className="font-semibold text-zinc-900 dark:text-white">{system.displayState || 'Bình thường'}</span>
           </div>
           <div>
             <span>Mất bước: </span>
-            <span className={`font-semibold ${errors.stepLossWarn ? 'text-red-700' : 'text-zinc-800'}`}>
+            <span className={`font-semibold ${errors.stepLossWarn ? 'text-red-700 dark:text-rose-400' : 'text-zinc-800 dark:text-slate-200'}`}>
               {errors.stepLossWarn ? 'Có cảnh báo mất bước' : 'Không'}
             </span>
           </div>
           <div>
             <span>Lệch RTC: </span>
-            <span className="font-semibold text-zinc-900">
+            <span className="font-semibold text-zinc-900 dark:text-white">
               {system.rtcOffsetMs !== null && system.rtcOffsetMs !== undefined 
                 ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms') 
                 : '--'}
@@ -94,20 +94,20 @@ export default function DetailedTelemetryModal({
           </div>
           <div>
             <span>Cờ E-Stop: </span>
-            <span className={`font-semibold ${system.estop ? 'text-red-700' : 'text-zinc-800'}`}>
+            <span className={`font-semibold ${system.estop ? 'text-red-700 dark:text-rose-400' : 'text-zinc-800 dark:text-slate-200'}`}>
               {system.estop ? 'Đang dừng khẩn cấp' : 'Bình thường'}
             </span>
           </div>
         </div>
 
         {/* Bộ chọn 4 Tab */}
-        <div className="flex border-b border-zinc-200 bg-zinc-100/50 text-xs overflow-x-auto">
+        <div className="flex border-b border-zinc-200 dark:border-slate-800 bg-zinc-100/50 dark:bg-slate-800/40 text-xs overflow-x-auto">
           <button
             onClick={() => setActiveTab('motors')}
             className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
               activeTab === 'motors'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+                ? 'border-blue-600 text-blue-600 dark:border-sky-400 dark:text-sky-300 bg-white dark:bg-slate-900'
+                : 'border-transparent text-zinc-600 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             Động cơ & Encoder
@@ -116,8 +116,8 @@ export default function DetailedTelemetryModal({
             onClick={() => setActiveTab('sensors')}
             className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
               activeTab === 'sensors'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+                ? 'border-blue-600 text-blue-600 dark:border-sky-400 dark:text-sky-300 bg-white dark:bg-slate-900'
+                : 'border-transparent text-zinc-600 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             Quang sai TEMT6000
@@ -126,8 +126,8 @@ export default function DetailedTelemetryModal({
             onClick={() => setActiveTab('electrical')}
             className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
               activeTab === 'electrical'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+                ? 'border-blue-600 text-blue-600 dark:border-sky-400 dark:text-sky-300 bg-white dark:bg-slate-900'
+                : 'border-transparent text-zinc-600 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             Điện áp & Dòng điện INA226
@@ -136,8 +136,8 @@ export default function DetailedTelemetryModal({
             onClick={() => setActiveTab('fuzzy_pso')}
             className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
               activeTab === 'fuzzy_pso'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+                ? 'border-blue-600 text-blue-600 dark:border-sky-400 dark:text-sky-300 bg-white dark:bg-slate-900'
+                : 'border-transparent text-zinc-600 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
             Giải thuật Fuzzy-PID & PSO

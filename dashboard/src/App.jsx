@@ -725,6 +725,7 @@ export default function App() {
             history30Days={history30Days}
             onClearCharts={handleClearCharts}
             isAdmin={authSession?.role === 'admin'}
+            themeMode={themeMode}
           />
         </section>
 
@@ -786,14 +787,14 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-zinc-200 bg-white/90 backdrop-blur-md py-3 px-4 sm:px-6 text-xs text-zinc-600 relative z-10">
+      <footer className="border-t border-zinc-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md py-3 px-4 sm:px-6 text-xs text-zinc-600 dark:text-slate-300 relative z-10 transition-colors">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div>
-            <span className="font-semibold text-zinc-900">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2: VÕ HỒNG PHÁT</span>
+            <span className="font-semibold text-zinc-900 dark:text-white">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2: VÕ HỒNG PHÁT</span>
           </div>
-          <div className="flex items-center gap-1.5 text-zinc-500">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-slate-400">
             <span>Gateway truyền thông:</span>
-            <span className="font-semibold text-zinc-800">ESP32-S3</span>
+            <span className="font-semibold text-zinc-800 dark:text-slate-200">ESP32-S3</span>
           </div>
         </div>
       </footer>
