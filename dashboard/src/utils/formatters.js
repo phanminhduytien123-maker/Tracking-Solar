@@ -60,8 +60,8 @@ export function getConnectionStatusBadge(connStatus, staleDurationMs = 0) {
   if (connStatus === 'LIVE') {
     return {
       text: 'Đang trực tiếp',
-      textColor: 'text-emerald-700',
-      dotColor: 'bg-emerald-600',
+      textColor: 'text-emerald-700 dark:text-emerald-400 font-medium',
+      dotColor: 'bg-emerald-600 dark:bg-emerald-400',
       isLive: true
     };
   }
@@ -70,15 +70,15 @@ export function getConnectionStatusBadge(connStatus, staleDurationMs = 0) {
     const label = sec >= 60 ? `Dữ liệu cũ ${Math.floor(sec / 60)} phút` : `Dữ liệu cũ ${sec} s`;
     return {
       text: label,
-      textColor: 'text-amber-700',
-      dotColor: 'bg-amber-600',
+      textColor: 'text-amber-700 dark:text-amber-300 font-medium',
+      dotColor: 'bg-amber-600 dark:bg-amber-400',
       isLive: false
     };
   }
   return {
     text: 'Mất kết nối',
-    textColor: 'text-red-700',
-    dotColor: 'bg-red-600',
+    textColor: 'text-red-700 dark:text-rose-400 font-medium',
+    dotColor: 'bg-red-600 dark:bg-rose-400',
     isLive: false
   };
 }

@@ -111,6 +111,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+.dark .lab-table th {
+  background-color: rgba(30, 41, 59, 0.7);
+  color: #ffffff;
+}
+
+.dark .lab-table td {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+/* Đảm bảo toàn bộ chữ màu xám trong Dark mode có độ tương phản cao, dễ đọc */
+.dark .text-zinc-400,
+.dark .text-zinc-500,
+.dark .text-zinc-600 {
+  color: #cbd5e1;
+}
+
+.dark .text-zinc-700,
+.dark .text-zinc-800 {
+  color: #f1f5f9;
+}
+
+.dark .text-zinc-900,
+.dark .text-zinc-950 {
+  color: #ffffff;
+}
+
 .safe-area-bottom {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
 }
