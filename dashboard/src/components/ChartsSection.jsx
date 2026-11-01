@@ -34,10 +34,22 @@ const RANGE_OPTIONS = [
   { value: 30, label: '30 ngày' }
 ];
 
-export default function ChartsSection({ intradayData, history30Days, onClearCharts, isAdmin = false }) {
+export default function ChartsSection({ intradayData, history30Days, onClearCharts, isAdmin = false, themeMode = 'light' }) {
   const [historyRange, setHistoryRange] = useState(1);
   const [expandedChart, setExpandedChart] = useState(null);
   const [includeExcludedDays, setIncludeExcludedDays] = useState(false);
+
+  // Nhận diện trạng thái dark mode chuẩn xác
+  const isDark = themeMode === 'dark' || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+  const chartGridColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#f1f5f9';
+  const chartTickColor = isDark ? '#cbd5e1' : '#64748b';
+  const chartLegendColor = isDark ? '#f8fafc' : '#334155';
+  const chartGreenTick = isDark ? '#4ade80' : '#15803d';
+
+  const trkLineColor = isDark ? '#38bdf8' : '#1d4ed8';
+  const trkBgColor = isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(29, 78, 216, 0.04)';
+  const staLineColor = isDark ? '#fb923c' : '#c2410c';
+  const gainLineColor = isDark ? '#4ade80' : '#15803d';
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -64,27 +76,27 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
       {
         label: 'Tấm tracker (nét liền xanh)',
         data: intradayTrackingPower,
-        borderColor: '#1d4ed8', // Xanh dương kỹ thuật
-        backgroundColor: 'rgba(29, 78, 216, 0.04)',
+        borderColor: trkLineColor,
+        backgroundColor: trkBgColor,
         borderWidth: 2,
         tension: 0.25,
         fill: true,
-        pointRadius: 0, // Không chấm tròn ở mỗi điểm dữ liệu
+        pointRadius: 0,
         pointHoverRadius: 5,
-        pointBackgroundColor: '#1d4ed8'
+        pointBackgroundColor: trkLineColor
       },
       {
         label: 'Cố định (Nam, ngửa 75° - nét đứt cam)',
         data: intradayStaticPower,
-        borderColor: '#c2410c', // Cam đất kỹ thuật
+        borderColor: staLineColor,
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderDash: [5, 5], // Nét đứt phân biệt khi in đen trắng
+        borderDash: [5, 5],
         tension: 0.25,
         fill: false,
         pointRadius: 0,
         pointHoverRadius: 5,
-        pointBackgroundColor: '#c2410c'
+        pointBackgroundColor: staLineColor
       }
     ]
   };
@@ -101,8 +113,8 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         position: 'top',
         align: 'end',
         labels: {
-          color: '#334155',
-          font: { family: 'Be Vietnam Pro', size: 12, weight: '500' },
+          color: chartLegendColor,
+          font: { family: 'Be Vietnam Pro', size: 12, weight: '600' },
           boxWidth: 24,
           boxHeight: 2,
           usePointStyle: false,
@@ -110,7 +122,9 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         }
       },
       tooltip: {
-        backgroundColor: '#1e293b',
+        backgroundColor: '#0f172a',
+        borderColor: '#334155',
+        borderWidth: 1,
         titleColor: '#ffffff',
         bodyColor: '#f8fafc',
         titleFont: { family: 'Be Vietnam Pro', size: 12, weight: 'bold' },
@@ -136,22 +150,22 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
     scales: {
       x: {
         grid: {
-          color: '#f1f5f9'
+          color: chartGridColor
         },
         ticks: {
-          color: '#64748b',
-          font: { family: 'Be Vietnam Pro', size: 11 },
+          color: chartTickColor,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '500' },
           maxTicksLimit: 8,
           maxRotation: 0
         }
       },
       y: {
         grid: {
-          color: '#f1f5f9'
+          color: chartGridColor
         },
         ticks: {
-          color: '#64748b',
-          font: { family: 'Be Vietnam Pro', size: 11 },
+          color: chartTickColor,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '500' },
           callback: function (value) {
             return `${formatDecimal(value, 0)} W`;
           }
@@ -178,19 +192,20 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         type: 'line',
         label: '% Gain cải thiện',
         data: historyGain,
-        borderColor: '#15803d', // Xanh lá đậm
-        backgroundColor: '#15803d',
-        borderWidth: 2,
+        borderColor: gainLineColor,
+        backgroundColor: gainLineColor,
+        borderWidth: 2.5,
         tension: 0.2,
         yAxisID: 'y1',
-        pointRadius: 2.5,
+        pointRadius: 3,
+        pointBackgroundColor: gainLineColor,
         order: 1
       },
       {
         type: 'bar',
         label: 'Tracker (Wh)',
         data: historyTracking,
-        backgroundColor: '#1d4ed8', // Xanh dương
+        backgroundColor: trkLineColor,
         borderRadius: 2,
         maxBarThickness: 32,
         yAxisID: 'y',
@@ -200,7 +215,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         type: 'bar',
         label: 'Cố định (Wh)',
         data: historyStatic,
-        backgroundColor: '#c2410c', // Cam
+        backgroundColor: staLineColor,
         borderRadius: 2,
         maxBarThickness: 32,
         yAxisID: 'y',
@@ -221,15 +236,17 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         position: 'top',
         align: 'end',
         labels: {
-          color: '#334155',
-          font: { family: 'Be Vietnam Pro', size: 12, weight: '500' },
+          color: chartLegendColor,
+          font: { family: 'Be Vietnam Pro', size: 12, weight: '600' },
           boxWidth: 14,
           boxHeight: 10,
           padding: 12
         }
       },
       tooltip: {
-        backgroundColor: '#1e293b',
+        backgroundColor: '#0f172a',
+        borderColor: '#334155',
+        borderWidth: 1,
         titleColor: '#ffffff',
         bodyColor: '#f8fafc',
         titleFont: { family: 'Be Vietnam Pro', size: 12, weight: 'bold' },
@@ -256,14 +273,14 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
     },
     scales: {
       x: {
-        grid: { color: '#f1f5f9' },
-        ticks: { color: '#64748b', font: { family: 'Be Vietnam Pro', size: 11 } }
+        grid: { color: chartGridColor },
+        ticks: { color: chartTickColor, font: { family: 'Be Vietnam Pro', size: 11, weight: '500' } }
       },
       y: {
-        grid: { color: '#f1f5f9' },
+        grid: { color: chartGridColor },
         ticks: {
-          color: '#64748b',
-          font: { family: 'Be Vietnam Pro', size: 11 },
+          color: chartTickColor,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '500' },
           callback: function (value) {
             return `${formatDecimal(value, 0)} Wh`;
           }
@@ -274,8 +291,8 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         position: 'right',
         grid: { drawOnChartArea: false },
         ticks: {
-          color: '#15803d',
-          font: { family: 'Be Vietnam Pro', size: 11 },
+          color: chartGreenTick,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '600' },
           callback: function (value) {
             return `${formatSignedNumber(value, 0, '%')}`;
           }
@@ -283,11 +300,6 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
       }
     }
   };
-
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  const chartGridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
-  const chartTickColor = isDark ? '#94a3b8' : '#64748b';
-  const chartLegendColor = isDark ? '#e2e8f0' : '#334155';
 
   return (
     <div id="section-charts" className="space-y-4">
@@ -297,16 +309,16 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         <div className="lab-card p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
                 Đồ thị công suất trong ngày
               </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
                 So sánh công suất tức thời (W) theo khung giờ đo 05:00 – 19:00
               </p>
             </div>
             <button
               onClick={() => setExpandedChart('intraday')}
-              className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
+              className="p-1.5 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
               title="Phóng to đồ thị"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -322,10 +334,10 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
         <div className="lab-card p-4 flex flex-col justify-between">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
                 Đồ thị năng lượng tích lũy
               </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
                 Sản lượng điện (Wh) và % Gain cải thiện theo khoảng thời gian
               </p>
             </div>
@@ -339,7 +351,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
                   className={`px-2 py-0.5 rounded-xs transition-colors cursor-pointer ${
                     historyRange === opt.value
                       ? 'bg-white dark:bg-slate-700 font-semibold text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-slate-600'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                      : 'text-zinc-700 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
                   }`}
                 >
                   {opt.label}
@@ -347,7 +359,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
               ))}
               <button
                 onClick={() => setExpandedChart('history')}
-                className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 ml-1 border-l border-zinc-200 dark:border-slate-700 cursor-pointer"
+                className="p-1 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white ml-1 border-l border-zinc-200 dark:border-slate-700 cursor-pointer"
                 title="Phóng to đồ thị"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
