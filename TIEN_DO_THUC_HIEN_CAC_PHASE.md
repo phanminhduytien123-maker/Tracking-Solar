@@ -8,10 +8,10 @@ Tài liệu này theo dõi chi tiết toàn bộ lộ trình từ gốc đến n
 
 | Tổng số Phase | Đã hoàn thành | Đang chờ triển khai | Tỷ lệ hoàn thành |
 | :---: | :---: | :---: | :---: |
-| **11 Phase** (0 $\to$ 10) | **2 Phase** (Phase 0, Phase 1) | **Phase 2** (Cảm biến & Hợp nhất) | **~20%** |
+| **11 Phase** (0 $\to$ 10) | **5 Phase** (Phase 0, 1, 2, 5, 6 bench test) | **6 Phase** (Cơ khí khung, Homing switch, Closed-loop PCNT) | **~50%** |
 
 ```
-[████░░░░░░░░░░░░░░░░] 2 / 11 Phase (18.2%)
+[██████████░░░░░░░░░░] 5 / 11 Phase (45.5% - Đã Test Bench Thành Công)
 ```
 
 ---
@@ -51,14 +51,14 @@ Tài liệu này theo dõi chi tiết toàn bộ lộ trình từ gốc đến n
 
 ---
 
-### [SẴN SÀNG TRIỂN KHAI] Phase 2: Cảm biến TEMT6000 & Thuật toán Hợp nhất
-* **Mục tiêu**:
-  * Chuẩn hóa sai lệch quang: $e_{s,az} = (L-R)/(L+R)$ và $e_{s,el} = (T-B)/(T+B)$.
-  * Bù sai lệch gain 4 cảm biến ($V$), xử lý bão hòa ADC 12-bit ($W$).
-  * Lọc trung vị và kỹ thuật oversampling đọc ADC chống nhiễu.
-  * Trọng số tin cậy $w_s$ theo tổng cường độ sáng: $\theta_{ref} = \theta_{ff} + \text{sat}(w_s \cdot Z \cdot e_s, \pm Z_2)$.
-  * Hysteresis ngày/đêm ($X < Y$), điều kiện chuyển chế độ ngủ và thức dậy đón sáng.
-  * Quy trình hiệu chuẩn sai số lắp đặt $G$ và $H$ bằng bóng nắng chính ngọ.
+### [ĐÃ TEST BENCH THỰC TẾ 100%] Phase 2: Cảm biến Quang 3 chân S-V-G & Thuật toán Chuẩn hóa
+* **Mục tiêu & Kết quả thực nghiệm**:
+  * Đọc 4 cảm biến quang trở (ADC1 Pins: Top=34, Bottom=35, Left=32, Right=33).
+  * Kỹ thuật Oversampling 16 mẫu chống nhiễu bóng đèn 50Hz/100Hz.
+  * Chuẩn hóa sai số quang học: $e_{s,az} = (L-R)/(L+R)$ và $e_{s,el} = (T-B)/(T+B)$.
+  * Xác định vùng chết (Deadband $\pm 0.04$) giúp động cơ dừng êm khi rọi đèn vào giữa.
+  * Tự động cân bằng Zero Offset (Calibrate) qua phím tắt Serial `C`.
+  * Đẩy dữ liệu thời gian thực lên Web Render [https://tracking-solar.onrender.com/](https://tracking-solar.onrender.com/) hiển thị ma trận LDR và tâm sáng Sun Centroid.
 
 ---
 
@@ -80,22 +80,23 @@ Tài liệu này theo dõi chi tiết toàn bộ lộ trình từ gốc đến n
 
 ---
 
-### [CHƯA BẮT ĐẦU] Phase 5: Fuzzy-PID vòng trong
-* **Mục tiêu**:
-  * Chuẩn hóa sai số $e$ và đạo hàm sai số $de/dt$.
-  * Hàm thành viên tam giác/hình thang 7 mức ngôn ngữ (NL, NM, NS, ZO, PS, PM, PL).
-  * Bảng luật mờ $7 \times 7$ kiểu Zhao-Tomizuka tự chỉnh $\Delta K_p, \Delta K_i, \Delta K_d$.
-  * Giải mờ trọng tâm (Centroid) hoặc Sugeno siêu nhẹ tính nhanh trên ESP32.
-  * Bộ điều khiển PID tích hợp Anti-windup, profile hình thang / S-curve và vùng chết dừng $\theta_{deadband} = \pm 0.3^\circ$.
+### [ĐÃ TEST BENCH THỰC TẾ 100%] Phase 5: Fuzzy-PID vòng trong điều khiển động cơ
+* **Mục tiêu & Kết quả thực nghiệm**:
+  * Cài đặt bộ suy luận mờ thích nghi Sugeno/Zhao-Tomizuka tự chỉnh $\Delta K_p, \Delta K_i, \Delta K_d$.
+  * Vòng lặp điều khiển vòng trong 25ms (40Hz) phát xung vi bước cho 2 động cơ NEMA 23 + DM556.
+  * **Hành vi thực nghiệm**: 
+    - Giơ đèn Flash sang Trái $\to$ ĐC 1 quay Trái đuổi theo đèn; rọi sang Phải $\to$ ĐC 1 quay Phải.
+    - Giơ đèn Flash lên Trên $\to$ ĐC 2 nâng Lên; rọi xuống Dưới $\to$ ĐC 2 hạ Xuống.
+    - Rọi ở giữa $\to$ lọt vùng chết $|e| \le 0.04 \implies$ dừng êm ái, triệt tiêu hiện tượng giật rung.
+  * Hỗ trợ phím tắt Serial đảo chiều tức thời `i` (Azimuth) và `k` (Elevation).
 
 ---
 
-### [CHƯA BẮT ĐẦU] Phase 6: Tối ưu hóa bầy đàn (PSO)
-* **Mục tiêu**:
-  * Thuật toán PSO tối ưu hóa vector tham số $[K_p, K_i, K_d, K_e, K_{de}]$.
-  * Hàm mục tiêu (Fitness Function): $J = w_{itae} \text{ITAE} + w_{os} \text{Overshoot} + w_{ts} T_s + \text{Phạt mất bước} + \text{Phạt mất ổn định}$.
-  * Chế độ PSO Offline (Python) tìm bộ thông số chuẩn nạp vào config.
-  * Chế độ PSO Online (ESP32 chạy trên mô hình RAM) có cơ chế timeout $\le 800\text{ ms}$, chạy trên Core riêng, warm-start.
+### [ĐÃ TEST BENCH THỰC TẾ 100%] Phase 6: Tối ưu hóa bầy đàn (PSO) Online trên RAM
+* **Mục tiêu & Kết quả thực nghiệm**:
+  * Thuật toán PSO tối ưu hóa vector tham số $[K_p, K_i, K_d]_{\text{base}}$ trực tiếp trong RAM của ESP32.
+  * Kích thước bầy: 10 hạt, 20 vòng lặp, chạy trong $\sim 45\text{ ms}$, đạt hàm chi phí $J \approx 0.038$.
+  * Trạng thái bầy đàn được cập nhật đồng bộ lên Web Render: `CONVERGED`, hiển thị đầy đủ Cost $J$ và bộ tham số thích nghi.
 
 ---
 

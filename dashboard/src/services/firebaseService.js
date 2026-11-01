@@ -1,28 +1,40 @@
 // Firebase Realtime Database Service for Dual-Axis Solar Tracking DATN
+// TUÂN THỦ NGUYÊN TẮC: CHỈ HIỂN THỊ, KHÔNG TỰ TÍNH LẠI HẰNG SỐ VẬT LÝ, PHÂN BIỆT THẬT/GIẢ
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/database';
 
+export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
+export const STALE_THRESHOLD_MS = 3 * LIVE_PUSH_INTERVAL_MS; // 3 giây (3 lần chu kỳ đẩy) -> Dữ liệu bắt đầu CŨ
+export const DISCONNECT_THRESHOLD_MS = 10000; // 10 giây không có gói tin mới -> MẤT KẾT NỐI
+
+/**
+ * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.
+ * TUYỆT ĐỐI KHÔNG ĐIỀN CÁC SỐ ẢO (0.0382, 142ms, 25 vòng, Kp=2.4) LÀM HIỂU NHẦM LÀ SỐ THẬT.
+ */
 export function getCleanZeroTelemetry() {
   return {
     timestamp: '--:--:--',
-    rawTimestamp: Date.now(),
+    rawTimestamp: null,
     system: {
       online: false,
+      source: 'none',       // 'device' | 'mock' | 'unknown' | 'none'
       isMock: false,
-      source: 'firebase',
-      mode: 'AUTO',
-      state: 'DEEP_SLEEP', // 'HOMING' | 'MOVE' | 'TRACKING' | 'PARK' | 'DEEP_SLEEP' | 'FAULT' | 'MANUAL'
-      wakeAt: '03:00',
+      connStatus: 'DISCONNECTED', // 'LIVE' | 'STALE' | 'DISCONNECTED'
+      mode: '--',
+      state: 'DISCONNECTED',
+      displayState: 'MẤT KẾT NỐI',
+      wakeAt: null,
       isSleeping: false,
-      activeAlgorithm: 'PSO_FUZZY_PID', // 'PID' | 'FUZZY_PID' | 'PSO_FUZZY_PID'
+      activeAlgorithm: null,
       estop: false,
       nightMode: false,
       rainWindSafeMode: false,
-      pingMs: 0,
-      ip: 'Waiting for ESP32...',
-      firmware: 'ESP32-S3 Live Firmware',
-      uptimeSeconds: 0,
-      rtcOffsetMs: 0,
+      pingMs: null,
+      ip: 'Chưa kết nối',
+      firmware: '--',
+      uptimeSeconds: null,
+      rtcOffsetMs: null,
+      rtcTime: null,
       errors: {
         sensorLost: false,
         driverFault: false,
@@ -36,124 +48,107 @@ export function getCleanZeroTelemetry() {
     },
     INA226: {
       tracking: {
-        voltage: 0,
-        current: 0,
-        power: 0,
-        energyWh: 0,
-        energyKwh: 0,
+        voltage: null,
+        current: null,
+        power: null,
+        energyWh: null,
+        energyKwh: null,
         online: false,
+        connStatus: 'DISCONNECTED',
+        staleDurationMs: 0,
         isSleeping: false,
-        wakeAt: '03:00'
+        wakeAt: null,
+        lastUpdate: null,
+        board: null
       },
       static: {
-        voltage: 0,
-        current: 0,
-        power: 0,
-        energyWh: 0,
-        energyKwh: 0,
-        online: false
+        voltage: null,
+        current: null,
+        power: null,
+        energyWh: null,
+        energyKwh: null,
+        fixedAzimuth: 180.0,
+        fixedTiltBeta: 15.0,
+        fixedElevationEps: 75.0, // ε = 90° - 15° = 75° (ngửa 75°)
+        online: false,
+        connStatus: 'DISCONNECTED',
+        staleDurationMs: 0,
+        lastUpdate: null,
+        board: null
       },
       comparison: {
-        percentGain: 0,
+        percentGain: null,
         hasValidGain: false,
-        powerDelta: 0,
-        energyDeltaWh: 0,
+        powerDelta: null,
+        energyDeltaWh: null,
         calibrationK: 1.018
       }
     },
     motors: {
       azimuth: {
-        phi: 0.0,
-        targetPhi: 0.0,
-        currentAngle: 180.0, // AZ la bàn = G + H + φ
-        targetAngle: 180.0,
-        errorAngle: 0.0,
-        encoderPulses: 0, // K_enc = 20 count/độ
-        commandPulses: 0,
-        stepLoss: 0,
+        phi: null,
+        targetPhi: null,
+        currentAngle: null,
+        targetAngle: null,
+        errorAngle: null,
+        encoderPulses: null,
+        commandPulses: null,
+        deg_per_count: null,
+        step_error_counts: null,
+        step_error_deg: null,
+        flag_step_loss: false,
         limitHome: false,
+        soft_min: null,
+        soft_max: null,
+        soft_limit_status: 'UNVERIFIED',
         softLimitViolated: false,
         moving: false,
-        isHomed: false
+        isHomed: false,
+        flag_stall: false,
+        compass_calibrated: false
       },
       elevation: {
-        epsilon: 90.0,
-        targetEpsilon: 90.0,
-        currentAngle: 90.0, // EL = ε
-        targetAngle: 90.0,
-        errorAngle: 0.0,
-        encoderPulses: 1800,
-        commandPulses: 1800,
-        stepLoss: 0,
+        epsilon: null,
+        targetEpsilon: null,
+        currentAngle: null,
+        targetAngle: null,
+        errorAngle: null,
+        encoderPulses: null,
+        commandPulses: null,
+        deg_per_count: null,
+        step_error_counts: null,
+        step_error_deg: null,
+        flag_step_loss: false,
         limitSwitch90: false,
+        soft_min: null,
+        soft_max: null,
+        soft_limit_status: 'UNVERIFIED',
         softLimitViolated: false,
         moving: false,
-        isHomed: false
+        isHomed: false,
+        flag_stall: false
       }
     },
     sensors: {
-      top: { lux: 0, adc: 0 },
-      bottom: { lux: 0, adc: 0 },
-      left: { lux: 0, adc: 0 },
-      right: { lux: 0, adc: 0 },
-      esAz: 0,
-      esEl: 0,
-      totalLightAdc: 0,
-      totalLux: 0,
-      weightWs: 0.0,
+      top: { lux: null, adc: null },
+      bottom: { lux: null, adc: null },
+      left: { lux: null, adc: null },
+      right: { lux: null, adc: null },
+      esAz: null,
+      esEl: null,
+      totalLightAdc: null,
+      totalLux: null,
+      weightWs: null,
       isSaturated: false,
-      dayNightState: 'NIGHT_SLEEP',
-      thresholdX: 40,
-      thresholdY: 200,
-      diffAzimuth: 0,
-      diffElevation: 0,
-      sunCentroidX: 0,
-      sunCentroidY: 0
+      light_state: 'NO_DATA', // 'DAY' | 'NIGHT' | 'NO_DATA'
+      diffAzimuth: null,
+      diffElevation: null,
+      sunCentroidX: null,
+      sunCentroidY: null
     },
-    fuzzy: {
-      activeAlgorithm: 'PSO_FUZZY_PID',
-      errorAngle: 0,
-      errorRate: 0,
-      az: {
-        kpBase: 2.4,
-        kiBase: 0.10,
-        kdBase: 0.60,
-        deltaKp: 0,
-        deltaKi: 0,
-        deltaKd: 0,
-        kpTotal: 2.4,
-        kiTotal: 0.10,
-        kdTotal: 0.60
-      },
-      el: {
-        kpBase: 2.8,
-        kiBase: 0.12,
-        kdBase: 0.75,
-        deltaKp: 0,
-        deltaKi: 0,
-        deltaKd: 0,
-        kpTotal: 2.8,
-        kiTotal: 0.12,
-        kdTotal: 0.75
-      },
-      kp: 2.4,
-      ki: 0.10,
-      kd: 0.60,
-      activeRule: 'Waiting for ESP32 stream...',
-      defuzzOutput: 0
-    },
-    pso: {
-      source: 'ONLINE', // 'OFFLINE_DEFAULT' | 'ONLINE' | 'FALLBACK'
-      costJ: 0.038, // Fitness cost J
-      gBestFitness: 0.038,
-      runTimeMs: 142,
-      swarmSize: 10,
-      iteration: 25,
-      maxIterations: 25,
-      status: 'IDLE',
-      bestAzimuth: 180,
-      bestElevation: 90
-    }
+    fuzzy: null, // Chưa có thuật toán -> null
+    pso: null,   // Chưa có thuật toán -> null
+    has_algo_data: false
   };
 }
 
@@ -163,8 +158,10 @@ export class FirebaseSolarService {
     this.app = null;
     this.db = null;
     this.solarRef = null;
-    this.controlRef = null;
+    this.connectedRef = null;
+    this.serverOffsetRef = null;
     this.isConnected = false;
+    this.serverTimeOffset = 0; // Độ lệch giữa đồng hồ máy khách và Firebase Server
     this.onTelemetry = () => { };
     this.onStatusChange = () => { };
     this.onError = () => { };
@@ -206,7 +203,7 @@ export class FirebaseSolarService {
 
     this.onStatusChange({ connected: false, connecting: true });
 
-    // Official Firebase RTDB connection listener (.info/connected)
+    // 1. Lắng nghe trạng thái kết nối Cloud (.info/connected)
     this.connectedRef = ref(this.db, '.info/connected');
     onValue(this.connectedRef, (snap) => {
       const isOnline = snap.val() === true;
@@ -214,7 +211,13 @@ export class FirebaseSolarService {
       this.onStatusChange({ connected: isOnline, connecting: !isOnline });
     });
 
-    // Khởi động bộ Watchdog quét liên tục mỗi 500ms để phát hiện mất kết nối quá 3s
+    // 2. Lắng nghe độ lệch thời gian Server chuẩn Firebase (.info/serverTimeOffset)
+    this.serverOffsetRef = ref(this.db, '.info/serverTimeOffset');
+    onValue(this.serverOffsetRef, (snap) => {
+      this.serverTimeOffset = Number(snap.val() || 0);
+    });
+
+    // 3. Bộ Watchdog quét chu kỳ 500ms để phát hiện dữ liệu CŨ hoặc MẤT KẾT NỐI
     if (this.watchdogTimer) clearInterval(this.watchdogTimer);
     this.watchdogTimer = setInterval(() => {
       if (this.latestRawData && this.isConnected) {
@@ -223,7 +226,7 @@ export class FirebaseSolarService {
       }
     }, 500);
 
-    // Listen to device telemetry on /solar
+    // 4. Lắng nghe node telemetry chính /solar
     this.solarRef = ref(this.db, 'solar');
     onValue(
       this.solarRef,
@@ -254,11 +257,9 @@ export class FirebaseSolarService {
             }
           }
 
-          // Map Firebase schema into unified dashboard telemetry
           const mappedTelemetry = this.mapFirebaseToTelemetry(data);
           this.onTelemetry(mappedTelemetry);
         } else {
-          // Empty or reset database
           this.isConnected = true;
           this.onStatusChange({ connected: true, connecting: false });
           this.onTelemetry(getCleanZeroTelemetry());
@@ -281,6 +282,10 @@ export class FirebaseSolarService {
       off(this.connectedRef);
       this.connectedRef = null;
     }
+    if (this.serverOffsetRef) {
+      off(this.serverOffsetRef);
+      this.serverOffsetRef = null;
+    }
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
       this.watchdogTimer = null;
@@ -289,178 +294,315 @@ export class FirebaseSolarService {
     this.onStatusChange({ connected: false, connecting: false });
   }
 
+  /**
+   * Ánh xạ dữ liệu thô từ Firebase lên đối tượng Telemetry thống nhất của Web.
+   * QUY TẮC BẮT BUỘC:
+   * - Khi CŨ hoặc MẤT KẾT NỐI: Giá trị đo chuyển sang null (Web sẽ hiển thị '--', không hiện số cũ, không hiện 0).
+   * - Kiểm tra trường `source`: 'device' (thật), 'mock' (ảo), thiếu -> 'unknown' (cảnh báo vàng).
+   * - Firmware chưa có PID/Fuzzy/PSO -> không hiển thị số, gán has_algo_data = false.
+   */
   mapFirebaseToTelemetry(fbData) {
+    if (!fbData || (!fbData.tracking && !fbData.static)) {
+      return getCleanZeroTelemetry();
+    }
+
     const tracking = fbData.tracking || {};
     const staticPanel = fbData.static || {};
     const algo = fbData.algorithm || {};
     const now = Date.now();
-    const TIMEOUT_MS = 3000; // 3 giây không có gói tin mới -> MẤT KẾT NỐI
+    const serverTimeNow = now + this.serverTimeOffset;
 
-    // 1. Kiểm tra trạng thái kết nối thật của Tấm Xoay & Chế độ ngủ đông ban đêm
-    let isTrackingOnline = false;
-    const isSleeping = tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true;
-    const wakeAt = tracking.wake_at || tracking.wakeAt || '03:00';
+    // 1. XÁC ĐỊNH NGUỒN GỐC DỮ LIỆU (source)
+    const rawSource = fbData.source || tracking.source || staticPanel.source || null;
+    let sourceStatus = 'unknown'; // 'device' | 'mock' | 'unknown'
+    if (rawSource === 'device') {
+      sourceStatus = 'device';
+    } else if (rawSource === 'mock') {
+      sourceStatus = 'mock';
+    } else {
+      sourceStatus = 'unknown'; // Thiếu trường source -> Cảnh báo vàng
+    }
 
+    // 2. TÍNH ĐỘ TƯƠI VÀ TRẠNG THÁI KẾT NỐI TỪNG KHỐI
+    // Tấm Xoay:
+    let trkAgeMs = Infinity;
     if (fbData.tracking && Object.keys(fbData.tracking).length > 0) {
-      const trkUpdate = Number(fbData.tracking.lastUpdate || 0);
+      const trkUpdate = Number(tracking.lastUpdate || 0);
       if (trkUpdate > 1700000000000) {
-        isTrackingOnline = (now - trkUpdate) <= TIMEOUT_MS;
-      } else {
-        isTrackingOnline = (now - this.lastTrackingReceivedTime) <= TIMEOUT_MS;
+        trkAgeMs = Math.max(0, serverTimeNow - trkUpdate);
+      } else if (this.lastTrackingReceivedTime > 0) {
+        trkAgeMs = Math.max(0, now - this.lastTrackingReceivedTime);
       }
     }
 
-    // 2. Kiểm tra trạng thái kết nối thật của Tấm Cố Định
-    let isStaticOnline = false;
+    let trkConnStatus = 'DISCONNECTED'; // 'LIVE' | 'STALE' | 'DISCONNECTED'
+    if (trkAgeMs <= STALE_THRESHOLD_MS) {
+      trkConnStatus = 'LIVE';
+    } else if (trkAgeMs <= DISCONNECT_THRESHOLD_MS) {
+      trkConnStatus = 'STALE';
+    } else {
+      trkConnStatus = 'DISCONNECTED';
+    }
+
+    // Tấm Cố Định:
+    let staAgeMs = Infinity;
     if (fbData.static && Object.keys(fbData.static).length > 0) {
-      const staUpdate = Number(fbData.static.lastUpdate || 0);
+      const staUpdate = Number(staticPanel.lastUpdate || 0);
       if (staUpdate > 1700000000000) {
-        isStaticOnline = (now - staUpdate) <= TIMEOUT_MS;
-      } else {
-        isStaticOnline = (now - this.lastStaticReceivedTime) <= TIMEOUT_MS;
+        staAgeMs = Math.max(0, serverTimeNow - staUpdate);
+      } else if (this.lastStaticReceivedTime > 0) {
+        staAgeMs = Math.max(0, now - this.lastStaticReceivedTime);
       }
     }
 
-    // Dữ liệu Tấm Xoay (Nếu Offline -> trả về 0)
-    const trkVolt = isTrackingOnline ? Number(tracking.voltage || 0) : 0.0;
-    const trkCurr = isTrackingOnline ? Number(tracking.current || 0) : 0.0;
-    const trkPower = isTrackingOnline ? Number(tracking.power || (trkVolt * trkCurr)) : 0.0;
-    const trkEnergyRaw = Number(tracking.dailyEnergyWh !== undefined ? tracking.dailyEnergyWh : (tracking.dailyEnergy || 0));
-    const trkEnergyWh = tracking.dailyEnergyWh !== undefined ? Number(tracking.dailyEnergyWh) : (trkEnergyRaw < 1.0 && trkEnergyRaw > 0 ? trkEnergyRaw * 1000 : trkEnergyRaw);
-    const trkEnergyKwh = trkEnergyWh / 1000;
+    let staConnStatus = 'DISCONNECTED';
+    if (staAgeMs <= STALE_THRESHOLD_MS) {
+      staConnStatus = 'LIVE';
+    } else if (staAgeMs <= DISCONNECT_THRESHOLD_MS) {
+      staConnStatus = 'STALE';
+    } else {
+      staConnStatus = 'DISCONNECTED';
+    }
 
-    // Dữ liệu Tấm Cố Định (Nếu Offline -> trả về 0)
-    const staVolt = isStaticOnline ? Number(staticPanel.voltage || 0) : 0.0;
-    const staCurr = isStaticOnline ? Number(staticPanel.current || 0) : 0.0;
-    const staPower = isStaticOnline ? Number(staticPanel.power || (staVolt * staCurr)) : 0.0;
-    const staEnergyRaw = Number(staticPanel.dailyEnergyWh !== undefined ? staticPanel.dailyEnergyWh : (staticPanel.dailyEnergy || 0));
-    const staEnergyWh = staticPanel.dailyEnergyWh !== undefined ? Number(staticPanel.dailyEnergyWh) : (staEnergyRaw < 1.0 && staEnergyRaw > 0 ? staEnergyRaw * 1000 : staEnergyRaw);
-    const staEnergyKwh = staEnergyWh / 1000;
+    const isTrackingLive = (trkConnStatus === 'LIVE');
+    const isStaticLive = (staConnStatus === 'LIVE');
+    const isSystemOnline = (trkConnStatus !== 'DISCONNECTED' || staConnStatus !== 'DISCONNECTED');
 
-    // TÍCH PHÂN NĂNG LƯỢNG NGÀY: % Gain = (ΣE_trk / (k * ΣE_sta) - 1) * 100%
-    // k = 1.018 (hệ số hiệu chuẩn chéo). Ngưỡng tối thiểu: ΣE_sta >= 5 Wh
+    // 3. THỐNG NHẤT TRẠNG THÁI HỆ THỐNG GIỮA THẺ NGOÀI VÀ MODAL
+    const isSleeping = tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true;
+    const wakeAt = tracking.wake_at || tracking.wakeAt || null;
+
+    let displayState = 'MẤT KẾT NỐI';
+    let rawState = tracking.state || 'DISCONNECTED';
+
+    if (trkConnStatus === 'DISCONNECTED') {
+      displayState = 'MẤT KẾT NỐI (Trk: OFF)';
+      rawState = 'DISCONNECTED';
+    } else if (trkConnStatus === 'STALE') {
+      displayState = 'DỮ LIỆU CŨ';
+      rawState = 'STALE';
+    } else if (isSleeping) {
+      displayState = wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG';
+      rawState = 'DEEP_SLEEP';
+    } else if (tracking.state === 'TRACKING' || tracking.status === 'TRACKING_ACTIVE') {
+      displayState = 'TRACKING (ĐANG BÁM)';
+      rawState = 'TRACKING';
+    } else if (tracking.state === 'MOVE' || tracking.status === 'MOVE') {
+      displayState = 'MOVE (ĐANG QUAY)';
+      rawState = 'MOVE';
+    } else if (tracking.state === 'PARK') {
+      displayState = 'PARK (ĐANG ĐỖ)';
+      rawState = 'PARK';
+    } else if (tracking.state === 'HOMING') {
+      displayState = 'HOMING (VỀ GỐC)';
+      rawState = 'HOMING';
+    } else if (tracking.state === 'FAULT' || tracking.estop) {
+      displayState = 'FAULT (SỰ CỐ)';
+      rawState = 'FAULT';
+    } else {
+      displayState = tracking.state || 'TRACKING';
+      rawState = tracking.state || 'TRACKING';
+    }
+
+    // 4. ĐO LƯỜNG ĐIỆN NĂNG INA226
+    // QUY TẮC: Khi CŨ hoặc MẤT KẾT NỐI -> null (hiện '--', KHÔNG hiện 0, KHÔNG hiện số cũ giả vờ mới)
+    const trkVolt = isTrackingLive ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
+    const trkCurr = isTrackingLive ? (tracking.current !== undefined ? Number(tracking.current) : null) : null;
+    const trkPower = isTrackingLive ? (tracking.power !== undefined ? Number(tracking.power) : (trkVolt !== null && trkCurr !== null ? Number((trkVolt * trkCurr).toFixed(2)) : null)) : null;
+    const trkEnergyWh = tracking.dailyEnergyWh !== undefined ? Number(tracking.dailyEnergyWh) : (tracking.dailyEnergy !== undefined ? Number((tracking.dailyEnergy * 1000).toFixed(1)) : null);
+
+    const staVolt = isStaticLive ? (staticPanel.voltage !== undefined ? Number(staticPanel.voltage) : null) : null;
+    const staCurr = isStaticLive ? (staticPanel.current !== undefined ? Number(staticPanel.current) : null) : null;
+    const staPower = isStaticLive ? (staticPanel.power !== undefined ? Number(staticPanel.power) : (staVolt !== null && staCurr !== null ? Number((staVolt * staCurr).toFixed(2)) : null)) : null;
+    const staEnergyWh = staticPanel.dailyEnergyWh !== undefined ? Number(staticPanel.dailyEnergyWh) : (staticPanel.dailyEnergy !== undefined ? Number((staticPanel.dailyEnergy * 1000).toFixed(1)) : null);
+
+    // Tấm cố định: lấy fixed_az_deg và fixed_tilt_beta_deg; ε tính ra = 90 - beta
+    const fixedAz = Number(staticPanel.fixed_az_deg !== undefined ? staticPanel.fixed_az_deg : (staticPanel.fixedAzimuth || 180.0));
+    const fixedBeta = Number(staticPanel.fixed_tilt_beta_deg !== undefined ? staticPanel.fixed_tilt_beta_deg : (staticPanel.fixed_tilt_beta || 15.0));
+    const fixedEps = Number((90.0 - fixedBeta).toFixed(1)); // 75.0°
+
+    // Tích phân % Gain: Chỉ tính khi CẢ 2 ĐANG LIVE, CÙNG NGUỒN DEVICE THẬT, VÀ ΣE_sta >= 5 Wh
     const K_CROSS = Number(algo.crossCalibrationK || 1.018);
-    let percentGain = 0.0;
+    let percentGain = null;
     let hasValidGain = false;
-    if (staEnergyWh >= 5.0) {
+    if (isTrackingLive && isStaticLive && sourceStatus === 'device' && staEnergyWh !== null && staEnergyWh >= 5.0 && trkEnergyWh !== null) {
       percentGain = Number((((trkEnergyWh / (K_CROSS * staEnergyWh)) - 1) * 100).toFixed(1));
       hasValidGain = true;
     }
 
-    const powerDelta = Number((trkPower - staPower).toFixed(2));
-    const energyDeltaWh = Number((trkEnergyWh - staEnergyWh).toFixed(1));
+    const powerDelta = (trkPower !== null && staPower !== null) ? Number((trkPower - staPower).toFixed(2)) : null;
+    const energyDeltaWh = (trkEnergyWh !== null && staEnergyWh !== null) ? Number((trkEnergyWh - staEnergyWh).toFixed(1)) : null;
 
-    // QUY ƯỚC GÓC: φ tính từ công tắc Azimuth (-120° đến +120°), ε tính từ mặt phẳng đỗ (25° đến 90°)
-    // AZ la bàn = G + H + φ (G = 180°, H = 0°); EL = ε
-    const curPhi = Number(tracking.phi !== undefined ? tracking.phi : (tracking.azimuthAngle !== undefined ? tracking.azimuthAngle - 180.0 : 0.0));
-    const curEpsilon = Number(tracking.epsilon !== undefined ? tracking.epsilon : (tracking.elevationAngle !== undefined ? tracking.elevationAngle : 90.0));
-    const tgtPhi = Number(tracking.targetPhi !== undefined ? tracking.targetPhi : (tracking.targetAzimuth !== undefined ? tracking.targetAzimuth - 180.0 : curPhi));
-    const tgtEpsilon = Number(tracking.targetEpsilon !== undefined ? tracking.targetEpsilon : (tracking.targetElevation !== undefined ? tracking.targetElevation : curEpsilon));
+    // 5. ĐỘ LỆCH RTC: CHỈ TÍNH KHI LIVE, GIỮA TIMESTAMP DS3231 VÀ GIỜ SERVER FIREBASE
+    let rtcOffsetMs = null;
+    if (isTrackingLive && tracking.rtc_timestamp) {
+      const rtcEpochMs = Number(tracking.rtc_timestamp);
+      if (rtcEpochMs > 1700000000000) {
+        rtcOffsetMs = Math.round(rtcEpochMs - serverTimeNow);
+      }
+    } else if (isTrackingLive && tracking.rtcOffsetMs !== undefined) {
+      rtcOffsetMs = Number(tracking.rtcOffsetMs);
+    }
 
-    const compassAzimuth = parseFloat((180.0 + curPhi).toFixed(1));
-    const compassTarget = parseFloat((180.0 + tgtPhi).toFixed(1));
+    // 6. GÓC VÀ ENCODER (CHỈ HIỂN THỊ SỐ FIRMWARE GỬI, KHÔNG TỰ QUY ĐỔI 20 COUNT)
+    const curPhi = tracking.phi !== undefined ? Number(tracking.phi) : null;
+    const curEpsilon = tracking.epsilon !== undefined ? Number(tracking.epsilon) : (tracking.elevationAngle !== undefined ? Number(tracking.elevationAngle) : null);
+    const tgtPhi = tracking.targetPhi !== undefined ? Number(tracking.targetPhi) : null;
+    const tgtEpsilon = tracking.targetEpsilon !== undefined ? Number(tracking.targetEpsilon) : (tracking.targetElevation !== undefined ? Number(tracking.targetElevation) : null);
 
-    const phiError = tgtPhi - curPhi;
-    const elError = tgtEpsilon - curEpsilon;
-    const totalError = Math.sqrt(phiError * phiError + elError * elError);
+    // Sai số từng trục do firmware gửi (không dùng sai số Euclidean 112.72°)
+    const errorAzDeg = tracking.error_az_deg !== undefined ? Number(tracking.error_az_deg) : (tgtPhi !== null && curPhi !== null ? Number((tgtPhi - curPhi).toFixed(2)) : null);
+    const errorElDeg = tracking.error_el_deg !== undefined ? Number(tracking.error_el_deg) : (tgtEpsilon !== null && curEpsilon !== null ? Number((tgtEpsilon - curEpsilon).toFixed(2)) : null);
 
-    // Xung Encoder: Đọc trực tiếp từ firmware, không tự quy đổi cứng 111.1!
-    // K_enc = 20 count/độ
-    const azEncPulses = Number(tracking.azEncoder !== undefined ? tracking.azEncoder : (tracking.encoderPulses !== undefined ? tracking.encoderPulses : Math.round(curPhi * 20)));
-    const elEncPulses = Number(tracking.elEncoder !== undefined ? tracking.elEncoder : Math.round(curEpsilon * 20));
-    const azCmdPulses = Number(tracking.azCommandPulses !== undefined ? tracking.azCommandPulses : Math.round(tgtPhi * 20));
-    const elCmdPulses = Number(tracking.elCommandPulses !== undefined ? tracking.elCommandPulses : Math.round(tgtEpsilon * 20));
-    const azStepLoss = azCmdPulses - azEncPulses;
-    const elStepLoss = elCmdPulses - elEncPulses;
+    // Độ phân giải Encoder: do firmware gửi
+    const degPerCountAz = tracking.deg_per_count_az !== undefined ? Number(tracking.deg_per_count_az) : (tracking.deg_per_count !== undefined ? Number(tracking.deg_per_count) : null);
+    const degPerCountEl = tracking.deg_per_count_el !== undefined ? Number(tracking.deg_per_count_el) : (tracking.deg_per_count !== undefined ? Number(tracking.deg_per_count) : null);
 
-    // Cảm biến quang trở TEMT6000
-    const ldrT = isTrackingOnline ? Number(tracking.ldrTop || 0) : 0;
-    const ldrB = isTrackingOnline ? Number(tracking.ldrBottom || 0) : 0;
-    const ldrL = isTrackingOnline ? Number(tracking.ldrLeft || 0) : 0;
-    const ldrR = isTrackingOnline ? Number(tracking.ldrRight || 0) : 0;
+    // Mất bước: Web KHÔNG tự trừ! Lấy trực tiếp từ firmware
+    const stepErrorCountsAz = tracking.step_error_counts_az !== undefined ? Number(tracking.step_error_counts_az) : (tracking.step_error_counts !== undefined ? Number(tracking.step_error_counts) : null);
+    const stepErrorDegAz = tracking.step_error_deg_az !== undefined ? Number(tracking.step_error_deg_az) : null;
+    const stepErrorCountsEl = tracking.step_error_counts_el !== undefined ? Number(tracking.step_error_counts_el) : null;
+    const stepErrorDegEl = tracking.step_error_deg_el !== undefined ? Number(tracking.step_error_deg_el) : null;
+    const flagStepLoss = Boolean(tracking.flag_step_loss || tracking.step_loss_az || tracking.step_loss_el);
 
-    const sumLR = Math.max(1, ldrL + ldrR);
-    const sumTB = Math.max(1, ldrT + ldrB);
-    const esAz = parseFloat(((ldrL - ldrR) / sumLR).toFixed(3));
-    const esEl = parseFloat(((ldrT - ldrB) / sumTB).toFixed(3));
-    const totalLightAdc = ldrT + ldrB + ldrL + ldrR;
-    const totalLux = Math.round(totalLightAdc / 4 * 20);
-    const isSaturated = Math.max(ldrT, ldrB, ldrL, ldrR) >= 3950;
-    const ws = Number(tracking.weightWs !== undefined ? tracking.weightWs : (totalLux >= 200 ? 0.85 : (totalLux >= 40 ? 0.35 : 0.0)));
-    const dayNightState = totalLux < 40 ? 'NIGHT_SLEEP' : (totalLux < 200 ? 'CLOUDY_ORBIT' : 'SUNNY_FUSION');
+    // Giới hạn mềm: Hiển thị giá trị do firmware gửi, kèm UNVERIFIED / VALID
+    const softMinAz = tracking.soft_min_az !== undefined ? Number(tracking.soft_min_az) : (tracking.soft_min !== undefined ? Number(tracking.soft_min) : null);
+    const softMaxAz = tracking.soft_max_az !== undefined ? Number(tracking.soft_max_az) : (tracking.soft_max !== undefined ? Number(tracking.soft_max) : null);
+    const softMinEl = tracking.soft_min_el !== undefined ? Number(tracking.soft_min_el) : null;
+    const softMaxEl = tracking.soft_max_el !== undefined ? Number(tracking.soft_max_el) : null;
+    const softLimitStatus = tracking.soft_limit_status || (softMinAz !== null ? 'VALID' : 'UNVERIFIED');
 
-    // Tách bộ Kp/Ki/Kd riêng cho từng trục (Base + Delta)
-    const kpAzBase = Number(algo.kpAzBase || 2.40);
-    const kiAzBase = Number(algo.kiAzBase || 0.10);
-    const kdAzBase = Number(algo.kdAzBase || 0.60);
-    const deltaKpAz = Number(algo.deltaKpAz || (Math.min(0.8, Math.abs(phiError) * 0.2)));
-    const deltaKiAz = Number(algo.deltaKiAz || (Math.min(0.05, Math.abs(phiError) * 0.01)));
-    const deltaKdAz = Number(algo.deltaKdAz || (Math.min(0.3, Math.abs(phiError) * 0.08)));
+    // AZ la bàn: G + H + φ do firmware gửi
+    const compassAzimuth = tracking.azimuthAngle !== undefined ? Number(tracking.azimuthAngle) : (curPhi !== null ? Number((180.0 + curPhi).toFixed(1)) : null);
+    const compassTarget = tracking.targetAzimuth !== undefined ? Number(tracking.targetAzimuth) : (tgtPhi !== null ? Number((180.0 + tgtPhi).toFixed(1)) : null);
+    const compassCalibrated = Boolean(tracking.compass_calibrated || (tracking.g_verified && tracking.h_verified));
 
-    const kpElBase = Number(algo.kpElBase || 2.80);
-    const kiElBase = Number(algo.kiElBase || 0.12);
-    const kdElBase = Number(algo.kdElBase || 0.75);
-    const deltaKpEl = Number(algo.deltaKpEl || (Math.min(0.9, Math.abs(elError) * 0.22)));
-    const deltaKiEl = Number(algo.deltaKiEl || (Math.min(0.06, Math.abs(elError) * 0.012)));
-    const deltaKdEl = Number(algo.deltaKdEl || (Math.min(0.35, Math.abs(elError) * 0.09)));
+    // 7. CẢM BIẾN QUANG TEMT6000 & TRẠNG THÁI ÁNH SÁNG
+    const ldrT = isTrackingLive && tracking.ldrTop !== undefined ? Number(tracking.ldrTop) : null;
+    const ldrB = isTrackingLive && tracking.ldrBottom !== undefined ? Number(tracking.ldrBottom) : null;
+    const ldrL = isTrackingLive && tracking.ldrLeft !== undefined ? Number(tracking.ldrLeft) : null;
+    const ldrR = isTrackingLive && tracking.ldrRight !== undefined ? Number(tracking.ldrRight) : null;
+    const adcSaturated = Boolean(tracking.adc_saturated || (ldrT !== null && Math.max(ldrT, ldrB, ldrL, ldrR) >= 3950));
 
-    // Hệ thống trạng thái & Chế độ thuật toán
-    const activeAlgorithm = tracking.activeAlgorithm || algo.name || 'PSO_FUZZY_PID';
-    const systemState = isSleeping ? 'DEEP_SLEEP' : (tracking.state || (tracking.mode === 'PARK' ? 'PARK' : (totalError > 1.0 ? 'MOVE' : 'TRACKING')));
+    // Chỉ tính Lux khi firmware gửi hệ số quy đổi lux_conv_factor; nếu không, giữ null để hiển thị ADC thô
+    const luxConvFactor = tracking.lux_conv_factor ? Number(tracking.lux_conv_factor) : null;
+    const totalLightAdc = (ldrT !== null && ldrB !== null && ldrL !== null && ldrR !== null) ? (ldrT + ldrB + ldrL + ldrR) : null;
+    const totalLux = (luxConvFactor !== null && totalLightAdc !== null) ? Math.round(totalLightAdc * luxConvFactor) : (tracking.total_lux !== undefined ? Number(tracking.total_lux) : null);
+
+    // Trạng thái ánh sáng: DAY / NIGHT / NO_DATA
+    let lightState = 'NO_DATA';
+    if (!isTrackingLive || ldrT === null) {
+      lightState = 'NO_DATA'; // Mất kết nối -> Không có dữ liệu cảm biến
+    } else if (tracking.light_state) {
+      lightState = tracking.light_state; // Firmware trực tiếp gửi
+    } else if (isSleeping) {
+      lightState = 'NIGHT';
+    } else {
+      lightState = 'DAY';
+    }
+
+    // 8. THUẬT TOÁN FUZZY & PSO: CHỈ HIỂN THỊ KHI FIRMWARE GỬI algo_state
+    const algoState = algo.algo_state || tracking.algo_state || null;
+    const hasAlgoData = Boolean(algoState && algoState !== 'UNINITIALIZED' && algoState !== 'DISABLED');
+
+    let psoData = null;
+    let fuzzyData = null;
+
+    if (hasAlgoData) {
+      psoData = {
+        source: algo.psoSource || algo.source || 'ONLINE',
+        costJ: algo.cost_j !== undefined ? Number(algo.cost_j) : (algo.psoCostJ !== undefined ? Number(algo.psoCostJ) : (algo.psoBestFitness !== undefined ? Number(algo.psoBestFitness) : null)),
+        runTimeMs: algo.run_time_ms !== undefined ? Number(algo.run_time_ms) : (algo.psoRunTimeMs !== undefined ? Number(algo.psoRunTimeMs) : null),
+        swarmSize: algo.swarm_size !== undefined ? Number(algo.swarm_size) : (algo.psoSwarmSize !== undefined ? Number(algo.psoSwarmSize) : null),
+        iteration: algo.iteration !== undefined ? Number(algo.iteration) : (algo.psoIteration !== undefined ? Number(algo.psoIteration) : null),
+        maxIterations: algo.max_iterations !== undefined ? Number(algo.max_iterations) : (algo.psoMaxIterations !== undefined ? Number(algo.psoMaxIterations) : null),
+        status: algo.status || algoState
+      };
+
+      fuzzyData = {
+        activeAlgorithm: tracking.activeAlgorithm || algo.name || 'PSO_FUZZY_PID',
+        az: {
+          kpBase: Number(algo.kpAzBase || algo.kp_az || 0),
+          kiBase: Number(algo.kiAzBase || algo.ki_az || 0),
+          kdBase: Number(algo.kdAzBase || algo.kd_az || 0),
+          deltaKp: Number(algo.deltaKpAz || algo.delta_kp_az || 0),
+          deltaKi: Number(algo.deltaKiAz || algo.delta_ki_az || 0),
+          deltaKd: Number(algo.deltaKdAz || algo.delta_kd_az || 0)
+        },
+        el: {
+          kpBase: Number(algo.kpElBase || algo.kp_el || 0),
+          kiBase: Number(algo.kiElBase || algo.ki_el || 0),
+          kdBase: Number(algo.kdElBase || algo.kd_el || 0),
+          deltaKp: Number(algo.deltaKpEl || algo.delta_kp_el || 0),
+          deltaKi: Number(algo.deltaKiEl || algo.delta_ki_el || 0),
+          deltaKd: Number(algo.deltaKdEl || algo.delta_kd_el || 0)
+        }
+      };
+    }
 
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
-      rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || Date.now(),
+      rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || now,
       system: {
-        online: isTrackingOnline || isStaticOnline,
-        isMock: false,
-        source: 'firebase',
-        mode: tracking.mode || 'AUTO',
-        state: systemState,
+        online: isSystemOnline,
+        source: sourceStatus, // 'device' | 'mock' | 'unknown'
+        isMock: sourceStatus === 'mock',
+        connStatus: trkConnStatus,
+        mode: tracking.mode || '--',
+        state: rawState,
+        displayState,
         wakeAt,
         isSleeping,
-        activeAlgorithm,
-        estop: tracking.estop || false,
-        nightMode: tracking.nightMode || isSleeping,
-        rainWindSafeMode: tracking.safeMode || false,
-        pingMs: 15,
-        ip: 'Firebase Cloud (Real-Time)',
-        firmware: 'ESP32 Live Telemetry',
-        uptimeSeconds: Math.floor((Date.now() - (tracking.lastUpdate || staticPanel.lastUpdate || Date.now())) / 1000),
-        rtcOffsetMs: Number(tracking.rtcOffsetMs || 0),
+        activeAlgorithm: tracking.activeAlgorithm || (hasAlgoData ? 'PSO_FUZZY_PID' : 'CHƯA CÓ DỮ LIỆU'),
+        estop: Boolean(tracking.estop),
+        nightMode: Boolean(tracking.nightMode || isSleeping),
+        rainWindSafeMode: Boolean(tracking.safeMode),
+        pingMs: isSystemOnline ? 15 : null,
+        ip: isSystemOnline ? 'Firebase Cloud' : 'Chưa kết nối',
+        firmware: tracking.firmware || 'ESP32 Live Telemetry',
+        uptimeSeconds: tracking.uptimeSeconds !== undefined ? Number(tracking.uptimeSeconds) : null,
+        rtcOffsetMs,
+        rtcTime: tracking.rtcTime || null,
         errors: {
           sensorLost: Boolean(tracking.sensorLost),
           driverFault: Boolean(tracking.estop || tracking.driverFault),
           limitSwitchMinTriggered: Boolean(tracking.limitMinFault),
           limitSwitchMaxTriggered: Boolean(tracking.limitMaxFault),
           earlyWake: Boolean(tracking.earlyWake),
-          zenithClamp: curEpsilon >= 89.0,
+          zenithClamp: curEpsilon !== null && curEpsilon >= 89.0,
           psoTimeout: Boolean(algo.psoTimeout),
-          stepLossWarn: Math.abs(azStepLoss) > 50 || Math.abs(elStepLoss) > 50
+          stepLossWarn: flagStepLoss
         }
       },
       INA226: {
         tracking: {
-          voltage: parseFloat(trkVolt.toFixed(2)),
-          current: parseFloat(trkCurr.toFixed(3)),
-          power: parseFloat(trkPower.toFixed(2)),
-          energyWh: parseFloat(trkEnergyWh.toFixed(1)),
-          energyKwh: parseFloat(trkEnergyKwh.toFixed(3)),
-          online: isTrackingOnline,
+          voltage: trkVolt,
+          current: trkCurr,
+          power: trkPower,
+          energyWh: trkEnergyWh,
+          energyKwh: trkEnergyWh !== null ? Number((trkEnergyWh / 1000).toFixed(3)) : null,
+          online: isTrackingLive,
+          connStatus: trkConnStatus,
+          staleDurationMs: trkAgeMs,
           isSleeping,
           wakeAt,
           lastUpdate: tracking.lastUpdate || null,
-          board: tracking.board || (isTrackingOnline ? 'ESP32-S3 Tracker' : null)
+          board: tracking.board || (isTrackingLive ? 'ESP32 Tracker' : null)
         },
         static: {
-          voltage: parseFloat(staVolt.toFixed(2)),
-          current: parseFloat(staCurr.toFixed(3)),
-          power: parseFloat(staPower.toFixed(2)),
-          energyWh: parseFloat(staEnergyWh.toFixed(1)),
-          energyKwh: parseFloat(staEnergyKwh.toFixed(3)),
-          online: isStaticOnline,
+          voltage: staVolt,
+          current: staCurr,
+          power: staPower,
+          energyWh: staEnergyWh,
+          energyKwh: staEnergyWh !== null ? Number((staEnergyWh / 1000).toFixed(3)) : null,
+          fixedAzimuth: fixedAz,
+          fixedTiltBeta: fixedBeta,
+          fixedElevationEps: fixedEps,
+          online: isStaticLive,
+          connStatus: staConnStatus,
+          staleDurationMs: staAgeMs,
           lastUpdate: staticPanel.lastUpdate || null,
-          board: staticPanel.board || (isStaticOnline ? 'ESP32 Static Node' : null)
+          board: staticPanel.board || (isStaticLive ? 'ESP32 Static Logger' : null)
         },
         comparison: {
           percentGain,
@@ -472,101 +614,74 @@ export class FirebaseSolarService {
       },
       motors: {
         azimuth: {
-          phi: parseFloat(curPhi.toFixed(1)),
-          targetPhi: parseFloat(tgtPhi.toFixed(1)),
-          currentAngle: compassAzimuth, // AZ la bàn
+          phi: curPhi,
+          targetPhi: tgtPhi,
+          currentAngle: compassAzimuth,
           targetAngle: compassTarget,
-          errorAngle: parseFloat(phiError.toFixed(2)),
-          encoderPulses: azEncPulses, // count thô từ firmware
-          commandPulses: azCmdPulses,
-          stepLoss: azStepLoss,
-          limitHome: Math.abs(curPhi) <= 0.3,
-          softLimitViolated: curPhi <= -120 || curPhi >= 120,
-          moving: Math.abs(phiError) > 0.3,
-          isHomed: tracking.isHomed !== false
+          errorAngle: errorAzDeg,
+          encoderPulses: tracking.azEncoder !== undefined ? Number(tracking.azEncoder) : (tracking.encoderPulses !== undefined ? Number(tracking.encoderPulses) : null),
+          commandPulses: tracking.azCommandPulses !== undefined ? Number(tracking.azCommandPulses) : null,
+          deg_per_count: degPerCountAz,
+          step_error_counts: stepErrorCountsAz,
+          step_error_deg: stepErrorDegAz,
+          flag_step_loss: flagStepLoss,
+          limitHome: Boolean(tracking.limitHome),
+          soft_min: softMinAz,
+          soft_max: softMaxAz,
+          soft_limit_status: softLimitStatus,
+          softLimitViolated: Boolean(tracking.softLimitViolatedAz),
+          moving: Boolean(tracking.movingAz || (errorAzDeg !== null && Math.abs(errorAzDeg) > 0.3)),
+          isHomed: tracking.isHomed !== false,
+          flag_stall: Boolean(tracking.flag_stall_az),
+          compass_calibrated: compassCalibrated
         },
         elevation: {
-          epsilon: parseFloat(curEpsilon.toFixed(1)),
-          targetEpsilon: parseFloat(tgtEpsilon.toFixed(1)),
-          currentAngle: parseFloat(curEpsilon.toFixed(1)), // EL = ε
-          targetAngle: parseFloat(tgtEpsilon.toFixed(1)),
-          errorAngle: parseFloat(elError.toFixed(2)),
-          encoderPulses: elEncPulses, // count thô từ firmware
-          commandPulses: elCmdPulses,
-          stepLoss: elStepLoss,
-          limitSwitch90: curEpsilon >= 89.5,
-          softLimitViolated: curEpsilon <= 25 || curEpsilon >= 90,
-          moving: Math.abs(elError) > 0.3,
-          isHomed: tracking.isHomed !== false
+          epsilon: curEpsilon,
+          targetEpsilon: tgtEpsilon,
+          currentAngle: curEpsilon,
+          targetAngle: tgtEpsilon,
+          errorAngle: errorElDeg,
+          encoderPulses: tracking.elEncoder !== undefined ? Number(tracking.elEncoder) : null,
+          commandPulses: tracking.elCommandPulses !== undefined ? Number(tracking.elCommandPulses) : null,
+          deg_per_count: degPerCountEl,
+          step_error_counts: stepErrorCountsEl,
+          step_error_deg: stepErrorDegEl,
+          flag_step_loss: flagStepLoss,
+          limitSwitch90: Boolean(tracking.limitHome2 || tracking.limitSwitch90),
+          soft_min: softMinEl,
+          soft_max: softMaxEl,
+          soft_limit_status: softLimitStatus,
+          softLimitViolated: Boolean(tracking.softLimitViolatedEl),
+          moving: Boolean(tracking.movingEl || (errorElDeg !== null && Math.abs(errorElDeg) > 0.3)),
+          isHomed: tracking.isHomed !== false,
+          flag_stall: Boolean(tracking.flag_stall_el)
         }
       },
       sensors: {
-        top: { lux: ldrT * 20, adc: ldrT },
-        bottom: { lux: ldrB * 20, adc: ldrB },
-        left: { lux: ldrL * 20, adc: ldrL },
-        right: { lux: ldrR * 20, adc: ldrR },
-        esAz,
-        esEl,
+        top: { lux: (luxConvFactor !== null && ldrT !== null) ? Math.round(ldrT * luxConvFactor) : null, adc: ldrT },
+        bottom: { lux: (luxConvFactor !== null && ldrB !== null) ? Math.round(ldrB * luxConvFactor) : null, adc: ldrB },
+        left: { lux: (luxConvFactor !== null && ldrL !== null) ? Math.round(ldrL * luxConvFactor) : null, adc: ldrL },
+        right: { lux: (luxConvFactor !== null && ldrR !== null) ? Math.round(ldrR * luxConvFactor) : null, adc: ldrR },
+        esAz: (ldrL !== null && ldrR !== null && (ldrL + ldrR) > 0) ? Number(((ldrL - ldrR) / (ldrL + ldrR)).toFixed(3)) : null,
+        esEl: (ldrT !== null && ldrB !== null && (ldrT + ldrB) > 0) ? Number(((ldrT - ldrB) / (ldrT + ldrB)).toFixed(3)) : null,
         totalLightAdc,
         totalLux,
-        weightWs: ws,
-        isSaturated,
-        dayNightState,
-        thresholdX: 40,
-        thresholdY: 200,
-        diffAzimuth: ldrL - ldrR,
-        diffElevation: ldrT - ldrB,
-        sunCentroidX: parseFloat(Math.max(-1, Math.min(1, (ldrL - ldrR) / 2000)).toFixed(3)),
-        sunCentroidY: parseFloat(Math.max(-1, Math.min(1, (ldrT - ldrB) / 2000)).toFixed(3))
+        weightWs: tracking.weightWs !== undefined ? Number(tracking.weightWs) : null,
+        isSaturated: adcSaturated,
+        light_state: lightState, // 'DAY' | 'NIGHT' | 'NO_DATA'
+        lux_conv_factor: luxConvFactor,
+        diffAzimuth: (ldrL !== null && ldrR !== null) ? (ldrL - ldrR) : null,
+        diffElevation: (ldrT !== null && ldrB !== null) ? (ldrT - ldrB) : null,
+        sunCentroidX: (ldrL !== null && ldrR !== null) ? Number(Math.max(-1, Math.min(1, (ldrL - ldrR) / 2000)).toFixed(3)) : null,
+        sunCentroidY: (ldrT !== null && ldrB !== null) ? Number(Math.max(-1, Math.min(1, (ldrT - ldrB) / 2000)).toFixed(3)) : null
       },
-      fuzzy: {
-        activeAlgorithm,
-        errorAngle: parseFloat(totalError.toFixed(2)),
-        errorRate: 0.02,
-        az: {
-          kpBase: kpAzBase,
-          kiBase: kiAzBase,
-          kdBase: kdAzBase,
-          deltaKp: parseFloat(deltaKpAz.toFixed(2)),
-          deltaKi: parseFloat(deltaKiAz.toFixed(3)),
-          deltaKd: parseFloat(deltaKdAz.toFixed(2)),
-          kpTotal: parseFloat((kpAzBase + deltaKpAz).toFixed(2)),
-          kiTotal: parseFloat((kiAzBase + deltaKiAz).toFixed(3)),
-          kdTotal: parseFloat((kdAzBase + deltaKdAz).toFixed(2))
-        },
-        el: {
-          kpBase: kpElBase,
-          kiBase: kiElBase,
-          kdBase: kdElBase,
-          deltaKp: parseFloat(deltaKpEl.toFixed(2)),
-          deltaKi: parseFloat(deltaKiEl.toFixed(3)),
-          deltaKd: parseFloat(deltaKdEl.toFixed(2)),
-          kpTotal: parseFloat((kpElBase + deltaKpEl).toFixed(2)),
-          kiTotal: parseFloat((kiElBase + deltaKiEl).toFixed(3)),
-          kdTotal: parseFloat((kdElBase + deltaKdEl).toFixed(2))
-        },
-        kp: parseFloat((kpAzBase + deltaKpAz).toFixed(2)),
-        ki: parseFloat((kiAzBase + deltaKiAz).toFixed(3)),
-        kd: parseFloat((kdAzBase + deltaKdAz).toFixed(2)),
-        activeRule: totalError > 2.0 ? 'R12: PB x ZE -> PB (Fast Slew)' : totalError > 0.5 ? 'R08: PS x NS -> PS (Fine Slew)' : 'R01: ZE x ZE -> ZE (Steady Deadband)',
-        defuzzOutput: parseFloat((totalError * 2.45).toFixed(2))
-      },
-      pso: {
-        source: algo.psoSource || 'ONLINE', // 'OFFLINE_DEFAULT' | 'ONLINE' | 'FALLBACK'
-        costJ: Number(algo.psoCostJ !== undefined ? algo.psoCostJ : (algo.psoBestFitness !== undefined ? algo.psoBestFitness : 0.0382)), // Hàm chi phí tối ưu J
-        gBestFitness: Number(algo.psoCostJ !== undefined ? algo.psoCostJ : 0.0382),
-        runTimeMs: Number(algo.psoRunTimeMs || 142),
-        swarmSize: Number(algo.psoSwarmSize || 10),
-        iteration: Number(algo.psoIteration || 25),
-        maxIterations: Number(algo.psoMaxIterations || 25),
-        status: algo.psoStatus || 'CONVERGED',
-        bestAzimuth: compassTarget,
-        bestElevation: parseFloat(tgtEpsilon.toFixed(1))
-      }
+      fuzzy: fuzzyData,
+      pso: psoData,
+      has_algo_data: hasAlgoData
     };
   }
 
-  // Clear all data on Firebase node /solar
+  // Clear all data on Firebase node /solar (Chỉ chạy khi có xác nhận)
   async clearAllData() {
     if (!this.db) return false;
     try {
@@ -580,7 +695,7 @@ export class FirebaseSolarService {
     }
   }
 
-  // Send Remote Control Command from Web to ESP32 with command ID, TTL (30s) and ack flag
+  // Gửi lệnh điều khiển từ xa với ID, TTL và ack flag
   async sendCommand(commandObj) {
     if (!this.db) {
       console.warn('[Firebase] Database not connected');
@@ -593,7 +708,7 @@ export class FirebaseSolarService {
       await set(controlRef, {
         id: cmdId,
         ...commandObj,
-        ttl: 30000, // 30 seconds Time-To-Live
+        ttl: 30000,
         ack: false,
         timestamp: Date.now()
       });
@@ -625,10 +740,66 @@ export class FirebaseSolarService {
   }
 
   async testDir(axis, direction = 1) {
-    return this.sendCommand({ cmd: 'test_dir', axis, direction, slowSpeed: true, lowCurrent: true });
+    return this.sendCommand({ cmd: 'test_dir', axis, direction });
   }
 
   async setEstop(enabled) {
     return this.sendCommand({ cmd: 'estop', state: enabled });
+  }
+
+  listenSiteConfig(callback) {
+    if (!this.db) return null;
+    const siteRef = ref(this.db, 'solar/config/site');
+    onValue(siteRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && callback) {
+        callback(data);
+      }
+    });
+    return siteRef;
+  }
+
+  async saveSiteConfig(siteObj) {
+    if (!this.db) {
+      console.warn('[Firebase] Database not connected');
+      return false;
+    }
+    try {
+      const siteRef = ref(this.db, 'solar/config/site');
+      await set(siteRef, {
+        lat_deg: Number(Number(siteObj.lat_deg !== undefined ? siteObj.lat_deg : siteObj.lat).toFixed(5)),
+        lon_deg: Number(Number(siteObj.lon_deg !== undefined ? siteObj.lon_deg : siteObj.lon).toFixed(5)),
+        rev: Number(siteObj.rev || 1),
+        updated_at: Number(siteObj.updated_at || Date.now()),
+        updated_by: String(siteObj.updated_by || 'admin'),
+        location_name: String(siteObj.location_name || siteObj.locationName || ''),
+        confirmed: Boolean(siteObj.confirmed || false),
+        confirmed_by: siteObj.confirmed ? String(siteObj.confirmed_by || 'admin') : null,
+        confirmed_at: siteObj.confirmed ? (siteObj.confirmed_at || Date.now()) : null
+      });
+      return true;
+    } catch (err) {
+      console.error('[Firebase Save SiteConfig Error]', err);
+      return false;
+    }
+  }
+
+  async confirmSiteConfig(confirmedBy = 'admin') {
+    if (!this.db) {
+      console.warn('[Firebase] Database not connected');
+      return false;
+    }
+    try {
+      const siteRef = ref(this.db, 'solar/config/site');
+      await update(siteRef, {
+        confirmed: true,
+        confirmed_by: String(confirmedBy),
+        confirmed_at: Date.now()
+      });
+      return true;
+    } catch (err) {
+      console.error('[Firebase Confirm SiteConfig Error]', err);
+      return false;
+    }
   }
 }

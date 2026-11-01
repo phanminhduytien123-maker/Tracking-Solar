@@ -23,6 +23,7 @@ export default function SettingsModal({
   onSendTestPacket,
   currentLocation = null,
   onSelectLocation = null,
+  onConfirmLocation = null,
   weatherData = null,
   initialTab = null
 }) {
@@ -258,7 +259,9 @@ void loop() {
     json.set("power", power);
     json.set("dailyEnergy", totalEnergyWh / 1000.0);
     json.set("fixedAzimuth", 180.0);
-    json.set("fixedElevation", 15.0);
+    json.set("fixed_tilt_beta", 15.0);
+    json.set("fixed_elevation_eps", 75.0);
+    json.set("fixedElevation", 75.0);
     json.set("lastUpdate", (double)millis());
 
     if (Firebase.RTDB.updateNode(&fbdo, "/solar/static", &json)) {
@@ -274,83 +277,83 @@ void loop() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl modal-sheet-container">
-      <div className="panel-card w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-zinc-700/80 bg-[#0d1017]">
-
-        {/* Mobile Grab Handle */}
-        <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
+      <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-3xl max-h-[92vh] flex flex-col shadow-sm text-zinc-900">
 
         {/* Header */}
-        <div className="flex items-center justify-between py-4 px-5 sm:px-6 border-b border-zinc-800 bg-[#121620]">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 bg-white">
           <div>
-            <h2 className="text-base sm:text-lg font-bold tracking-tight uppercase text-white">
-              CẤU HÌNH HỆ THỐNG
+            <h2 className="text-base font-bold text-zinc-950">
+              Cấu hình hệ thống
             </h2>
-            <span className="text-xs text-zinc-400 font-medium">Nguồn dữ liệu, GPS tọa độ, Quản lý người dùng & Mã nhúng ESP32</span>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Nguồn dữ liệu, tọa độ trạm đo, quản lý người dùng và mã nhúng ESP32
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer border border-transparent hover:border-zinc-700"
+            className="p-1.5 text-zinc-500 hover:text-zinc-900 border border-zinc-300 rounded-sm cursor-pointer"
+            title="Đóng cửa sổ"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-zinc-800 bg-[#0d1017] px-4 sm:px-6 pt-2 gap-2 text-sm overflow-x-auto">
+        <div className="flex border-b border-zinc-200 bg-zinc-50 px-4 pt-1 gap-1 text-xs overflow-x-auto">
           <button
             onClick={() => setActiveTab('config')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'config'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'config'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
             Nguồn dữ liệu
           </button>
           <button
             onClick={() => setActiveTab('location')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'location'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'location'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
             Tọa độ lắp đặt
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm flex items-center gap-1.5 ${activeTab === 'users'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'users'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
             <span>Quản lý người dùng</span>
             {usersList.some(u => u.status !== 'active') && (
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('esp32_trk')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'esp32_trk'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'esp32_trk'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
-            Code ESP32 Tấm xoay
+            Code ESP32 tấm xoay
           </button>
           <button
             onClick={() => setActiveTab('esp32_fix')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'esp32_fix'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'esp32_fix'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
-            Code ESP32 Tấm cố định
+            Code ESP32 tấm cố định
           </button>
           <button
             onClick={() => setActiveTab('json')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer font-semibold whitespace-nowrap text-sm ${activeTab === 'json'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'json'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
               }`}
           >
             Dữ liệu thô (JSON)
@@ -362,29 +365,27 @@ void loop() {
 
           {/* TAB 1: CONFIG */}
           {activeTab === 'config' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
 
               {/* Mode Selector */}
               <div>
-                <label className="text-xs uppercase text-zinc-300 font-bold tracking-wider block mb-2.5">
-                  CHỌN CHẾ ĐỘ NGUỒN DỮ LIỆU
+                <label className="text-xs font-bold text-zinc-800 block mb-2">
+                  Chọn chế độ nguồn dữ liệu
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
 
                   {/* FIREBASE CLOUD */}
                   <button
                     type="button"
                     onClick={() => setDataSource('firebase')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'firebase'
-                        ? 'bg-zinc-800/90 text-white border-white shadow-md'
-                        : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                    className={`p-3 rounded-sm border text-left transition-colors cursor-pointer ${dataSource === 'firebase'
+                        ? 'bg-blue-50/70 text-blue-950 border-blue-700 font-semibold'
+                        : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
                       }`}
                   >
-                    <div className="font-bold text-sm text-white tracking-wide">
-                      FIREBASE CLOUD
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Kết nối Realtime Database qua mạng Internet (4G/WiFi).
+                    <div className="font-bold text-xs">Firebase Cloud</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                      Kết nối Realtime Database qua Internet (4G/WiFi).
                     </div>
                   </button>
 
@@ -392,16 +393,14 @@ void loop() {
                   <button
                     type="button"
                     onClick={() => setDataSource('mock')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'mock'
-                        ? 'bg-zinc-800/90 text-white border-white shadow-md'
-                        : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                    className={`p-3 rounded-sm border text-left transition-colors cursor-pointer ${dataSource === 'mock'
+                        ? 'bg-blue-50/70 text-blue-950 border-blue-700 font-semibold'
+                        : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
                       }`}
                   >
-                    <div className="font-bold text-sm text-white tracking-wide">
-                      GIẢ LẬP DỮ LIỆU
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Tạo dữ liệu mô phỏng thuật toán Fuzzy-PID & PSO.
+                    <div className="font-bold text-xs">Giả lập dữ liệu</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                      Mô phỏng thuật toán trên trình duyệt (source: 'mock').
                     </div>
                   </button>
 
@@ -409,16 +408,14 @@ void loop() {
                   <button
                     type="button"
                     onClick={() => setDataSource('esp32_ws')}
-                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${dataSource === 'esp32_ws'
-                        ? 'bg-zinc-800/90 text-white border-white shadow-md'
-                        : 'bg-[#12151f] text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                    className={`p-3 rounded-sm border text-left transition-colors cursor-pointer ${dataSource === 'esp32_ws'
+                        ? 'bg-blue-50/70 text-blue-950 border-blue-700 font-semibold'
+                        : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
                       }`}
                   >
-                    <div className="font-bold text-sm text-white tracking-wide">
-                      WEBSOCKET ESP32
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      Kết nối trực tiếp IP mạng LAN nội bộ tại phòng lab.
+                    <div className="font-bold text-xs">WebSocket ESP32</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                      Kết nối trực tiếp IP mạng LAN nội bộ phòng lab.
                     </div>
                   </button>
                 </div>
@@ -426,59 +423,59 @@ void loop() {
 
               {/* FIREBASE CONFIG PANEL */}
               {dataSource === 'firebase' && (
-                <div className="p-4 sm:p-5 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                    <span className="font-bold text-sm text-zinc-100 uppercase tracking-wide">
+                <div className="p-4 rounded-sm bg-zinc-50 border border-zinc-200 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                    <span className="font-bold text-xs text-zinc-800">
                       Thông số kết nối Firebase RTDB
                     </span>
-                    <span className={`px-2.5 py-1 rounded text-xs font-semibold ${firebaseConnected ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                    <span className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${firebaseConnected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-zinc-200 text-zinc-700 border border-zinc-300'
                       }`}>
                       {firebaseConnected ? '● Đã kết nối' : '○ Chưa nhận dữ liệu'}
                     </span>
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-zinc-300 block mb-1.5">Database URL (Bắt buộc):</label>
+                    <label className="text-xs font-semibold text-zinc-700 block mb-1">Database URL (Bắt buộc):</label>
                     <input
                       type="text"
                       value={firebaseConfig.databaseURL || ''}
                       onChange={(e) => setFirebaseConfig({ ...firebaseConfig, databaseURL: e.target.value })}
                       placeholder="https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app"
-                      className="w-full bg-[#0a0c12] border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-hidden focus:border-zinc-400 font-mono"
+                      className="w-full bg-white border border-zinc-300 rounded-sm px-3 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 font-mono"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold text-zinc-300 block mb-1.5">Web API Key (Bắt buộc):</label>
+                      <label className="text-xs font-semibold text-zinc-700 block mb-1">Web API Key (Bắt buộc):</label>
                       <input
                         type="text"
                         value={firebaseConfig.apiKey || ''}
                         onChange={(e) => setFirebaseConfig({ ...firebaseConfig, apiKey: e.target.value })}
                         placeholder="AIzaSy..."
-                        className="w-full bg-[#0a0c12] border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-hidden focus:border-zinc-400 font-mono"
+                        className="w-full bg-white border border-zinc-300 rounded-sm px-3 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 font-mono"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-zinc-300 block mb-1.5">Project ID (Tuỳ chọn):</label>
+                      <label className="text-xs font-semibold text-zinc-700 block mb-1">Project ID (Tuỳ chọn):</label>
                       <input
                         type="text"
                         value={firebaseConfig.projectId || ''}
                         onChange={(e) => setFirebaseConfig({ ...firebaseConfig, projectId: e.target.value })}
                         placeholder="tracking-solar-datn"
-                        className="w-full bg-[#0a0c12] border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-hidden focus:border-zinc-400 font-mono"
+                        className="w-full bg-white border border-zinc-300 rounded-sm px-3 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 font-mono"
                       />
                     </div>
                   </div>
 
                   {/* Khóa thí nghiệm (30 ngày: 01/11 - 30/11) */}
-                  <div className="p-3.5 rounded-lg bg-[#0a0c12] border border-zinc-800 space-y-2">
+                  <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-bold text-white block uppercase tracking-wide">
-                          Khóa chế độ thí nghiệm (30 ngày đo: 01/11 - 30/11)
+                        <span className="text-xs font-bold text-zinc-900 block">
+                          Khóa chế độ thí nghiệm (30 ngày đo: 01/11 – 30/11)
                         </span>
-                        <span className="text-[11px] text-zinc-400 block mt-0.5">
+                        <span className="text-[11px] text-zinc-500 block">
                           Khóa thay đổi thông số &amp; Jog thủ công để bảo đảm dữ liệu đo đối chứng tính hợp lệ.
                         </span>
                       </div>
@@ -489,25 +486,25 @@ void loop() {
                           setIsExperimentLocked(nextVal);
                           localStorage.setItem('solar_experiment_locked', nextVal ? 'true' : 'false');
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1 rounded-sm text-xs font-bold transition-colors cursor-pointer ${
                           isExperimentLocked 
-                            ? 'bg-amber-500 text-black shadow-md' 
-                            : 'bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700'
+                            ? 'bg-amber-700 text-white' 
+                            : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-300'
                         }`}
                       >
-                        {isExperimentLocked ? '🔒 ĐANG KHÓA' : '🔓 ĐANG MỞ'}
+                        {isExperimentLocked ? 'Đang khóa' : 'Đang mở'}
                       </button>
                     </div>
                   </div>
 
                   {/* Actions for Firebase */}
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-zinc-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200">
                     <button
                       type="button"
                       onClick={onSendTestPacket}
-                      className="px-4 py-2 rounded-lg text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-600 transition-all cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-sm text-xs font-semibold bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer"
                     >
-                      Gửi 1 gói mẫu thử nghiệm
+                      Gửi 1 gói mẫu thử nghiệm (vào /solar_mock)
                     </button>
                     <button
                       type="button"
@@ -516,15 +513,11 @@ void loop() {
                           alert('Khóa thí nghiệm đang BẬT! Không thể xóa dữ liệu trong giai đoạn đo 30 ngày đối chứng (01/11 - 30/11).');
                           return;
                         }
-                        if (window.confirm('CẢNH BÁO: Nguồn dữ liệu gốc được lưu an toàn trên thẻ SD của logger, Firebase chỉ là bản sao. Bạn có chắc chắn muốn xóa bản sao trên Firebase?')) {
-                          if (window.confirm('Xác nhận bước 2: Đặt lại toàn bộ dữ liệu trên node /solar? Thao tác này không thể hoàn tác!')) {
-                            onClearFirebase && onClearFirebase();
-                          }
-                        }
+                        onClearFirebase && onClearFirebase();
                       }}
-                      className="px-4 py-2 rounded-lg text-xs font-bold bg-red-950/70 hover:bg-red-900 text-red-200 border border-red-800/80 transition-all cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-sm text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-800 border border-red-300 cursor-pointer"
                     >
-                      Xóa dữ liệu Firebase (Xác nhận 2 bước)
+                      Dọn dữ liệu Firebase (Hướng dẫn script an toàn)
                     </button>
                   </div>
                 </div>
@@ -532,41 +525,41 @@ void loop() {
 
               {/* LOCAL WEBSOCKET CONFIG PANEL */}
               {dataSource === 'esp32_ws' && (
-                <div className="p-4 sm:p-5 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-4">
+                <div className="p-4 rounded-sm bg-zinc-50 border border-zinc-200 space-y-3">
                   <div>
-                    <label className="text-xs font-semibold text-zinc-300 uppercase block mb-1.5">
-                      Địa Chỉ WebSocket ESP32-S3 (ws://)
+                    <label className="text-xs font-semibold text-zinc-700 block mb-1">
+                      Địa chỉ WebSocket ESP32-S3 (ws://)
                     </label>
                     <input
                       type="text"
                       value={wsUrl}
                       onChange={(e) => setWsUrl(e.target.value)}
                       placeholder="ws://192.168.4.1/ws"
-                      className="w-full bg-[#0a0c12] border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-zinc-400 font-mono"
+                      className="w-full bg-white border border-zinc-300 rounded-sm px-3 py-1.5 text-xs text-zinc-900 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-zinc-300 uppercase block mb-1.5">
-                      Địa Chỉ REST API Fallback (http://)
+                    <label className="text-xs font-semibold text-zinc-700 block mb-1">
+                      Địa chỉ REST API Fallback (http://)
                     </label>
                     <input
                       type="text"
                       value={restUrl}
                       onChange={(e) => setRestUrl(e.target.value)}
                       placeholder="http://192.168.4.1/api/telemetry"
-                      className="w-full bg-[#0a0c12] border border-zinc-700 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-zinc-400 font-mono"
+                      className="w-full bg-white border border-zinc-300 rounded-sm px-3 py-1.5 text-xs text-zinc-900 font-mono"
                     />
                   </div>
                 </div>
               )}
 
               {/* Refresh Rate */}
-              <div className="pt-2">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs uppercase text-zinc-300 font-bold tracking-wider">
+              <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-semibold text-zinc-700">
                     Tần số làm mới giao diện
                   </label>
-                  <span className="text-sm text-white font-mono font-bold">{refreshRate} ms</span>
+                  <span className="text-xs text-zinc-900 font-bold">{refreshRate} ms</span>
                 </div>
                 <input
                   type="range"
@@ -575,7 +568,7 @@ void loop() {
                   step="100"
                   value={refreshRate}
                   onChange={(e) => setRefreshRate(Number(e.target.value))}
-                  className="w-full accent-white cursor-pointer h-2 bg-zinc-700 rounded-lg"
+                  className="w-full cursor-pointer h-1.5 bg-zinc-300 rounded-sm accent-blue-700"
                 />
               </div>
 
@@ -588,7 +581,10 @@ void loop() {
               <InstallationLocationTab
                 currentLocation={currentLocation}
                 onSelectLocation={onSelectLocation}
+                onConfirmLocation={onConfirmLocation}
                 weatherData={weatherData}
+                latestTelemetry={latestTelemetry}
+                currentUser={currentUser}
               />
             </div>
           )}
@@ -599,67 +595,63 @@ void loop() {
 
               {/* Action Feedback Toast */}
               {userActionFeedback && (
-                <div className={`p-3 rounded-lg border flex items-center justify-between gap-2 text-xs font-semibold animate-in fade-in duration-150 ${userActionFeedback.type === 'success'
-                    ? 'bg-[#10241b] text-emerald-300 border-emerald-800/80'
+                <div className={`p-2.5 rounded-sm border flex items-center justify-between gap-2 text-xs font-semibold ${userActionFeedback.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                     : userActionFeedback.type === 'warning'
-                      ? 'bg-[#2a1d0d] text-amber-300 border-amber-800/80'
+                      ? 'bg-amber-50 text-amber-800 border-amber-300'
                       : userActionFeedback.type === 'danger'
-                        ? 'bg-[#2a0e14] text-rose-300 border-rose-800/80'
-                        : 'bg-[#131722] text-zinc-300 border-zinc-700'
+                        ? 'bg-red-50 text-red-800 border-red-300'
+                        : 'bg-zinc-50 text-zinc-800 border-zinc-300'
                   }`}>
                   <span>{userActionFeedback.message}</span>
                   <button
                     onClick={() => setUserActionFeedback(null)}
-                    className="text-white/60 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer"
+                    className="text-zinc-500 hover:text-zinc-800 px-1.5 py-0.5 rounded text-xs cursor-pointer"
                   >
                     ✕
                   </button>
                 </div>
               )}
 
-              {/* Top Stats Overview Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Stat 1: Total accounts */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
-                  <span className="text-xs text-zinc-400 font-medium block">Tổng người dùng</span>
-                  <span className="text-lg font-bold text-white mt-0.5 block">{usersList.length} tài khoản</span>
+              {/* Top Stats Overview */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                  <span className="text-xs text-zinc-500 block">Tổng số người dùng</span>
+                  <span className="text-base font-bold text-zinc-900 mt-0.5 block">{usersList.length} tài khoản</span>
                 </div>
 
-                {/* Stat 2: Online */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
-                  <span className="text-xs text-zinc-400 font-medium block">Đang trực tuyến</span>
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                  <span className="text-xs text-zinc-500 block">Đang trực tuyến</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="text-lg font-bold text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span className="text-base font-bold text-emerald-800">
                       {usersList.filter(u => u.isOnline || (currentUser?.username === u.username)).length} đang online
                     </span>
                   </div>
                 </div>
 
-                {/* Stat 3: Locked */}
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
-                  <span className="text-xs text-zinc-400 font-medium block">Tài khoản bị khóa</span>
-                  <span className={`text-lg font-bold mt-0.5 block ${usersList.some(u => u.status !== 'active') ? 'text-rose-400' : 'text-zinc-400'
-                    }`}>
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                  <span className="text-xs text-zinc-500 block">Tài khoản bị khóa</span>
+                  <span className={`text-base font-bold mt-0.5 block ${usersList.some(u => u.status !== 'active') ? 'text-red-700' : 'text-zinc-600'}`}>
                     {usersList.filter(u => u.status !== 'active').length} bị khóa
                   </span>
                 </div>
               </div>
 
               {/* Search & Refresh Actions Bar */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
                 <div className="relative flex-1">
                   <input
                     type="text"
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
                     placeholder="Tìm theo tên tài khoản, họ tên, vai trò..."
-                    className="w-full px-3.5 pr-8 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+                    className="w-full px-3 py-1.5 rounded-sm bg-white border border-zinc-300 text-xs text-zinc-900 placeholder-zinc-400"
                   />
                   {userSearchQuery && (
                     <button
                       onClick={() => setUserSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer"
                     >
                       ✕
                     </button>
@@ -668,14 +660,14 @@ void loop() {
                 <button
                   type="button"
                   onClick={handleRefreshUsers}
-                  className="px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-600 transition-all cursor-pointer active:scale-95 shrink-0"
+                  className="px-3 py-1.5 rounded-sm bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-800 border border-zinc-300 cursor-pointer shrink-0"
                 >
                   Đồng bộ trạng thái
                 </button>
               </div>
 
               {/* Users List Cards */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {usersList
                   .filter(u => {
                     const q = userSearchQuery.trim().toLowerCase();
@@ -693,7 +685,6 @@ void loop() {
                     const isLockedPerm = user.status === 'locked_permanent';
                     const isLocked = isLocked1H || isLockedPerm;
 
-                    // Remaining time for 1h lock
                     const remainingMins = user.lockedUntil && Date.now() < user.lockedUntil
                       ? Math.max(1, Math.ceil((user.lockedUntil - Date.now()) / 60000))
                       : null;
@@ -701,128 +692,77 @@ void loop() {
                     return (
                       <div
                         key={user.id}
-                        className={`p-4 rounded-xl border transition-all ${isLockedPerm
-                            ? 'bg-rose-950/20 border-rose-800/60 hover:border-rose-700'
+                        className={`p-3 rounded-sm border ${isLockedPerm
+                            ? 'bg-red-50/50 border-red-300'
                             : isLocked1H
-                              ? 'bg-amber-950/20 border-amber-800/60 hover:border-amber-700'
-                              : 'bg-[#131722] border-zinc-700/80 hover:border-zinc-500'
+                              ? 'bg-amber-50/50 border-amber-300'
+                              : 'bg-zinc-50 border-zinc-200'
                           }`}
                       >
-                        {/* Header: User Info & Online Tag */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-zinc-800">
-                          <div className="flex items-center gap-3">
-                            {/* Role Avatar */}
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs bg-zinc-800 border border-zinc-700 text-zinc-200 shrink-0">
-                              {user.username.slice(0, 2).toUpperCase()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-white text-sm">
-                                  {user.displayName}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-zinc-900 text-xs sm:text-sm">
+                                {user.displayName}
+                              </span>
+                              {isCurrentUser && (
+                                <span className="px-1.5 py-0.2 rounded-xs text-[10px] font-semibold bg-zinc-200 text-zinc-700">
+                                  Phiên hiện tại
                                 </span>
-                                {isCurrentUser && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700">
-                                    Phiên hiện tại
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5">
-                                <span className="font-mono text-zinc-300">@{user.username}</span>
-                                <span>•</span>
-                                <span className="text-zinc-400">{user.roleName}</span>
-                              </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-zinc-500 mt-0.5">
+                              <span>@{user.username}</span>
+                              <span className="mx-1.5">•</span>
+                              <span>{user.roleName}</span>
                             </div>
                           </div>
 
-                          {/* Online Presence Badge */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            {isOnline ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold bg-[#10241b] text-emerald-300 border border-emerald-800/80">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                <span>Đang online</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
-                                <span className="w-2 h-2 rounded-full bg-zinc-500"></span>
-                                <span>Offline ({user.lastActive})</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Status Details & Device / Location */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-zinc-400 font-medium">Trạng thái:</span>
-                            {user.status === 'active' && (
-                              <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700 inline-flex items-center gap-1.5">
-                                <span>● Hoạt động bình thường</span>
-                              </span>
-                            )}
-                            {isLocked1H && (
-                              <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-950 text-amber-300 border border-amber-700 inline-flex items-center gap-1.5">
-                                <span>Tạm khóa 1 giờ (còn ~{remainingMins} phút)</span>
-                              </span>
-                            )}
-                            {isLockedPerm && (
-                              <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-700 inline-flex items-center gap-1.5">
-                                <span>Đã khóa vĩnh viễn</span>
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="text-zinc-400 text-xs">
-                            <span className="text-zinc-500">Vị trí kết nối: </span>
-                            <span className="text-zinc-300 font-mono">{user.ipAddress}</span>
+                          <div className="text-xs text-zinc-600">
+                            {user.status === 'active' && <span className="text-emerald-700 font-semibold">● Hoạt động bình thường</span>}
+                            {isLocked1H && <span className="text-amber-700 font-semibold">Tạm khóa 1 giờ (còn ~{remainingMins} phút)</span>}
+                            {isLockedPerm && <span className="text-red-700 font-semibold">Đã khóa vĩnh viễn</span>}
                           </div>
                         </div>
 
                         {/* Action Buttons Row */}
-                        <div className="pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-end gap-2">
-                          {user.role === 'admin' ? (
-                            <div className="px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 font-medium">
-                              <span>Tài khoản Quản trị viên (Không thể khóa)</span>
-                            </div>
-                          ) : (
-                            <>
-                              {/* Action 1: Khóa 1 giờ */}
-                              {user.status === 'active' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleLock1H(user)}
-                                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
-                                  title="Khóa tạm thời tài khoản trong 1 giờ"
-                                >
-                                  Khóa 1 giờ
-                                </button>
-                              )}
-
-                              {/* Action 2: Khóa vĩnh viễn */}
-                              {!isLockedPerm && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleLockPerm(user)}
-                                  className="px-3 py-1.5 rounded-lg bg-red-950/70 hover:bg-red-900 border border-red-800/80 text-red-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
-                                  title="Khóa vĩnh viễn tài khoản người dùng"
-                                >
-                                  Khóa vĩnh viễn
-                                </button>
-                              )}
-
-                              {/* Action 3: Khôi phục tài khoản */}
-                              {isLocked && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRestore(user)}
-                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-200 text-xs font-semibold transition-all cursor-pointer active:scale-95"
-                                  title="Khôi phục trạng thái hoạt động bình thường"
-                                >
-                                  Khôi phục tài khoản
-                                </button>
-                              )}
-                            </>
-                          )}
+                        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="text-zinc-500">IP: {user.ipAddress}</span>
+                          <div className="flex items-center gap-2">
+                            {user.role === 'admin' ? (
+                              <span className="text-zinc-400 italic">Tài khoản quản trị viên</span>
+                            ) : (
+                              <>
+                                {user.status === 'active' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLock1H(user)}
+                                    className="px-2.5 py-1 rounded-sm bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-semibold cursor-pointer"
+                                  >
+                                    Khóa 1 giờ
+                                  </button>
+                                )}
+                                {!isLockedPerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLockPerm(user)}
+                                    className="px-2.5 py-1 rounded-sm bg-red-50 hover:bg-red-100 border border-red-300 text-red-800 text-xs font-semibold cursor-pointer"
+                                  >
+                                    Khóa vĩnh viễn
+                                  </button>
+                                )}
+                                {isLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRestore(user)}
+                                    className="px-2.5 py-1 rounded-sm bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold cursor-pointer"
+                                  >
+                                    Khôi phục
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -834,19 +774,19 @@ void loop() {
 
           {/* TAB 4: ESP32-1 TRACKER CODE */}
           {activeTab === 'esp32_trk' && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-zinc-300">
-                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Xoay</b> (2 trục +  INA226 + LDR + Firebase):
+                <span className="text-xs font-semibold text-zinc-700">
+                  Mã nguồn C++ cho ESP32-S3 tấm xoay:
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32TrackerCode, 'trk')}
-                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-600 cursor-pointer transition-all active:scale-95"
+                  className="px-3 py-1 rounded-sm bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-800 border border-zinc-300 cursor-pointer"
                 >
                   {copiedTab === 'trk' ? 'Đã sao chép!' : 'Sao chép mã'}
                 </button>
               </div>
-              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 text-xs font-mono text-zinc-800 overflow-x-auto max-h-[360px] leading-relaxed">
                 {esp32TrackerCode}
               </pre>
             </div>
@@ -854,19 +794,19 @@ void loop() {
 
           {/* TAB 5: ESP32-2 FIXED PANEL CODE */}
           {activeTab === 'esp32_fix' && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-zinc-300">
-                  Mã Arduino C++ cho <b>ESP32-S3 Tấm Cố Định</b> ( INA226 + Firebase):
+                <span className="text-xs font-semibold text-zinc-700">
+                  Mã nguồn C++ cho ESP32-S3 tấm cố định:
                 </span>
                 <button
                   onClick={() => handleCopyCode(esp32FixedCode, 'fix')}
-                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-100 border border-zinc-600 cursor-pointer transition-all active:scale-95"
+                  className="px-3 py-1 rounded-sm bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-800 border border-zinc-300 cursor-pointer"
                 >
                   {copiedTab === 'fix' ? 'Đã sao chép!' : 'Sao chép mã'}
                 </button>
               </div>
-              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-300 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 text-xs font-mono text-zinc-800 overflow-x-auto max-h-[360px] leading-relaxed">
                 {esp32FixedCode}
               </pre>
             </div>
@@ -874,12 +814,12 @@ void loop() {
 
           {/* TAB 6: RAW JSON LIVE */}
           {activeTab === 'json' && (
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Dữ liệu Telemetry JSON trực tiếp:</span>
-                <span className="font-mono text-zinc-400">{new Date().toLocaleTimeString()}</span>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs text-zinc-600">
+                <span className="font-semibold">Dữ liệu thô JSON từ Firebase / ESP32:</span>
+                <span className="font-mono">{new Date().toLocaleTimeString()}</span>
               </div>
-              <pre className="p-4 rounded-xl bg-[#0a0c12] border border-zinc-700/80 text-xs font-mono text-zinc-200 overflow-x-auto max-h-[380px] leading-relaxed">
+              <pre className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 text-xs font-mono text-zinc-800 overflow-x-auto max-h-[360px] leading-relaxed">
                 {JSON.stringify(latestTelemetry || {}, null, 2)}
               </pre>
             </div>
@@ -888,15 +828,15 @@ void loop() {
         </div>
 
         {/* Footer */}
-        <div className="px-5 sm:px-6 py-4 bg-[#121620] border-t border-zinc-800 flex items-center justify-between safe-area-bottom">
-          <span className="text-xs font-medium text-zinc-400">
-            {dataSource === 'firebase' ? 'Firebase Realtime Database' : dataSource === 'mock' ? 'Mô phỏng dữ liệu' : 'ESP32 WebSocket'}
+        <div className="p-3 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+          <span className="text-xs text-zinc-500">
+            Nguồn kết nối: {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Giả lập' : 'WebSocket LAN'}
           </span>
           <button
             onClick={onClose}
-            className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white text-zinc-950 hover:bg-zinc-200 transition-all cursor-pointer shadow-lg active:scale-95"
+            className="px-4 py-1.5 rounded-sm text-xs font-semibold bg-blue-700 text-white hover:bg-blue-800 cursor-pointer"
           >
-            Lưu Cấu Hình & Đóng
+            Lưu cấu hình & đóng
           </button>
         </div>
 
