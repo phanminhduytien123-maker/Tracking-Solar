@@ -707,7 +707,7 @@ export default function App() {
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 space-y-4 flex-1 relative z-10">
+      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10">
 
         {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
         <section aria-label="So sánh đối chứng hai tấm pin">
@@ -809,6 +809,8 @@ export default function App() {
         onOpenDetails={() => setIsDetailsModalOpen(true)}
         onOpenSettings={() => openSettingsTab('config')}
         onLogout={handleLogout}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
       />
 
       {/* 6. DISCRETE WEATHER PRESET DEMO PILL & DARK/LIGHT MODE TOGGLE (Bottom Right corner) */}

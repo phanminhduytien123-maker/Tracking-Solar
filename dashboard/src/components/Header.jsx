@@ -56,7 +56,7 @@ export default function Header({
   const weatherLocation = weatherData?.location?.split(',')[0] || 'TP.HCM';
 
   return (
-    <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-slate-800 text-zinc-900 dark:text-zinc-100 sticky top-0 z-40 transition-colors">
+    <header className="hidden sm:block bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-slate-800 text-zinc-900 dark:text-zinc-100 sticky top-0 z-40 transition-colors">
       {/* 1. DÒNG TIÊU ĐỀ CHÍNH VÀ CÁC THAO TÁC */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Khối bên trái: Logo TĐT và Tiêu đề đề tài in hoa */}
