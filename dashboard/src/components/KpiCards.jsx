@@ -1,19 +1,22 @@
 import React from 'react';
 import { Zap, TrendingUp, Compass, SunMedium } from 'lucide-react';
+import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge } from '../utils/formatters';
 
 export default function KpiCards({ INA226 }) {
-  const tracking = INA226?.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const stat = INA226?.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const comparison = INA226?.comparison || { percentGain: 0, powerDelta: 0, energyDeltaWh: 0 };
+  const tracking = INA226?.tracking || { voltage: null, current: null, power: null, energyWh: null };
+  const stat = INA226?.static || { voltage: null, current: null, power: null, energyWh: null, fixedAzimuth: 180, fixedTiltBeta: 15, fixedElevationEps: 75 };
+  const comparison = INA226?.comparison || { percentGain: null, powerDelta: null, energyDeltaWh: null, hasValidGain: false };
 
-  const isPositiveGain = comparison.percentGain >= 0;
+  const trkBadge = getConnectionStatusBadge(tracking.connStatus, tracking.staleDurationMs);
+  const staBadge = getConnectionStatusBadge(stat.connStatus, stat.staleDurationMs);
+
+  const hasValidGain = comparison.hasValidGain && comparison.percentGain !== null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 lg:gap-4">
 
-      {/* 1. TẤM PIN TRACKING (Fuzzy-PID + PSO) */}
+      {/* 1. TẤM PIN TRACKING */}
       <div className="panel-card flex flex-col justify-between overflow-hidden relative">
-        {/* Subtle decorative top border highlight */}
         <div className="h-[2px] w-full bg-zinc-400 opacity-60"></div>
 
         <div className="p-4 sm:p-5">
@@ -28,12 +31,12 @@ export default function KpiCards({ INA226 }) {
                   Tấm Pin Tracking
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  Fuzzy-PID + PSO ( INA226 #1)
+                  Hai trục điều hướng (INA226 #1)
                 </span>
               </div>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-[#181a22] text-zinc-300 border border-[#262b38]">
-              2-TRỤC ĐIỀU HƯỚNG
+            <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded border ${trkBadge.colorClass}`}>
+              {trkBadge.text}
             </span>
           </div>
 
@@ -43,8 +46,8 @@ export default function KpiCards({ INA226 }) {
               Công suất tức thời (P)
             </div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-white">
-                {tracking.power.toFixed(2)}
+              <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${trkBadge.isLive ? 'text-white' : 'text-zinc-500'}`}>
+                {formatValueOrDash(tracking.power, 2)}
               </span>
               <span className="text-sm font-mono text-zinc-400 font-medium">W</span>
             </div>
@@ -54,20 +57,20 @@ export default function KpiCards({ INA226 }) {
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#181a22]">
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Điện áp</span>
-              <span className="text-sm font-mono font-semibold text-zinc-200 block mt-0.5">
-                {tracking.voltage.toFixed(2)} <span className="text-[10px] font-normal text-zinc-400">V</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${trkBadge.isLive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                {formatValueOrDash(tracking.voltage, 2)} <span className="text-[10px] font-normal text-zinc-400">V</span>
               </span>
             </div>
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Dòng điện</span>
-              <span className="text-sm font-mono font-semibold text-zinc-200 block mt-0.5">
-                {tracking.current.toFixed(2)} <span className="text-[10px] font-normal text-zinc-400">A</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${trkBadge.isLive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                {formatValueOrDash(tracking.current, 3)} <span className="text-[10px] font-normal text-zinc-400">A</span>
               </span>
             </div>
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Năng lượng</span>
               <span className="text-sm font-mono font-semibold text-zinc-200 block mt-0.5">
-                {tracking.energyWh.toFixed(1)} <span className="text-[10px] font-normal text-zinc-400">Wh</span>
+                {formatValueOrDash(tracking.energyWh, 1)} <span className="text-[10px] font-normal text-zinc-400">Wh</span>
               </span>
             </div>
           </div>
@@ -76,7 +79,7 @@ export default function KpiCards({ INA226 }) {
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between">
           <span>Tích lũy ngày:</span>
-          <span className="text-zinc-200 font-medium">{tracking.energyWh.toFixed(1)} Wh</span>
+          <span className="text-zinc-200 font-medium">{formatValueOrDash(tracking.energyWh, 1, 'Wh')}</span>
         </div>
       </div>
 
@@ -96,12 +99,12 @@ export default function KpiCards({ INA226 }) {
                   Tấm Pin Cố Định
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  Cố định South 15° ( INA226 #2)
+                  Hướng Nam 180°, ngửa 75° (nghiêng 15°) (INA226 #2)
                 </span>
               </div>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-[#181a22] text-zinc-400 border border-[#232733]">
-              ĐỐI CHỨNG
+            <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded border ${staBadge.colorClass}`}>
+              {staBadge.text}
             </span>
           </div>
 
@@ -111,8 +114,8 @@ export default function KpiCards({ INA226 }) {
               Công suất tức thời (P)
             </div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-zinc-300">
-                {stat.power.toFixed(2)}
+              <span className={`text-3xl sm:text-4xl font-mono font-bold tracking-tight ${staBadge.isLive ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                {formatValueOrDash(stat.power, 2)}
               </span>
               <span className="text-sm font-mono text-zinc-400 font-medium">W</span>
             </div>
@@ -122,20 +125,20 @@ export default function KpiCards({ INA226 }) {
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#181a22]">
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Điện áp</span>
-              <span className="text-sm font-mono font-semibold text-zinc-300 block mt-0.5">
-                {stat.voltage.toFixed(2)} <span className="text-[10px] font-normal text-zinc-400">V</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${staBadge.isLive ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                {formatValueOrDash(stat.voltage, 2)} <span className="text-[10px] font-normal text-zinc-400">V</span>
               </span>
             </div>
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Dòng điện</span>
-              <span className="text-sm font-mono font-semibold text-zinc-300 block mt-0.5">
-                {stat.current.toFixed(2)} <span className="text-[10px] font-normal text-zinc-400">A</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${staBadge.isLive ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                {formatValueOrDash(stat.current, 3)} <span className="text-[10px] font-normal text-zinc-400">A</span>
               </span>
             </div>
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Năng lượng</span>
               <span className="text-sm font-mono font-semibold text-zinc-300 block mt-0.5">
-                {stat.energyWh.toFixed(1)} <span className="text-[10px] font-normal text-zinc-400">Wh</span>
+                {formatValueOrDash(stat.energyWh, 1)} <span className="text-[10px] font-normal text-zinc-400">Wh</span>
               </span>
             </div>
           </div>
@@ -144,7 +147,7 @@ export default function KpiCards({ INA226 }) {
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between">
           <span>Tích lũy ngày:</span>
-          <span className="text-zinc-300 font-medium">{stat.energyWh.toFixed(1)} Wh</span>
+          <span className="text-zinc-300 font-medium">{formatValueOrDash(stat.energyWh, 1, 'Wh')}</span>
         </div>
       </div>
 
@@ -164,12 +167,12 @@ export default function KpiCards({ INA226 }) {
                   Hiệu Suất Cải Thiện
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  % Gain = ((ΣE_trk - k·ΣE_sta) / (k·ΣE_sta)) × 100%
+                  % Gain = (ΣE_trk / (k · ΣE_sta) − 1) × 100%
                 </span>
               </div>
             </div>
             <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-[#181a22] text-zinc-200 border border-[#2c3140]">
-              ĐÃ HIỆU CHUẨN (k=1.018)
+              HIỆU CHUẨN k=1.018
             </span>
           </div>
 
@@ -179,19 +182,21 @@ export default function KpiCards({ INA226 }) {
               Gia tăng sản lượng tích phân (%)
             </div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              {comparison.hasValidGain !== false && (stat.energyWh >= 5.0 || comparison.percentGain !== 0) ? (
+              {hasValidGain ? (
                 <>
                   <span className="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-zinc-100">
-                    {isPositiveGain ? `+${comparison.percentGain.toFixed(1)}` : `${comparison.percentGain.toFixed(1)}`}%
+                    {formatSignedNumber(comparison.percentGain, 1, '%')}
                   </span>
-                  <span className="text-xs font-mono text-zinc-400 font-medium">so với tấm tĩnh</span>
+                  <span className="text-xs font-mono text-zinc-400 font-medium">so với tấm cố định</span>
                 </>
               ) : (
                 <>
-                  <span className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-zinc-300">
+                  <span className="text-2xl sm:text-3xl font-mono font-bold tracking-tight text-zinc-500">
                     -- %
                   </span>
-                  <span className="text-xs font-mono text-zinc-400 font-medium">(Đang tích lũy &lt; 5Wh)</span>
+                  <span className="text-xs font-mono text-zinc-400 font-medium">
+                    {tracking.connStatus !== 'LIVE' || stat.connStatus !== 'LIVE' ? '(Mất kết nối)' : '(Chờ đủ ngưỡng 5Wh)'}
+                  </span>
                 </>
               )}
             </div>
@@ -201,14 +206,14 @@ export default function KpiCards({ INA226 }) {
           <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#181a22]">
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Chênh lệch Công suất (ΔP)</span>
-              <span className="text-sm font-mono font-semibold text-zinc-100 block mt-0.5">
-                {comparison.powerDelta >= 0 ? `+${comparison.powerDelta.toFixed(2)}` : comparison.powerDelta.toFixed(2)} <span className="text-[10px] font-normal text-zinc-400">W</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${comparison.powerDelta !== null ? 'text-zinc-100' : 'text-zinc-500'}`}>
+                {comparison.powerDelta !== null ? formatSignedNumber(comparison.powerDelta, 2, 'W') : '--'}
               </span>
             </div>
             <div className="panel-subtle p-2">
               <span className="text-[10px] font-mono text-zinc-400 block uppercase">Năng lượng vượt trội (ΔE)</span>
-              <span className="text-sm font-mono font-semibold text-zinc-100 block mt-0.5">
-                {comparison.energyDeltaWh >= 0 ? `+${comparison.energyDeltaWh.toFixed(1)}` : comparison.energyDeltaWh.toFixed(1)} <span className="text-[10px] font-normal text-zinc-400">Wh</span>
+              <span className={`text-sm font-mono font-semibold block mt-0.5 ${comparison.energyDeltaWh !== null ? 'text-zinc-100' : 'text-zinc-500'}`}>
+                {comparison.energyDeltaWh !== null ? formatSignedNumber(comparison.energyDeltaWh, 1, 'Wh') : '--'}
               </span>
             </div>
           </div>
@@ -217,7 +222,7 @@ export default function KpiCards({ INA226 }) {
         {/* Footer Meta */}
         <div className="px-4 py-2 bg-[#0e0f13] border-t border-[#191b22] text-[11px] font-mono text-zinc-400 flex justify-between items-center">
           <span>Tích phân năng lượng:</span>
-          <span className="text-zinc-200 font-semibold">{comparison.hasValidGain !== false ? 'TÍNH THEO Wh TÍCH LŨY' : 'CHỜ ĐỦ NGƯỠNG 5Wh'}</span>
+          <span className="text-zinc-200 font-semibold">{hasValidGain ? 'TÍNH THEO Wh TÍCH LŨY' : 'CHỜ ĐỦ NGƯỠNG 5Wh'}</span>
         </div>
       </div>
 

@@ -1,34 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Sliders, 
-  Settings, 
-  AlertTriangle, 
-  RotateCcw, 
-  Clock, 
-  LogOut, 
-  ShieldCheck,
-  MapPin
-} from 'lucide-react';
-import WeatherWidget from './WeatherWidget';
+import { Sliders, Settings, LogOut, ShieldCheck, CloudSun } from 'lucide-react';
+import { formatSignedNumber } from '../utils/formatters';
 
-export default function Header({ 
-  system = {}, 
-  mode = 'AUTO', 
+export default function Header({
+  system = {},
+  mode = 'AUTO',
   dataSource = 'firebase',
   firebaseConnected = false,
   currentUser = null,
   onLogout,
-  onOpenManualModal, 
+  onOpenManualModal,
   onOpenSettingsModal,
   onResetEstop,
   weatherData = null,
   isLoadingWeather = false,
   onRefreshWeather = null,
-  customOverrideType = null,
-  setCustomOverrideType = null,
   onOpenMapModal = null
 }) {
-
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -51,180 +39,171 @@ export default function Header({
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const hasAlarm = system?.errors?.sensorLost || 
-    system?.errors?.driverFault || 
-    system?.errors?.limitSwitchMinTriggered || 
+  // Kiểm tra lỗi hệ thống
+  const hasAlarm = system?.errors?.sensorLost ||
+    system?.errors?.driverFault ||
+    system?.errors?.limitSwitchMinTriggered ||
     system?.errors?.limitSwitchMaxTriggered ||
+    system?.errors?.stepLossWarn ||
     system?.estop;
 
+  // Trạng thái kết nối chung
+  const isOnline = system?.online || (dataSource === 'firebase' && firebaseConnected);
+
+  // Dữ liệu thời tiết hiện tại (được giữ theo yêu cầu người dùng)
+  const currentTemp = weatherData?.current?.temp;
+  const weatherLabel = weatherData?.current?.condition?.label || 'Bình thường';
+  const weatherLocation = weatherData?.location?.split(',')[0] || 'TP.HCM';
+
   return (
-    <header className="border-b border-zinc-200 bg-white text-zinc-950 sticky top-0 z-40 shadow-xs relative">
-      {/* Top Main Bar: Edge-to-edge layout with ample space */}
-      <div className="w-full px-3 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-4 relative">
-        
-        {/* Left: Mobile Title / Desktop Logo + Weather Widget */}
-        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 min-w-0">
-          {/* Mobile Title */}
-          <h1 className="sm:hidden text-base font-sans font-bold tracking-tight text-zinc-950 uppercase whitespace-nowrap">
-            TRACKING SOLAR
-          </h1>
-
-          {/* Desktop Logo on Left */}
-          <img 
-            src="/tdt_logo.png" 
-            alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="hidden sm:block h-10 md:h-11 w-auto object-contain shrink-0"
+    <header className="bg-white border-b border-zinc-200 text-zinc-900 sticky top-0 z-40">
+      {/* 1. DÒNG TIÊU ĐỀ CHÍNH VÀ CÁC THAO TÁC */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+        {/* Khối bên trái: Tên cơ sở nghiên cứu và tên hệ thống */}
+        <div className="flex items-center gap-3">
+          <img
+            src="/tdt_logo.png"
+            alt="Logo"
+            className="h-9 w-auto object-contain hidden sm:block"
           />
-
-          {/* Weather Widget right beside Logo */}
-          {weatherData && (
-            <div className="hidden md:block shrink-0">
-              <WeatherWidget 
-                weatherData={weatherData}
-                isLoading={isLoadingWeather}
-                onRefresh={onRefreshWeather}
-                customOverrideType={customOverrideType}
-                setCustomOverrideType={setCustomOverrideType}
-                onOpenMapModal={onOpenMapModal}
-              />
+          <div>
+            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">
+              ĐẠI HỌC BÁCH KHOA - ĐHQG TP.HCM | KHOA ĐIỆN - ĐIỆN TỬ
             </div>
-          )}
-        </div>
-
-        {/* Center (Desktop): Title TRACKING SOLAR exactly in the middle */}
-        <div className="hidden sm:flex items-center justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
-          <h1 className="text-xl md:text-2xl lg:text-[26px] font-sans font-black tracking-tight text-zinc-950 uppercase whitespace-nowrap">
-            TRACKING SOLAR
-          </h1>
-        </div>
-
-        {/* Mobile Right: Logo */}
-        <div className="sm:hidden flex items-center justify-end shrink-0 max-w-[48%]">
-          <img 
-            src="/tdt_logo.png" 
-            alt="Logo Trường Đại học Tôn Đức Thắng (TDTU)" 
-            className="h-6 w-auto max-w-full object-contain"
-          />
-        </div>
-
-        {/* Desktop Right: Status Badges & Quick Controls */}
-        <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
-
-            {/* Cloud / Source Badge (Admin Only) */}
-            {isAdmin && (
-              <div 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800"
-                title={
-                  dataSource === 'firebase'
-                    ? (firebaseConnected 
-                        ? (system.online ? 'Firebase Cloud: Đang truyền dữ liệu ESP32 trực tiếp' : 'Firebase Cloud: Đã kết nối RTDB (Đang chờ gói tin ESP32)')
-                        : 'Firebase Cloud: Đang kết nối...')
-                    : (system.online ? 'Hệ thống đang hoạt động' : 'Chưa có kết nối')
-                }
-              >
-                <span className={`w-2 h-2 rounded-full ${
-                  (dataSource === 'firebase' ? firebaseConnected : system.online)
-                    ? 'bg-emerald-600'
-                    : 'bg-zinc-400'
-                } ${system.online ? 'animate-pulse' : ''}`}></span>
-                <span className="font-bold text-xs text-zinc-900">
-                  {dataSource === 'firebase' ? 'Firebase RTDB' : dataSource === 'mock' ? 'Mô phỏng' : 'ESP32 WS'}
-                </span>
-              </div>
-            )}
-
-          {/* RTC Clock & Date Badge with RTC Offset */}
-          <div 
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-mono cursor-help"
-            title={`Thời gian đồng bộ RTC DS3231 của thiết bị. Độ lệch so với Server: ${system?.rtcOffsetMs !== undefined ? `${system.rtcOffsetMs} ms` : '±0 ms'}`}
-          >
-            <Clock className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="font-bold text-xs text-zinc-950">RTC {formattedTime}</span>
-            <span className="hidden lg:inline text-[10px] text-zinc-500 font-semibold font-mono">
-              (Δ {system?.rtcOffsetMs !== undefined ? `${system.rtcOffsetMs}ms` : '0ms'})
-            </span>
-            <span className="hidden md:inline text-zinc-400">|</span>
-            <span className="hidden md:inline text-zinc-700 font-sans font-medium">{formattedDate}</span>
+            <h1 className="text-sm sm:text-base font-bold text-zinc-950 tracking-tight">
+              Theo dõi pin mặt trời hai trục (Dual-Axis Solar Tracker)
+            </h1>
           </div>
+        </div>
 
-          {/* Desktop Manual Control Button (Admin Only) */}
+        {/* Khối bên phải: Thời tiết + Các nút thao tác */}
+        <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+          {/* Thời tiết (phong cách hiển thị kỹ thuật nhẹ nhàng, không emoji/glow) */}
+          {weatherData && (
+            <button
+              onClick={onOpenMapModal}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs text-zinc-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-sm cursor-pointer transition-colors"
+              title="Nhấn để xem cấu hình tọa độ trạm và thời tiết chi tiết"
+            >
+              <CloudSun className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Thời tiết:</span>
+              <span className="font-semibold text-zinc-900">
+                {currentTemp !== undefined ? `${String(currentTemp).replace('.', ',')} °C` : '-- °C'}, {weatherLabel} ({weatherLocation})
+              </span>
+            </button>
+          )}
+
+          {/* Nút Điều khiển thủ công */}
           {isAdmin && (
             <button
               id="btn-open-manual-control"
               onClick={onOpenManualModal}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-all cursor-pointer active:scale-95 shadow-xs"
+              className="px-3 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors"
             >
-              <Sliders className="w-3.5 h-3.5 text-zinc-200" />
-              <span>Điều khiển</span>
+              Điều khiển
             </button>
           )}
 
-          {/* Settings Modal Trigger Button (Admin Only) */}
+          {/* Nút Cài đặt */}
           {isAdmin && (
             <button
               id="btn-open-settings"
               onClick={onOpenSettingsModal}
-              className="p-2 rounded-lg text-zinc-800 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer active:scale-95"
-              title="Cài đặt kết nối"
+              className="px-3 py-1 text-xs font-semibold text-zinc-800 bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 rounded-sm cursor-pointer transition-colors"
             >
-              <Settings className="w-4 h-4" />
+              Cài đặt
             </button>
           )}
 
-          {/* User Badge & Logout Button (Màu nền cơ bản, trung tính, không neon/phát sáng) */}
-          <div className="flex items-center gap-2 pl-2 border-l border-zinc-300">
-            {currentUser?.role === 'admin' ? (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-zinc-700" />
-                <span>Admin</span>
-              </div>
-            ) : (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs text-zinc-800 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-zinc-500"></span>
-                <span>Khách (khach123)</span>
-              </div>
-            )}
-            {onLogout && (
-              <button
-                id="btn-logout"
-                onClick={onLogout}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-800 hover:text-red-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 transition-all cursor-pointer active:scale-95"
-                title="Đăng xuất khỏi hệ thống"
-              >
-                <LogOut className="w-3.5 h-3.5 text-zinc-700" />
-                <span className="hidden xl:inline">Đăng xuất</span>
-              </button>
-            )}
-          </div>
+          {/* Đăng xuất */}
+          {onLogout && (
+            <button
+              id="btn-logout"
+              onClick={onLogout}
+              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:text-red-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-sm cursor-pointer transition-colors"
+              title="Đăng xuất"
+            >
+              Đăng xuất
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Quick Alert / Warning Banner if active */}
-      {hasAlarm && (
-        <div className="bg-red-900 border-t border-b border-red-700 px-4 sm:px-6 py-2 text-xs text-white font-mono flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-            <AlertTriangle className="w-4 h-4 text-red-200 shrink-0" />
-            <span className="font-bold uppercase tracking-wider text-xs">CẢNH BÁO SỰ CỐ:</span>
-            <div className="flex items-center gap-2 whitespace-nowrap text-xs">
-              {system?.estop && <span className="font-bold text-white">[DỪNG KHẨN CẤP E-STOP]</span>}
-              {system?.errors?.driverFault && <span>[LỖI DRIVER ĐỘNG CƠ]</span>}
-              {system?.errors?.sensorLost && <span>[MẤT KẾT NỐI CẢM BIẾN]</span>}
-              {system?.errors?.limitSwitchMinTriggered && <span>[SỰ CỐ CTHT MIN]</span>}
-              {system?.errors?.limitSwitchMaxTriggered && <span>[SỰ CỐ CTHT MAX]</span>}
+      {/* 2. DẢI TRẠNG THÁI MỘT DÒNG (STATUS BAR) */}
+      <div className="border-t border-zinc-200 bg-zinc-50 text-xs text-zinc-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-y-1 gap-x-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {/* Chế độ */}
+            <div>
+              <span>Chế độ: </span>
+              <span className="font-semibold text-zinc-900">
+                {mode === 'AUTO' ? 'Tự động' : mode === 'MANUAL' ? 'Thủ công' : mode}
+              </span>
+            </div>
+
+            {/* Trạng thái kết nối */}
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-600' : 'bg-red-600'}`} />
+              <span>Kết nối: </span>
+              <span className={`font-semibold ${isOnline ? 'text-emerald-700' : 'text-red-700'}`}>
+                {isOnline ? 'Trực tiếp' : 'Mất kết nối'}
+              </span>
+            </div>
+
+            {/* Sai lệch RTC */}
+            <div>
+              <span>Lệch RTC: </span>
+              <span className="font-semibold text-zinc-900">
+                {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
+                  ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
+                  : '--'}
+              </span>
+            </div>
+
+            {/* Đồng hồ thực địa */}
+            <div className="hidden lg:block text-zinc-500">
+              <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
+            </div>
+
+            {/* Nguồn dữ liệu */}
+            <div>
+              <span>Nguồn: </span>
+              <span className={`font-semibold ${
+                system?.isMock || dataSource === 'mock' 
+                  ? 'text-red-700' 
+                  : system?.source === 'device' 
+                    ? 'text-emerald-700' 
+                    : 'text-amber-700'
+              }`}>
+                {system?.isMock || dataSource === 'mock'
+                  ? 'Dữ liệu giả lập'
+                  : system?.source === 'device'
+                    ? 'Thiết bị thật'
+                    : 'Chưa xác thực nguồn'}
+              </span>
             </div>
           </div>
-          {system?.estop && (
-            <button
-              onClick={onResetEstop}
-              className="flex items-center gap-1.5 px-3 py-1 rounded bg-white hover:bg-zinc-100 text-xs text-red-950 cursor-pointer shrink-0 ml-2 font-bold shadow-sm"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset E-STOP</span>
-            </button>
+
+          {/* Cảnh báo sự cố nếu có (hiển thị trực tiếp dạng chữ có màu) */}
+          {hasAlarm && (
+            <div className="flex items-center gap-2 text-red-700 font-semibold">
+              <span>Sự cố:</span>
+              {system?.estop && <span>[Dừng khẩn cấp]</span>}
+              {system?.errors?.driverFault && <span>[Lỗi driver động cơ]</span>}
+              {system?.errors?.stepLossWarn && <span className="text-amber-700">[Mất bước động cơ]</span>}
+              {system?.errors?.sensorLost && <span>[Mất cảm biến]</span>}
+              {system?.estop && onResetEstop && (
+                <button
+                  onClick={onResetEstop}
+                  className="ml-1 text-[11px] underline hover:text-red-900 cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
     </header>
   );
 }
-

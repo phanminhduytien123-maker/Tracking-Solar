@@ -1,636 +1,420 @@
 import React, { useState } from 'react';
-import { X, Cpu, Activity, Sun, Zap, Disc3, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { X } from 'lucide-react';
+import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
 
 export default function DetailedTelemetryModal({
   isOpen,
   onClose,
   telemetry = {}
 }) {
-  const [activeTab, setActiveTab] = useState('fuzzy_pso'); // 'fuzzy_pso' | 'sensors' | 'motors' | 'electrical'
+  const [activeTab, setActiveTab] = useState('motors'); // 'motors' | 'sensors' | 'electrical' | 'fuzzy_pso'
 
   if (!isOpen) return null;
 
   const system = telemetry?.system || {};
+  const isMockData = system.isMock || system.source === 'mock';
+  const isUnknownSource = system.source === 'unknown' && system.online;
+
   const ina = telemetry?.INA226 || {};
-  const trk = ina.tracking || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const sta = ina.static || { voltage: 0, current: 0, power: 0, energyWh: 0, energyKwh: 0 };
-  const comparison = ina.comparison || { percentGain: 0, powerDelta: 0, energyDeltaWh: 0, hasValidGain: false };
+  const trk = ina.tracking || { voltage: null, current: null, power: null, energyWh: null };
+  const sta = ina.static || { voltage: null, current: null, power: null, energyWh: null };
 
   const motors = telemetry?.motors || {};
-  const az = motors.azimuth || { currentAngle: 180, targetAngle: 180, phi: 0, targetPhi: 0, errorAngle: 0, encoderPulses: 0, commandPulses: 0, stepLoss: 0, limitHome: false, softLimitViolated: false, isHomed: true };
-  const el = motors.elevation || { currentAngle: 90, targetAngle: 90, epsilon: 90, targetEpsilon: 90, errorAngle: 0, encoderPulses: 1800, commandPulses: 1800, stepLoss: 0, limitSwitch90: false, softLimitViolated: false, isHomed: true };
+  const az = motors.azimuth || { currentAngle: null, phi: null, errorAngle: null, encoderPulses: null, commandPulses: null };
+  const el = motors.elevation || { currentAngle: null, epsilon: null, errorAngle: null, encoderPulses: null, commandPulses: null };
 
   const sensors = telemetry?.sensors || {};
-  const sTop = sensors.top || { lux: 0, adc: 0 };
-  const sBottom = sensors.bottom || { lux: 0, adc: 0 };
-  const sLeft = sensors.left || { lux: 0, adc: 0 };
-  const sRight = sensors.right || { lux: 0, adc: 0 };
+  const sTop = sensors.top || { lux: null, adc: null };
+  const sBottom = sensors.bottom || { lux: null, adc: null };
+  const sLeft = sensors.left || { lux: null, adc: null };
+  const sRight = sensors.right || { lux: null, adc: null };
 
-  const fuzzy = telemetry?.fuzzy || {};
-  const azGains = fuzzy.az || { kpBase: 2.40, kiBase: 0.10, kdBase: 0.60, deltaKp: 0.0, deltaKi: 0.0, deltaKd: 0.0, kpTotal: 2.40, kiTotal: 0.10, kdTotal: 0.60 };
-  const elGains = fuzzy.el || { kpBase: 2.80, kiBase: 0.12, kdBase: 0.75, deltaKp: 0.0, deltaKi: 0.0, deltaKd: 0.0, kpTotal: 2.80, kiTotal: 0.12, kdTotal: 0.75 };
-  const activeAlgorithm = system.activeAlgorithm || fuzzy.activeAlgorithm || 'PSO_FUZZY_PID';
+  const hasAlgoData = Boolean(telemetry?.has_algo_data && telemetry?.pso);
+  const pso = telemetry?.pso || null;
+  const fuzzy = telemetry?.fuzzy || null;
 
-  const pso = telemetry?.pso || {
-    source: 'ONLINE',
-    costJ: 0.0382,
-    gBestFitness: 0.0382,
-    runTimeMs: 142,
-    swarmSize: 10,
-    iteration: 25,
-    maxIterations: 25,
-    status: 'CONVERGED'
-  };
-
-  const sysState = system.state || (system.isSleeping ? 'DEEP_SLEEP' : 'TRACKING');
-  const wakeAt = system.wakeAt || '03:00';
   const errors = system.errors || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xl modal-sheet-container">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
+      <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-4xl max-h-[92vh] flex flex-col shadow-sm">
+        
+        {/* Banner dữ liệu giả lập nếu có */}
+        {isMockData && (
+          <div className="bg-red-700 text-white text-xs font-semibold py-1.5 px-4 text-center shrink-0">
+            Dữ liệu giả lập, không phải số đo thật từ firmware
+          </div>
+        )}
 
-      {/* Modal Card */}
-      <div className="panel-card w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col modal-sheet-card border-white/20">
+        {/* Banner nguồn chưa xác thực nếu có */}
+        {isUnknownSource && (
+          <div className="bg-amber-700 text-white text-xs font-semibold py-1 px-4 text-center shrink-0">
+            Nguồn dữ liệu: Chưa rõ (Bản tin thiếu cờ xác thực 'device')
+          </div>
+        )}
 
-        {/* Mobile Grab Handle */}
-        <div className="sm:hidden w-12 h-1.5 rounded-full bg-white/30 mx-auto mt-2.5 mb-1 shrink-0" />
-
-        {/* Header */}
-        <div className="py-3.5 px-5 sm:px-6 border-b border-white/10 bg-white/10 backdrop-blur-md flex items-center justify-between gap-3">
+        {/* Tiêu đề Modal */}
+        <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-lg font-bold tracking-tight uppercase text-white">
-                THÔNG SỐ CHI TIẾT HỆ THỐNG
-              </h2>
-              {/* State Badge */}
-              <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-wide uppercase border ${
-                sysState === 'DEEP_SLEEP'
-                  ? 'bg-indigo-500/30 text-indigo-200 border-indigo-400/50'
-                  : sysState === 'FAULT'
-                    ? 'bg-rose-500/30 text-rose-200 border-rose-400/50'
-                    : 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50'
-              }`}>
-                {sysState === 'DEEP_SLEEP' ? `🌙 NGỦ ĐÔNG (Thức ${wakeAt})` : sysState}
-              </span>
-            </div>
-            <span className="text-xs text-zinc-300 font-medium block mt-0.5">
-              Phân tích cảm biến TEMT6000, tham số thuật toán Fuzzy-PID & PSO thích nghi
-            </span>
+            <h2 className="text-base font-bold text-zinc-950">
+              Thông số kỹ thuật chi tiết
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Bảng dữ liệu đo đạc chi tiết từ các cảm biến và khối chấp hành
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent hover:border-white/10"
+            className="p-1.5 text-zinc-500 hover:text-zinc-900 border border-zinc-300 rounded-sm cursor-pointer"
+            title="Đóng cửa sổ"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* System Diagnostics Status Bar */}
-        <div className="px-5 sm:px-6 py-2 bg-[#0c0f17] border-b border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-          <div className="flex items-center gap-3 overflow-x-auto py-0.5">
-            <span className="text-zinc-400 font-sans">Báo thức kế tiếp:</span>
-            <span className="text-white font-bold">{wakeAt}</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-400 font-sans">Độ lệch RTC:</span>
-            <span className="text-emerald-400 font-bold">{system.rtcOffsetMs || 0} ms</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-400 font-sans">Cờ Zenith Clamp:</span>
-            <span className={errors.zenithClamp ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
-              {errors.zenithClamp ? 'TRIGGERED' : 'CLEAR'}
+        {/* Thanh cờ trạng thái phía trên: Dạng một dòng chữ bình tĩnh */}
+        <div className="px-4 py-2 bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-600 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div>
+            <span>Trạng thái máy: </span>
+            <span className="font-semibold text-zinc-900">{system.displayState || 'Bình thường'}</span>
+          </div>
+          <div>
+            <span>Mất bước: </span>
+            <span className={`font-semibold ${errors.stepLossWarn ? 'text-red-700' : 'text-zinc-800'}`}>
+              {errors.stepLossWarn ? 'Có cảnh báo mất bước' : 'Không'}
             </span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-400 font-sans">Cờ Mất bước:</span>
-            <span className={errors.stepLossWarn ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
-              {errors.stepLossWarn ? 'CẢNH BÁO' : 'OK'}
+          </div>
+          <div>
+            <span>Lệch RTC: </span>
+            <span className="font-semibold text-zinc-900">
+              {system.rtcOffsetMs !== null && system.rtcOffsetMs !== undefined 
+                ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms') 
+                : '--'}
+            </span>
+          </div>
+          <div>
+            <span>Cờ E-Stop: </span>
+            <span className={`font-semibold ${system.estop ? 'text-red-700' : 'text-zinc-800'}`}>
+              {system.estop ? 'Đang dừng khẩn cấp' : 'Bình thường'}
             </span>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-white/10 bg-white/5 px-4 sm:px-6 pt-2 gap-2 text-sm overflow-x-auto">
+        {/* Bộ chọn 4 Tab */}
+        <div className="flex border-b border-zinc-200 bg-zinc-100/50 text-xs overflow-x-auto">
           <button
-            type="button"
-            onClick={() => setActiveTab('fuzzy_pso')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm flex items-center gap-1.5 ${
-              activeTab === 'fuzzy_pso'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>Fuzzy & PSO</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('sensors')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm flex items-center gap-1.5 ${
-              activeTab === 'sensors'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Sun className="w-4 h-4" />
-            <span>Cảm biến TEMT6000</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('motors')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm flex items-center gap-1.5 ${
+            className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
               activeTab === 'motors'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <Disc3 className="w-4 h-4" />
-            <span>Góc quay & Encoder</span>
+            Động cơ & Encoder
           </button>
-
           <button
-            type="button"
-            onClick={() => setActiveTab('electrical')}
-            className={`pb-3 px-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap font-semibold text-sm flex items-center gap-1.5 ${
-              activeTab === 'electrical'
-                ? 'border-white text-white font-bold'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            onClick={() => setActiveTab('sensors')}
+            className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+              activeTab === 'sensors'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <Zap className="w-4 h-4" />
-            <span>Đo lường điện INA226</span>
+            Quang sai TEMT6000
+          </button>
+          <button
+            onClick={() => setActiveTab('electrical')}
+            className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+              activeTab === 'electrical'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Điện áp & Dòng điện INA226
+          </button>
+          <button
+            onClick={() => setActiveTab('fuzzy_pso')}
+            className={`py-2 px-4 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+              activeTab === 'fuzzy_pso'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Giải thuật Fuzzy-PID & PSO
           </button>
         </div>
 
-        {/* Tab Content Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-4 max-h-[72vh] sm:max-h-[66vh] text-sm">
+        {/* Nội dung Tab: Bảng hai cột "Tên thông số : Giá trị" thẳng hàng */}
+        <div className="p-4 overflow-y-auto flex-1">
 
-          {/* TAB 1: FUZZY & PSO */}
-          {activeTab === 'fuzzy_pso' && (
-            <div className="space-y-4">
-              
-              {/* Algorithm Active Mode Badge Row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80">
-                <div>
-                  <span className="text-xs text-zinc-400 block font-semibold">Thuật toán điều khiển đang chạy:</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="px-2.5 py-1 rounded-md bg-zinc-800 text-white font-mono font-bold text-sm border border-zinc-600">
-                      {activeAlgorithm}
-                    </span>
-                    <span className="text-xs text-zinc-300">
-                      {activeAlgorithm === 'PID' ? '(Baseline PID)' : activeAlgorithm === 'FUZZY_PID' ? '(Fuzzy-PID Tức thời)' : '(PSO Tối ưu + Fuzzy Thích nghi)'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xs text-zinc-400 block font-semibold">Sai số góc tổng hợp:</span>
-                  <span className="text-base font-bold font-mono text-white mt-1 block">
-                    {fuzzy.errorAngle !== undefined ? fuzzy.errorAngle : (Math.sqrt((az.errorAngle || 0)**2 + (el.errorAngle || 0)**2)).toFixed(2)}°
-                  </span>
-                </div>
-              </div>
-
-              {/* BỘ THAM SỐ AZIMUTH VÀ ELEVATION TÁCH BIỆT */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* TRỤC AZIMUTH (PHƯƠNG VỊ) */}
-                <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                  <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
-                    <span className="text-xs font-bold uppercase tracking-wide text-zinc-200">
-                      1. Trục Azimuth (Phương vị φ)
-                    </span>
-                    <span className="text-[11px] font-mono text-zinc-400">Kp, Ki, Kd</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Kp_az (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{azGains.kpBase.toFixed(2)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{azGains.deltaKp.toFixed(2)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{azGains.kpTotal.toFixed(2)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Ki_az (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{azGains.kiBase.toFixed(3)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{azGains.deltaKi.toFixed(3)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{azGains.kiTotal.toFixed(3)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Kd_az (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{azGains.kdBase.toFixed(2)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{azGains.deltaKd.toFixed(2)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{azGains.kdTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TRỤC ELEVATION (ĐỘ NGỬA) */}
-                <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                  <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
-                    <span className="text-xs font-bold uppercase tracking-wide text-zinc-200">
-                      2. Trục Elevation (Độ ngửa ε)
-                    </span>
-                    <span className="text-[11px] font-mono text-zinc-400">Kp, Ki, Kd</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Kp_el (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{elGains.kpBase.toFixed(2)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{elGains.deltaKp.toFixed(2)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{elGains.kpTotal.toFixed(2)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Ki_el (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{elGains.kiBase.toFixed(3)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{elGains.deltaKi.toFixed(3)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{elGains.kiTotal.toFixed(3)}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                      <span className="text-[10px] text-zinc-400 block">Kd_el (PSO)</span>
-                      <span className="font-mono font-bold text-sm text-zinc-200 block">{elGains.kdBase.toFixed(2)}</span>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">+{elGains.deltaKd.toFixed(2)} Δ</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1 pt-1 border-t border-zinc-800">{elGains.kdTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* BẢNG TRẠNG THÁI PSO TỐI ƯU */}
-              <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wide text-zinc-200 block pb-2 border-b border-zinc-800">
-                  Thông số giải thuật PSO (Particle Swarm Optimization)
-                </span>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                    <span className="text-xs text-zinc-400 block">Nguồn nghiệm:</span>
-                    <span className={`px-2 py-0.5 mt-1 inline-block rounded text-xs font-mono font-bold border ${
-                      pso.source === 'ONLINE'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : pso.source === 'OFFLINE_DEFAULT'
-                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    }`}>
-                      {pso.source || 'ONLINE'}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                    <span className="text-xs text-zinc-400 block">Thời gian chạy (Runtime):</span>
-                    <span className="font-mono font-bold text-sm text-white mt-1 block">
-                      {pso.runTimeMs || 142} ms
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                    <span className="text-xs text-zinc-400 block">Kích thước bầy hạt:</span>
-                    <span className="font-mono font-bold text-sm text-white mt-1 block">
-                      {pso.swarmSize || 10} hạt
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0a0c12] border border-zinc-800">
-                    <span className="text-xs text-zinc-400 block">Số vòng lặp (Iterations):</span>
-                    <span className="font-mono font-bold text-sm text-white mt-1 block">
-                      {pso.iteration || 25} / {pso.maxIterations || 25} vòng
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-[#0a0c12] border border-zinc-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-semibold text-zinc-300 block">
-                      Chi phí hàm mục tiêu (Fitness Cost J):
-                    </span>
-                    <span className="text-[11px] text-zinc-400 font-mono">
-                      J = w1·ITAE + w2·Vọt lố + w3·Dao động (càng nhỏ càng tối ưu)
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-base text-emerald-400">
-                    {pso.costJ !== undefined ? pso.costJ : pso.gBestFitness}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 2: CẢM BIẾN TEMT6000 */}
-          {activeTab === 'sensors' && (
-            <div className="space-y-4">
-              <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
-                Ma trận 4 cảm biến quang trở TEMT6000 & Sai số chuẩn hóa
-              </span>
-
-              {/* LDR Cross Visualizer */}
-              <div className="p-5 rounded-2xl bg-[#131722] border border-zinc-700/80 flex flex-col items-center justify-center gap-3">
-                {/* TOP */}
-                <div className="p-3 rounded-xl bg-[#0a0c12] border border-zinc-700 text-center w-40">
-                  <span className="text-xs text-zinc-400 block font-semibold">TRÊN (Top)</span>
-                  <span className="font-mono font-bold text-base text-white mt-0.5 block">{sTop.adc} <span className="text-xs text-zinc-500 font-normal">ADC</span></span>
-                  <span className="text-[10px] text-zinc-400 font-mono">{sTop.lux} lx</span>
-                </div>
-
-                {/* LEFT & RIGHT */}
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-[#0a0c12] border border-zinc-700 text-center w-40">
-                    <span className="text-xs text-zinc-400 block font-semibold">TRÁI (Left)</span>
-                    <span className="font-mono font-bold text-base text-white mt-0.5 block">{sLeft.adc} <span className="text-xs text-zinc-500 font-normal">ADC</span></span>
-                    <span className="text-[10px] text-zinc-400 font-mono">{sLeft.lux} lx</span>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-600 flex items-center justify-center text-zinc-300 font-bold text-xs shadow-inner">
-                    CTR
-                  </div>
-                  <div className="p-3 rounded-xl bg-[#0a0c12] border border-zinc-700 text-center w-40">
-                    <span className="text-xs text-zinc-400 block font-semibold">PHẢI (Right)</span>
-                    <span className="font-mono font-bold text-base text-white mt-0.5 block">{sRight.adc} <span className="text-xs text-zinc-500 font-normal">ADC</span></span>
-                    <span className="text-[10px] text-zinc-400 font-mono">{sRight.lux} lx</span>
-                  </div>
-                </div>
-
-                {/* BOTTOM */}
-                <div className="p-3 rounded-xl bg-[#0a0c12] border border-zinc-700 text-center w-40">
-                  <span className="text-xs text-zinc-400 block font-semibold">DƯỚI (Bottom)</span>
-                  <span className="font-mono font-bold text-base text-white mt-0.5 block">{sBottom.adc} <span className="text-xs text-zinc-500 font-normal">ADC</span></span>
-                  <span className="text-[10px] text-zinc-400 font-mono">{sBottom.lux} lx</span>
-                </div>
-              </div>
-
-              {/* SAI SỐ CHUẨN HÓA E_S VÀ THÔNG SỐ QUANG HỌC */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 text-center">
-                  <span className="text-xs text-zinc-400 block font-medium">e_s Azimuth (L-R)/(L+R):</span>
-                  <span className="text-xl font-bold font-mono text-white mt-1 block">
-                    {sensors.esAz !== undefined ? sensors.esAz : (parseFloat(((sLeft.adc - sRight.adc) / Math.max(1, sLeft.adc + sRight.adc)).toFixed(3)))}
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 text-center">
-                  <span className="text-xs text-zinc-400 block font-medium">e_s Elevation (T-B)/(T+B):</span>
-                  <span className="text-xl font-bold font-mono text-white mt-1 block">
-                    {sensors.esEl !== undefined ? sensors.esEl : (parseFloat(((sTop.adc - sBottom.adc) / Math.max(1, sTop.adc + sBottom.adc)).toFixed(3)))}
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 text-center">
-                  <span className="text-xs text-zinc-400 block font-medium">Trọng số quang học w_s:</span>
-                  <span className="text-xl font-bold font-mono text-emerald-400 mt-1 block">
-                    {sensors.weightWs !== undefined ? sensors.weightWs : 0.85}
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#131722] border border-zinc-700/80 text-center">
-                  <span className="text-xs text-zinc-400 block font-medium">Cờ bão hòa ADC (≥3950):</span>
-                  <span className={`text-base font-bold font-mono mt-1 block ${sensors.isSaturated ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {sensors.isSaturated ? 'BÃO HÒA' : 'TUYẾN TÍNH'}
-                  </span>
-                </div>
-              </div>
-
-              {/* TRẠNG THÁI NGÀY / ĐÊM THEO NGƯỠNG X, Y */}
-              <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span className="text-xs font-bold text-zinc-300 block uppercase">
-                    Trạng thái ánh sáng theo ngưỡng X (40 lx) & Y (200 lx):
-                  </span>
-                  <span className="text-xs text-zinc-400 mt-0.5 block">
-                    Tổng quang thông: {sensors.totalLux || Math.round((sLeft.lux + sRight.lux + sTop.lux + sBottom.lux) / 4)} lx (ADC: {sensors.totalLightAdc || (sLeft.adc + sRight.adc + sTop.adc + sBottom.adc)})
-                  </span>
-                </div>
-                <span className={`px-3 py-1 rounded-md text-xs font-mono font-bold border ${
-                  sensors.dayNightState === 'SUNNY_FUSION'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : sensors.dayNightState === 'CLOUDY_ORBIT'
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                      : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                }`}>
-                  {sensors.dayNightState === 'SUNNY_FUSION' ? '☀️ NẮNG TỐT (Sensor Fusion)' : sensors.dayNightState === 'CLOUDY_ORBIT' ? '☁️ NHIỀU MÂY (Quỹ đạo thiên văn)' : '🌙 ĐÊM (Deep Sleep / Park)'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: GÓC ĐỘNG CƠ & ENCODER */}
+          {/* TAB 1: ĐỘNG CƠ & ENCODER */}
           {activeTab === 'motors' && (
             <div className="space-y-4">
-              <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
-                Vị trí góc, Xung phát lệnh vs Xung đếm Encoder & Công tắc hành trình
-              </span>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* TRỤC AZIMUTH */}
-                <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-3 text-sm">
-                  <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
-                    <span className="text-xs font-bold text-white uppercase">Trục Phương Vị (Azimuth φ)</span>
-                    <span className="text-[11px] font-mono text-zinc-400">K_enc = 20 count/°</span>
-                  </div>
-
-                  <div className="space-y-2 font-mono text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">AZ la bàn (G + H + φ):</span>
-                      <span className="font-bold text-white text-sm">{(180 + (az.phi || 0)).toFixed(1)}°</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Góc φ từ công tắc:</span>
-                      <span className="font-bold text-white text-sm">{az.phi !== undefined ? az.phi.toFixed(1) : (az.currentAngle - 180).toFixed(1)}°</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Xung phát lệnh (RMT):</span>
-                      <span className="font-bold text-white">{az.commandPulses || Math.round((az.targetPhi || 0) * 20)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Xung đếm (PCNT Encoder):</span>
-                      <span className="font-bold text-white">{az.encoderPulses}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Độ lệch xung (Mất bước):</span>
-                      <span className={`font-bold ${Math.abs(az.stepLoss || 0) > 30 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {az.stepLoss || 0} xung
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t border-zinc-800">
-                      <span className="text-zinc-400 font-sans">Công tắc Home (φ = 0°):</span>
-                      <span className={`font-bold ${az.limitHome ? 'text-amber-400' : 'text-zinc-300'}`}>
-                        {az.limitHome ? 'ĐANG CHẠM' : 'HỞ MẠCH (OK)'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Giới hạn mềm [-120°, +120°]:</span>
-                      <span className={`font-bold ${az.softLimitViolated ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {az.softLimitViolated ? 'VI PHẠM' : 'AN TOÀN'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TRỤC ELEVATION */}
-                <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 space-y-3 text-sm">
-                  <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
-                    <span className="text-xs font-bold text-white uppercase">Trục Độ Ngửa (Elevation ε)</span>
-                    <span className="text-[11px] font-mono text-zinc-400">K_enc = 20 count/°</span>
-                  </div>
-
-                  <div className="space-y-2 font-mono text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Góc ngửa EL = ε:</span>
-                      <span className="font-bold text-white text-sm">{el.epsilon !== undefined ? el.epsilon.toFixed(1) : el.currentAngle.toFixed(1)}°</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Mục tiêu ε*:</span>
-                      <span className="font-bold text-white text-sm">{el.targetEpsilon !== undefined ? el.targetEpsilon.toFixed(1) : el.targetAngle.toFixed(1)}°</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Xung phát lệnh (RMT):</span>
-                      <span className="font-bold text-white">{el.commandPulses || Math.round((el.targetEpsilon || 90) * 20)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Xung đếm (PCNT Encoder):</span>
-                      <span className="font-bold text-white">{el.encoderPulses}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Độ lệch xung (Mất bước):</span>
-                      <span className={`font-bold ${Math.abs(el.stepLoss || 0) > 30 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {el.stepLoss || 0} xung
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t border-zinc-800">
-                      <span className="text-zinc-400 font-sans">Công tắc hành trình (ε = 90°):</span>
-                      <span className={`font-bold ${el.limitSwitch90 ? 'text-amber-400' : 'text-zinc-300'}`}>
-                        {el.limitSwitch90 ? 'ĐANG CHẠM' : 'HỞ MẠCH (OK)'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Giới hạn mềm [25°, 90°]:</span>
-                      <span className={`font-bold ${el.softLimitViolated ? 'text-rose-400' : 'text-emerald-400'}`}>
-                        {el.softLimitViolated ? 'VI PHẠM' : 'AN TOÀN'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Trạng thái Homing */}
-              <div className="p-3 rounded-xl bg-[#131722] border border-zinc-700/80 flex items-center justify-between text-xs">
-                <span className="text-zinc-300 font-medium">Trạng thái định vị gốc toạ độ (Homing Status):</span>
-                <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
-                  ĐÃ HOÀN TẤT HOMING (HOMED)
-                </span>
-              </div>
+              <table className="lab-table text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 text-zinc-700">
+                    <th className="text-left font-semibold py-2 px-3 w-1/2">Tên thông số kỹ thuật</th>
+                    <th className="text-left font-semibold py-2 px-3 w-1/2">Giá trị đo đạc / Cấu hình</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Góc quay phương vị hiện tại (φ)</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">
+                      {az.phi !== null && az.phi !== undefined ? formatSignedNumber(az.phi, 1, '°') : '--'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Độ ngửa hiện tại (ε)</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">
+                      {el.epsilon !== null && el.epsilon !== undefined ? formatValueOrDash(el.epsilon, 1, '°') : '--'}
+                      <span className="text-[11px] text-zinc-500 font-normal ml-2">(Nằm ngang = 90°, dựng đứng = 0°)</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Góc mục tiêu thiên văn (φ_ref / ε_ref)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {az.targetAngle !== null ? formatSignedNumber(az.targetAngle - 180, 1, '°') : '--'}
+                      <span className="mx-2 text-zinc-400">/</span>
+                      {el.targetAngle !== null ? formatValueOrDash(el.targetAngle, 1, '°') : '--'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Sai lệch góc từng trục (Δφ / Δε)</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">
+                      Δφ: {az.errorAngle !== null ? formatSignedNumber(az.errorAngle, 1, '°') : '--'}
+                      <span className="mx-2 text-zinc-400">|</span>
+                      Δε: {el.errorAngle !== null ? formatSignedNumber(el.errorAngle, 1, '°') : '--'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Xung encoder đọc từ phần cứng (PCNT)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      Trục φ: {formatValueOrDash(az.encoderPulses, 0, 'xung')} | Trục ε: {formatValueOrDash(el.encoderPulses, 0, 'xung')}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Hệ số góc encoder (K_enc)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.k_enc_deg_per_pulse !== undefined && motors.k_enc_deg_per_pulse !== null
+                        ? `${formatDecimal(motors.k_enc_deg_per_pulse, 4)} °/xung`
+                        : 'Chưa xác định (chờ firmware gửi)'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Sai số bước từ firmware</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.step_error_counts !== undefined && motors.step_error_counts !== null
+                        ? `${motors.step_error_counts} bước (${formatSignedNumber(motors.step_error_deg, 2, '°')})`
+                        : 'Không có lỗi bước'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Giới hạn mềm trục phương vị</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.az_soft_min_deg !== undefined && motors.az_soft_max_deg !== undefined
+                        ? `[${formatSignedNumber(motors.az_soft_min_deg, 1, '°')}, ${formatSignedNumber(motors.az_soft_max_deg, 1, '°')}] (Đã xác nhận)`
+                        : 'Chưa đo'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Giới hạn mềm trục độ ngửa</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.el_soft_min_deg !== undefined && motors.el_soft_max_deg !== undefined
+                        ? `[${formatValueOrDash(motors.el_soft_min_deg, 1, '°')}, ${formatValueOrDash(motors.el_soft_max_deg, 1, '°')}] (Đã xác nhận)`
+                        : 'Chưa đo'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình phương vị (AZ_MIN / AZ_MAX)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.limit_az_min ? 'Đang chạm' : 'Hở'} / {motors.limit_az_max ? 'Đang chạm' : 'Hở'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình độ ngửa (EL_MIN / EL_MAX)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.limit_el_min ? 'Đang chạm' : 'Hở'} / {motors.limit_el_max ? 'Đang chạm' : 'Hở'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Trạng thái gốc tọa độ (Homing)</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {motors.isHomed ? 'Đã hoàn thành xác lập gốc' : 'Chưa Homing'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* TAB 4: ĐO LƯỜNG ĐIỆN INA226 */}
+          {/* TAB 2: CẢM BIẾN QUANG SAI TEMT6000 */}
+          {activeTab === 'sensors' && (
+            <div className="space-y-4">
+              <table className="lab-table text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 text-zinc-700">
+                    <th className="text-left font-semibold py-2 px-3 w-1/3">Cảm biến quang học</th>
+                    <th className="text-left font-semibold py-2 px-3 w-1/3">Giá trị ADC thô (12-bit)</th>
+                    <th className="text-left font-semibold py-2 px-3 w-1/3">Độ rọi ước lượng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-2 px-3 font-medium text-zinc-700">Cảm biến Trên (Top)</td>
+                    <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(sTop.adc, 0)}</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {sTop.lux !== null ? `${formatDecimal(sTop.lux, 0)} lx (ước lượng)` : 'Chưa hiệu chuẩn'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-medium text-zinc-700">Cảm biến Dưới (Bottom)</td>
+                    <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(sBottom.adc, 0)}</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {sBottom.lux !== null ? `${formatDecimal(sBottom.lux, 0)} lx (ước lượng)` : 'Chưa hiệu chuẩn'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-medium text-zinc-700">Cảm biến Trái (Left)</td>
+                    <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(sLeft.adc, 0)}</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {sLeft.lux !== null ? `${formatDecimal(sLeft.lux, 0)} lx (ước lượng)` : 'Chưa hiệu chuẩn'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 font-medium text-zinc-700">Cảm biến Phải (Right)</td>
+                    <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(sRight.adc, 0)}</td>
+                    <td className="py-2 px-3 text-zinc-800">
+                      {sRight.lux !== null ? `${formatDecimal(sRight.lux, 0)} lx (ước lượng)` : 'Chưa hiệu chuẩn'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Trạng thái ánh sáng môi trường</td>
+                    <td colSpan={2} className="py-2 px-3 font-semibold text-zinc-900">
+                      {sensors.light_state === 'DAY'
+                        ? 'Ban ngày (Đủ điều kiện bám theo ánh sáng)'
+                        : sensors.light_state === 'NIGHT'
+                          ? 'Ban đêm (Dưới ngưỡng ánh sáng kích hoạt)'
+                          : 'Chưa có dữ liệu'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Cờ bão hòa ADC (&gt; 4000)</td>
+                    <td colSpan={2} className="py-2 px-3 text-zinc-800">
+                      {sensors.adc_saturated ? 'Bão hòa quang học' : 'Bình thường trong thang đo'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* TAB 3: ĐIỆN ÁP & DÒNG ĐIỆN INA226 */}
           {activeTab === 'electrical' && (
             <div className="space-y-4">
-              <span className="text-xs font-bold text-zinc-300 block uppercase tracking-wider">
-                Bảng so sánh năng lượng INA226 & Hệ số hiệu chuẩn chéo k
-              </span>
+              <table className="lab-table text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 text-zinc-700">
+                    <th className="text-left font-semibold py-2 px-3 w-1/3">Đại lượng đo đạc</th>
+                    <th className="text-left font-semibold py-2 px-3 w-1/3 text-blue-700">Tấm tracker (INA226 #1)</th>
+                    <th className="text-left font-semibold py-2 px-3 w-1/3 text-amber-800">Tấm cố định (INA226 #2)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Điện áp đo đạc (V)</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">{formatValueOrDash(trk.voltage, 2, 'V')}</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">{formatValueOrDash(sta.voltage, 2, 'V')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Dòng điện đo đạc (A)</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">{formatValueOrDash(trk.current, 2, 'A')}</td>
+                    <td className="py-2 px-3 font-semibold text-zinc-900">{formatValueOrDash(sta.current, 2, 'A')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Công suất tức thời (W)</td>
+                    <td className="py-2 px-3 font-bold text-blue-700">{formatValueOrDash(trk.power, 1, 'W')}</td>
+                    <td className="py-2 px-3 font-bold text-amber-800">{formatValueOrDash(sta.power, 1, 'W')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Năng lượng tích lũy hôm nay (Wh)</td>
+                    <td className="py-2 px-3 font-bold text-blue-700">{formatValueOrDash(trk.energyWh, 1, 'Wh')}</td>
+                    <td className="py-2 px-3 font-bold text-amber-800">{formatValueOrDash(sta.energyWh, 1, 'Wh')}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Chênh lệch công suất tức thời</td>
+                    <td colSpan={2} className="py-2 px-3 text-zinc-900 font-medium">
+                      {trk.power !== null && sta.power !== null
+                        ? `${formatSignedNumber(trk.power - sta.power, 1, 'W')}`
+                        : '--'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Tấm xoay */}
-                <div className="p-4 rounded-2xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-                    <span className="text-xs font-bold text-white block uppercase tracking-wide">
-                      TẤM PIN TRACKING (2-TRỤC)
-                    </span>
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold ${
-                      trk.isSleeping 
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40' 
-                        : (trk.online ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40')
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        trk.isSleeping ? 'bg-indigo-400 animate-pulse' : (trk.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400')
-                      }`} />
-                      {trk.isSleeping ? `Trk: 🌙 Ngủ (${trk.wakeAt || '03:00'})` : (trk.online ? 'Trk: ON' : 'Trk: OFF')}
-                    </span>
-                  </div>
-                  <div className="space-y-2 font-mono text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Điện áp:</span>
-                      <span className="font-bold text-white">{trk.voltage.toFixed(2)} V</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Dòng điện:</span>
-                      <span className="font-bold text-white">{trk.current.toFixed(3)} A</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Công suất:</span>
-                      <span className="font-bold text-white text-base">{trk.power.toFixed(2)} W</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Năng lượng ngày (ΣE):</span>
-                      <span className="font-bold text-emerald-400 text-base">{trk.energyWh.toFixed(1)} Wh</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tấm cố định */}
-                <div className="p-4 rounded-2xl bg-[#131722] border border-zinc-700/80 space-y-3">
-                  <span className="text-xs font-bold text-white block uppercase tracking-wide pb-2 border-b border-zinc-800">
-                    TẤM PIN CỐ ĐỊNH (SOUTH 15°)
+          {/* TAB 4: GIẢI THUẬT FUZZY-PID & PSO */}
+          {activeTab === 'fuzzy_pso' && (
+            <div className="space-y-4">
+              {!hasAlgoData ? (
+                <div className="p-6 border border-zinc-200 rounded-sm bg-zinc-50 text-center space-y-2">
+                  <span className="font-bold text-zinc-900 block text-sm">
+                    Chưa chạy (Không có dữ liệu thuật toán từ firmware)
                   </span>
-                  <div className="space-y-2 font-mono text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Điện áp:</span>
-                      <span className="font-bold text-white">{sta.voltage.toFixed(2)} V</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Dòng điện:</span>
-                      <span className="font-bold text-white">{sta.current.toFixed(3)} A</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Công suất:</span>
-                      <span className="font-bold text-white text-base">{sta.power.toFixed(2)} W</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400 font-sans">Năng lượng ngày (ΣE):</span>
-                      <span className="font-bold text-zinc-300 text-base">{sta.energyWh.toFixed(1)} Wh</span>
-                    </div>
-                  </div>
+                  <p className="text-xs text-zinc-600 max-w-lg mx-auto leading-relaxed">
+                    Firmware hiện tại chưa nạp giải thuật Fuzzy/PSO hoặc đang ở chế độ thủ công/chờ.
+                    Các thông số tính toán (J, Kp, Ki, Kd, số vòng lặp, thời gian thực thi) sẽ chỉ xuất hiện khi firmware gửi bản tin thuật toán hợp lệ.
+                  </p>
                 </div>
-              </div>
-
-              {/* Tích phân Gain */}
-              <div className="p-4 rounded-xl bg-[#131722] border border-zinc-700/80 flex flex-wrap items-center justify-between gap-3 font-mono text-sm">
-                <div>
-                  <span className="text-xs font-sans text-zinc-300 font-semibold block">
-                    Hiệu suất tích phân năng lượng ngày % Gain (k = 1.018):
-                  </span>
-                  <span className="text-xs text-zinc-400 block font-sans mt-0.5">
-                    % Gain = (ΣE_trk / (k · ΣE_sta) - 1) × 100%
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xl font-bold text-white block">
-                    {comparison.hasValidGain !== false && (sta.energyWh >= 5.0 || comparison.percentGain !== 0)
-                      ? `${comparison.percentGain >= 0 ? `+${comparison.percentGain.toFixed(1)}` : comparison.percentGain.toFixed(1)}%`
-                      : '-- % (Chờ đủ 5 Wh)'
-                    }
-                  </span>
-                </div>
-              </div>
-
+              ) : (
+                <table className="lab-table text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-zinc-50 text-zinc-700">
+                      <th className="text-left font-semibold py-2 px-3 w-1/2">Tham số thuật toán</th>
+                      <th className="text-left font-semibold py-2 px-3 w-1/2">Giá trị tối ưu thời gian thực</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Hàm mục tiêu chi phí (Cost Function J)</td>
+                      <td className="py-2 px-3 font-bold text-zinc-900">{formatValueOrDash(pso?.cost_j, 4)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Hệ số tỷ lệ Kp</td>
+                      <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(fuzzy?.kp, 3)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Hệ số tích phân Ki</td>
+                      <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(fuzzy?.ki, 3)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Hệ số vi phân Kd</td>
+                      <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(fuzzy?.kd, 3)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Số thế hệ vòng lặp PSO</td>
+                      <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(pso?.iteration, 0)} vòng</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-3 text-zinc-600">Thời gian hội tụ thuật toán</td>
+                      <td className="py-2 px-3 text-zinc-900">{formatValueOrDash(pso?.run_time_ms, 0, 'ms')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-5 sm:px-6 py-4 bg-[#121620] border-t border-zinc-800 flex justify-end safe-area-bottom">
+        {/* Nút đóng ở chân modal */}
+        <div className="p-3 border-t border-zinc-200 bg-zinc-50 flex justify-end">
           <button
-            type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white text-zinc-950 hover:bg-zinc-200 transition-all cursor-pointer shadow-lg active:scale-95"
+            className="px-4 py-1.5 text-xs font-semibold text-zinc-800 bg-white hover:bg-zinc-100 border border-zinc-300 rounded-sm cursor-pointer"
           >
-            Đóng
+            Đóng cửa sổ
           </button>
         </div>
 

@@ -2,252 +2,98 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --bg-app: #080a10;
-    --bg-panel: rgba(15, 18, 26, 0.85);
-    --bg-panel-header: rgba(255, 255, 255, 0.03);
-    --bg-subtle: rgba(255, 255, 255, 0.04);
-    --bg-input: #0b0d14;
-    --bg-hover: rgba(255, 255, 255, 0.08);
+    color-scheme: light;
+    --bg-app: #f4f5f7;
+    --bg-panel: #ffffff;
+    --bg-subtle: #f8fafc;
+    --border-main: #d1d5db;
+    --border-subtle: #e2e8f0;
 
-    --border-subtle: rgba(255, 255, 255, 0.1);
-    --border-card: rgba(255, 255, 255, 0.14);
-    --border-active: rgba(255, 255, 255, 0.35);
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
 
-    --text-primary: #ffffff;
-    --text-secondary: #94a3b8;
-    --text-tertiary: #64748b;
+    --color-tracker: #1d4ed8;
+    --color-fixed: #c2410c;
 
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --font-serif: "Times New Roman", Times, "Liberation Serif", serif;
-    --font-times: "Times New Roman", Times, "Liberation Serif", serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", monospace;
-  }
+    --status-live: #15803d;
+    --status-stale: #b45309;
+    --status-error: #b91c1c;
 
-  .font-playfair, .font-times {
-    font-family: var(--font-times);
+    --font-sans: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 
   * {
     box-sizing: border-box;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
     -webkit-tap-highlight-color: transparent;
-  }
-
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 999px;
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #080a10;
+    background-color: var(--bg-app);
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
-    letter-spacing: -0.01em;
+    line-height: 1.5;
   }
 
-  code, pre, .font-mono {
-    font-family: var(--font-mono);
+  /* Con số thẳng cột tuyệt đối */
+  .tabular-nums, table, [data-tabular] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hiển thị rõ vị trí focus khi dùng bàn phím Tab */
+  *:focus-visible {
+    outline: 2px solid #1d4ed8;
+    outline-offset: 1px;
+  }
+
+  /* Tôn trọng người dùng tắt chuyển động */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Tối ưu hóa khi in báo cáo ra giấy A4 */
+  @media print {
+    body {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+    .no-print {
+      display: none !important;
+    }
+    .print-border {
+      border: 1px solid #000000 !important;
+    }
   }
 }
 
-/* Apple-style Liquid Frosted Glass Panels (Base / Night / Dark Atmosphere) */
-.panel-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.12) 100%);
-  backdrop-filter: blur(36px) saturate(190%);
-  -webkit-backdrop-filter: blur(36px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  border-top: 1px solid rgba(255, 255, 255, 0.55);
-  border-left: 1px solid rgba(255, 255, 255, 0.38);
-  box-shadow: 
-    0 24px 48px -12px rgba(0, 0, 0, 0.50),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.50),
-    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
-  transition: 
-    background 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    backdrop-filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+/* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 4px, không bóng đổ */
+.lab-card {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
 }
 
-.panel-card:hover {
-  border-color: rgba(255, 255, 255, 0.38);
-  border-top-color: rgba(255, 255, 255, 0.70);
-  box-shadow: 
-    0 28px 56px -12px rgba(0, 0, 0, 0.60),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.70);
+.lab-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.panel-header {
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 16px 22px;
-  border-top-left-radius: 24px;
-  border-top-right-radius: 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.8s ease;
-}
-
-.panel-footer {
-  background: rgba(255, 255, 255, 0.06);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 14px 22px;
-  border-bottom-left-radius: 24px;
-  border-bottom-right-radius: 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: background 0.8s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.8s ease;
-}
-
-.panel-subtle {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-top: 1px solid rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border-radius: 16px;
-  box-shadow: 
-    0 8px 24px -4px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
-  transition: 
-    background 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ========================================================================= */
-/* ADAPTIVE WEATHER THEME: SUNNY DAY / BRIGHT SKY (DEEPER POLARIZED GLASS)   */
-/* Automatically darkens panel opacity against bright clouds/sun for clarity */
-/* ========================================================================= */
-[data-weather-theme="sunny-day"] .panel-card,
-.theme-sunny-day .panel-card {
-  background: linear-gradient(135deg, rgba(10, 18, 36, 0.76) 0%, rgba(14, 24, 46, 0.65) 50%, rgba(12, 20, 38, 0.72) 100%);
-  backdrop-filter: blur(40px) saturate(210%);
-  -webkit-backdrop-filter: blur(40px) saturate(210%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-top: 1px solid rgba(255, 255, 255, 0.65);
-  border-left: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow: 
-    0 30px 60px -12px rgba(0, 12, 36, 0.55),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-[data-weather-theme="sunny-day"] .panel-card:hover,
-.theme-sunny-day .panel-card:hover {
-  border-color: rgba(255, 255, 255, 0.45);
-  border-top-color: rgba(255, 255, 255, 0.80);
-  box-shadow: 
-    0 34px 68px -12px rgba(0, 12, 36, 0.65),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.75);
-}
-
-[data-weather-theme="sunny-day"] .panel-header,
-.theme-sunny-day .panel-header {
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-}
-
-[data-weather-theme="sunny-day"] .panel-footer,
-.theme-sunny-day .panel-footer {
-  background: rgba(0, 0, 0, 0.32);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-[data-weather-theme="sunny-day"] .panel-subtle,
-.theme-sunny-day .panel-subtle {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-top: 1px solid rgba(255, 255, 255, 0.50);
-  box-shadow: 
-    0 8px 20px -4px rgba(0, 5, 20, 0.40),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.40);
-}
-
-/* ========================================================================= */
-/* ADAPTIVE WEATHER THEME: GOLDEN HOUR / SUNSET (WARM LIQUID GLASS)         */
-/* ========================================================================= */
-[data-weather-theme="golden-hour"] .panel-card,
-.theme-golden-hour .panel-card {
-  background: linear-gradient(135deg, rgba(32, 14, 20, 0.72) 0%, rgba(42, 18, 26, 0.60) 50%, rgba(28, 12, 18, 0.68) 100%);
-  backdrop-filter: blur(38px) saturate(200%);
-  -webkit-backdrop-filter: blur(38px) saturate(200%);
-  border: 1px solid rgba(255, 220, 200, 0.28);
-  border-top: 1px solid rgba(255, 240, 220, 0.60);
-  box-shadow: 
-    0 28px 56px -12px rgba(24, 6, 12, 0.55),
-    inset 0 1px 1px 0 rgba(255, 240, 220, 0.50);
-}
-
-/* ========================================================================= */
-/* ADAPTIVE WEATHER THEME: RAINY & STORMY (DEEP SLATE FROSTED GLASS)        */
-/* ========================================================================= */
-[data-weather-theme="rainy"] .panel-card,
-.theme-rainy .panel-card {
-  background: linear-gradient(135deg, rgba(14, 20, 32, 0.78) 0%, rgba(18, 26, 42, 0.66) 50%, rgba(12, 18, 28, 0.74) 100%);
-  backdrop-filter: blur(38px) saturate(190%);
-  -webkit-backdrop-filter: blur(38px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-top: 1px solid rgba(255, 255, 255, 0.55);
+.lab-table th, .lab-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .safe-area-bottom {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
 }
-
-/* Mobile Bottom Sheet Modal */
-@media (max-width: 639px) {
-  .modal-sheet-container {
-    align-items: flex-end !important;
-    padding: 0 !important;
-  }
-
-  .modal-sheet-card {
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    border-top-left-radius: 24px !important;
-    border-top-right-radius: 24px !important;
-    max-height: 88vh !important;
-    max-height: 88dvh !important;
-    width: 100% !important;
-    border-bottom: none !important;
-    animation: slideUpMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-}
-
-@keyframes slideUpMobile {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-8px); }
-  40%, 80% { transform: translateX(8px); }
-}
-
-.animate-shake {
-  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-}
-
