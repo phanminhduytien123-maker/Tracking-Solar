@@ -1,10 +1,11 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
     color-scheme: light;
     --bg-app: #f4f5f7;
-    --bg-panel: #ffffff;
+    --bg-panel: rgba(255, 255, 255, 0.94);
     --bg-subtle: #f8fafc;
     --border-main: #d1d5db;
     --border-subtle: #e2e8f0;
@@ -21,6 +22,19 @@
     --status-error: #b91c1c;
 
     --font-sans: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --bg-app: #0f172a;
+    --bg-panel: rgba(15, 23, 42, 0.88);
+    --bg-subtle: #1e293b;
+    --border-main: rgba(255, 255, 255, 0.15);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
   }
 
   * {
@@ -76,13 +90,14 @@
   }
 }
 
-/* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 4px, không bóng đổ */
+/* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 6px, kính mờ */
 .lab-card {
-  background-color: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid #d1d5db;
+  background-color: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-main);
   border-radius: 6px;
+  color: var(--text-primary);
 }
 
 .lab-table {
@@ -91,7 +106,7 @@
 }
 
 .lab-table th, .lab-table td {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   padding: 8px 12px;
   font-variant-numeric: tabular-nums;
 }

@@ -284,24 +284,29 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
     }
   };
 
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const chartGridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+  const chartTickColor = isDark ? '#94a3b8' : '#64748b';
+  const chartLegendColor = isDark ? '#e2e8f0' : '#334155';
+
   return (
     <div id="section-charts" className="space-y-4">
       {/* 2 ĐỒ THỊ LỚN BỐ TRÍ SONG SONG HOẶC TRÊN DƯỚI */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ĐỒ THỊ 1: CÔNG SUẤT TRONG NGÀY */}
         <div className="lab-card p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200">
+          <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                 Đồ thị công suất trong ngày
               </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 So sánh công suất tức thời (W) theo khung giờ đo 05:00 – 19:00
               </p>
             </div>
             <button
               onClick={() => setExpandedChart('intraday')}
-              className="p-1.5 text-zinc-500 hover:text-zinc-800 border border-zinc-200 rounded-sm cursor-pointer"
+              className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
               title="Phóng to đồ thị"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -315,26 +320,26 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
 
         {/* ĐỒ THỊ 2: NĂNG LƯỢNG TÍCH LŨY */}
         <div className="lab-card p-4 flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                 Đồ thị năng lượng tích lũy
               </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Sản lượng điện (Wh) và % Gain cải thiện theo khoảng thời gian
               </p>
             </div>
 
             {/* Bộ chọn khoảng thời gian */}
-            <div className="flex items-center gap-1 border border-zinc-300 rounded-sm p-0.5 bg-zinc-50 text-xs">
+            <div className="flex items-center gap-1 border border-zinc-300 dark:border-slate-700 rounded-sm p-0.5 bg-zinc-50 dark:bg-slate-800 text-xs">
               {RANGE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setHistoryRange(opt.value)}
                   className={`px-2 py-0.5 rounded-xs transition-colors cursor-pointer ${
                     historyRange === opt.value
-                      ? 'bg-white font-semibold text-zinc-900 shadow-xs border border-zinc-200'
-                      : 'text-zinc-600 hover:text-zinc-900'
+                      ? 'bg-white dark:bg-slate-700 font-semibold text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-slate-600'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
                   }`}
                 >
                   {opt.label}
@@ -342,7 +347,7 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
               ))}
               <button
                 onClick={() => setExpandedChart('history')}
-                className="p-1 text-zinc-500 hover:text-zinc-800 ml-1 border-l border-zinc-200"
+                className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 ml-1 border-l border-zinc-200 dark:border-slate-700 cursor-pointer"
                 title="Phóng to đồ thị"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
@@ -358,15 +363,15 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
 
       {/* MODAL PHÓNG TO ĐỒ THỊ NẾU CẦN */}
       {expandedChart && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-5xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
-              <h3 className="text-base font-bold text-zinc-900">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-zinc-300 dark:border-slate-700 rounded-sm w-full max-w-5xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                 {expandedChart === 'intraday' ? 'Đồ thị công suất trong ngày (Phóng to)' : 'Đồ thị năng lượng tích lũy (Phóng to)'}
               </h3>
               <button
                 onClick={() => setExpandedChart(null)}
-                className="p-1.5 text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-sm cursor-pointer"
+                className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
