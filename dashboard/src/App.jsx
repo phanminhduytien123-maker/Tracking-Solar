@@ -160,12 +160,44 @@ export default function App() {
     }
   };
 
-  // Handle map coordinate selection
+  // Handle map coordinate selection & sync to Firebase /solar/config/site
   const handleSelectLocation = (newLoc) => {
     setSelectedLocation(newLoc);
     localStorage.setItem('solar_custom_location', JSON.stringify(newLoc));
     setCustomWeatherType(null); // Switch back to live weather mode for this location
     loadWeather(newLoc);
+
+    // Đổi tọa độ thì cờ confirmed tự động về false
+    localStorage.setItem('solar_site_confirmed', 'false');
+    localStorage.removeItem('solar_site_confirmed_by');
+
+    // Đồng bộ tức thời lên Firebase node /solar/config/site để ESP32 tự động cập nhật
+    if (firebaseServiceRef.current) {
+      const prevRev = Number(localStorage.getItem('solar_site_rev') || 0);
+      const nextRev = prevRev + 1;
+      localStorage.setItem('solar_site_rev', nextRev.toString());
+
+      firebaseServiceRef.current.saveSiteConfig({
+        lat_deg: Number(Number(newLoc.lat).toFixed(5)),
+        lon_deg: Number(Number(newLoc.lon).toFixed(5)),
+        rev: nextRev,
+        updated_at: Date.now(),
+        updated_by: authSession?.username || 'admin',
+        location_name: newLoc.locationName || newLoc.name || '',
+        confirmed: false,
+        confirmed_by: null,
+        confirmed_at: null
+      });
+    }
+  };
+
+  // Xác nhận tọa độ thực địa
+  const handleConfirmSiteLocation = (confirmedBy = 'admin') => {
+    localStorage.setItem('solar_site_confirmed', 'true');
+    localStorage.setItem('solar_site_confirmed_by', confirmedBy);
+    if (firebaseServiceRef.current) {
+      firebaseServiceRef.current.confirmSiteConfig(confirmedBy);
+    }
   };
 
   useEffect(() => {
@@ -173,6 +205,28 @@ export default function App() {
     const weatherTimer = setInterval(() => loadWeather(selectedLocation), 600000);
     return () => clearInterval(weatherTimer);
   }, [selectedLocation]);
+
+  // Lắng nghe SiteConfig từ Firebase khi kết nối
+  useEffect(() => {
+    if (dataSource === 'firebase' && firebaseServiceRef.current && firebaseConnected) {
+      const unsub = firebaseServiceRef.current.listenSiteConfig((siteData) => {
+        if (siteData && siteData.lat_deg && siteData.lon_deg) {
+          const currentRev = Number(localStorage.getItem('solar_site_rev') || 0);
+          if (siteData.rev > currentRev) {
+            localStorage.setItem('solar_site_rev', siteData.rev.toString());
+            const newLoc = {
+              lat: Number(Number(siteData.lat_deg).toFixed(5)),
+              lon: Number(Number(siteData.lon_deg).toFixed(5)),
+              locationName: siteData.location_name || 'Tọa độ từ Firebase',
+              ward: siteData.location_name || ''
+            };
+            setSelectedLocation(newLoc);
+            localStorage.setItem('solar_custom_location', JSON.stringify(newLoc));
+          }
+        }
+      });
+    }
+  }, [dataSource, firebaseConnected]);
 
   // Initialize ESP32 Local WebSocket Service
   useEffect(() => {
@@ -314,9 +368,13 @@ export default function App() {
   }, []);
 
   // Sync today's accumulated energy to the latest day entry in history30Days
+  // CHỈ CỘNG DỒN KHI DỮ LIỆU LÀ TỪ THIẾT BỊ THẬT (source === 'device'), KHÔNG CỘNG DỮ LIỆU MOCK!
   useEffect(() => {
-    const trkWh = Number(telemetry?.INA226?.tracking?.energyWh || (telemetry?.INA226?.tracking?.energyKwh || 0) * 1000);
-    const staWh = Number(telemetry?.INA226?.static?.energyWh || (telemetry?.INA226?.static?.energyKwh || 0) * 1000);
+    const isRealDevice = telemetry?.system?.source === 'device' && !telemetry?.system?.isMock && dataSource !== 'mock';
+    if (!isRealDevice) return; // Bỏ qua hoàn toàn dữ liệu giả lập
+
+    const trkWh = Number(telemetry?.INA226?.tracking?.energyWh || 0);
+    const staWh = Number(telemetry?.INA226?.static?.energyWh || 0);
     const trkKwh = Number((trkWh / 1000).toFixed(3));
     const staKwh = Number((staWh / 1000).toFixed(3));
 
@@ -328,7 +386,8 @@ export default function App() {
         if (today.trackingWh === trkWh && today.staticWh === staWh) return prev;
         const diffWh = parseFloat((trkWh - staWh).toFixed(1));
         const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
-        const gain = staWh > 0 ? parseFloat((((trkWh - staWh) / staWh) * 100).toFixed(1)) : 0;
+        const expectedStaWh = 1.018 * staWh;
+        const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
         const updated = [...prev];
         updated[lastIdx] = {
           ...today,
@@ -343,19 +402,20 @@ export default function App() {
         return updated;
       });
     }
-  }, [telemetry?.INA226?.tracking?.energyWh, telemetry?.INA226?.static?.energyWh, telemetry?.INA226?.tracking?.energyKwh, telemetry?.INA226?.static?.energyKwh]);
+  }, [telemetry?.INA226?.tracking?.energyWh, telemetry?.INA226?.static?.energyWh, telemetry?.system?.source, telemetry?.system?.isMock, dataSource]);
 
-  // Action: Clear Firebase Data
-  const handleClearFirebase = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn xoá sạch toàn bộ dữ liệu trên Firebase không?')) {
-      await firebaseServiceRef.current.clearAllData();
-      setTelemetry(getCleanZeroTelemetry());
-      handleClearCharts();
-      alert('Đã xoá sạch dữ liệu trên Firebase và làm mới các sơ đồ!');
-    }
+  // Action: Clear Firebase Data (Được bảo vệ nghiêm ngặt theo BỔ SUNG #4)
+  const handleClearFirebase = () => {
+    alert(
+      'CẢNH BÁO AN TOÀN (BỔ SUNG #4):\n' +
+      'Thao tác xóa trực tiếp từ Web đã bị vô hiệu hóa để bảo vệ dữ liệu thực nghiệm.\n\n' +
+      'Để dọn dữ liệu ảo an toàn (có sao lưu JSON tự động), vui lòng chạy thủ công script tại máy tính:\n' +
+      '  node scripts/clear_mock_data.js\n' +
+      '(Mặc định chạy ở chế độ Dry-Run để kiểm tra danh sách trước khi xóa thật).'
+    );
   };
 
-  // Action: Send Single Test Packet to Firebase
+  // Action: Send Single Test Packet to Firebase (MẶC ĐỊNH GỬI VÀO /solar_mock, KHÔNG GHI ĐÈ /solar)
   const handleSendTestPacket = async () => {
     const dbUrl = firebaseConfig.databaseURL;
     if (!dbUrl) {
@@ -365,11 +425,14 @@ export default function App() {
 
     const cleanUrl = dbUrl.endsWith('/') ? dbUrl : `${dbUrl}/`;
     const payload = {
+      source: 'mock',
       tracking: {
+        source: 'mock',
         voltage: 19.45,
         current: 2.580,
         power: 50.18,
         dailyEnergy: 0.285,
+        dailyEnergyWh: 285.0,
         azimuthAngle: 165.2,
         elevationAngle: 52.8,
         targetAzimuth: 165.5,
@@ -384,32 +447,40 @@ export default function App() {
         lastUpdate: Date.now()
       },
       static: {
+        source: 'mock',
         voltage: 17.80,
         current: 1.820,
         power: 32.40,
         dailyEnergy: 0.190,
+        dailyEnergyWh: 190.0,
+        fixed_az_deg: 180.0,
+        fixed_tilt_beta_deg: 15.0,
         fixedAzimuth: 180.0,
-        fixedElevation: 15.0,
+        fixedElevation: 75.0,
         lastUpdate: Date.now()
       },
       algorithm: {
-        name: 'Fuzzy-PID & PSO',
+        source: 'mock',
+        algo_state: 'RUNNING',
+        name: 'Fuzzy-PID & PSO (Mock Test)',
         kp: 2.65,
         ki: 0.08,
         kd: 0.72,
         psoBestFitness: 0.992,
+        cost_j: 0.0382,
         psoIteration: 18
       }
     };
 
     try {
-      const res = await fetch(`${cleanUrl}solar.json`, {
+      // Ghi vào nhánh riêng solar_mock để bảo vệ nhánh solar thật
+      const res = await fetch(`${cleanUrl}solar_mock.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        alert('✅ Đã gửi thành công 1 gói Telemetry mẫu lên Firebase! Dashboard sẽ cập nhật ngay.');
+        alert('✅ Đã gửi gói Telemetry MOCK lên /solar_mock (được gắn source="mock" an toàn, không đụng /solar)!');
       } else {
         alert(`❌ Lỗi gửi: ${res.status} ${res.statusText}`);
       }
@@ -578,16 +649,21 @@ export default function App() {
   }
 
   return (
-    <div
-      data-weather-theme={weatherTheme}
-      className={`min-h-screen text-white flex flex-col justify-between selection:bg-white/30 selection:text-white relative font-sans overflow-x-hidden theme-${weatherTheme}`}
-    >
+    <div className="min-h-screen bg-[#f4f5f7] text-zinc-900 flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900 font-sans">
 
-      {/* 0. DYNAMIC ATMOSPHERIC WEATHER BACKGROUND (SAIGON DISTRICT 1 LIVE API) */}
-      <WeatherBackground
-        weatherData={weatherData}
-        customOverrideType={customWeatherType}
-      />
+      {/* BANNER ĐỎ CỐ ĐỊNH KHI DỮ LIỆU LÀ GIẢ LẬP */}
+      {(dataSource === 'mock' || telemetry?.system?.isMock || telemetry?.system?.source === 'mock') && (
+        <div className="bg-red-700 text-white text-xs sm:text-sm font-semibold py-2 px-4 text-center sticky top-0 z-50 border-b border-red-800">
+          Dữ liệu giả lập, không phải số đo thật từ firmware (Không cộng dồn sản lượng hay % Gain vào thống kê lịch sử)
+        </div>
+      )}
+
+      {/* CẢNH BÁO VÀNG KHI THIẾU CỜ SOURCE TỪ FIRMWARE */}
+      {dataSource === 'firebase' && !telemetry?.system?.isMock && telemetry?.system?.source === 'unknown' && telemetry?.system?.online && (
+        <div className="bg-amber-600 text-white text-xs sm:text-sm font-semibold py-1.5 px-4 text-center sticky top-0 z-50 border-b border-amber-700">
+          Nguồn dữ liệu: Chưa rõ (Gói tin từ Firebase thiếu cờ xác nhận 'device')
+        </div>
+      )}
 
       {/* 1. HEADER & SYSTEM STATUS */}
       <Header
@@ -603,25 +679,22 @@ export default function App() {
         weatherData={weatherData}
         isLoadingWeather={isLoadingWeather}
         onRefreshWeather={() => loadWeather(selectedLocation)}
-        customOverrideType={customWeatherType}
-        setCustomOverrideType={setCustomWeatherType}
         onOpenMapModal={() => openSettingsTab('location')}
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="w-full px-3 sm:px-6 lg:px-8 py-3 sm:py-5 space-y-3.5 sm:space-y-5 pb-24 sm:pb-8 flex-1 relative z-10">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 space-y-4 flex-1">
 
-        {/* HERO: TRỰC QUAN 2 TẤM PIN MẶT TRỜI + GÓC ĐỘNG CƠ + CÔNG SUẤT + % GAIN */}
-        <section aria-label="So sánh trực quan 2 tấm pin mặt trời">
+        {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
+        <section aria-label="So sánh đối chứng hai tấm pin">
           <VisualPanelsComparison
             INA226={telemetry.INA226}
             motors={telemetry.motors}
             onOpenDetails={() => setIsDetailsModalOpen(true)}
-            onOpenManual={() => setIsManualModalOpen(true)}
           />
         </section>
 
-        {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN THU ĐƯỢC (HÔM NAY & 30 NGÀY) */}
+        {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN ĐỐI CHỨNG (HÔM NAY & 30 NGÀY) */}
         <section aria-label="Biểu đồ sản lượng điện">
           <ChartsSection
             intradayData={intradayData}
@@ -683,24 +756,25 @@ export default function App() {
         onSendTestPacket={handleSendTestPacket}
         currentLocation={selectedLocation}
         onSelectLocation={handleSelectLocation}
+        onConfirmLocation={handleConfirmSiteLocation}
         weatherData={weatherData}
         initialTab={settingsInitialTab}
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-white/10 bg-black/30 backdrop-blur-2xl py-3 px-3 sm:px-6 lg:px-8 text-center text-xs text-white/70 relative z-10">
-        <div className="w-full flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-white tracking-wide text-xs sm:text-sm">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2:  VÕ HỒNG PHÁT</span>
+      <footer className="border-t border-zinc-200 bg-white py-3 px-4 sm:px-6 text-xs text-zinc-600">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span className="font-semibold text-zinc-900">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2: VÕ HỒNG PHÁT</span>
           </div>
-          <div className="flex items-center gap-1.5 text-white/70 font-sans text-xs sm:text-[13px] select-none">
-            <span>Gateway:</span>
-            <span className="font-semibold text-zinc-100">ESP32-S3</span>
+          <div className="flex items-center gap-1.5 text-zinc-500">
+            <span>Gateway truyền thông:</span>
+            <span className="font-semibold text-zinc-800">ESP32-S3</span>
           </div>
         </div>
       </footer>
 
-      {/* 5. MOBILE BOTTOM NAVIGATION BAR (Hiển thị cố định đáy màn hình điện thoại) */}
+      {/* 5. MOBILE BOTTOM NAVIGATION BAR */}
       <MobileBottomNav
         currentUser={authSession}
         dataSource={dataSource}
@@ -711,84 +785,6 @@ export default function App() {
         onOpenSettings={() => openSettingsTab('config')}
         onLogout={handleLogout}
       />
-
-      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Floating Switcher) */}
-      <div className="fixed bottom-18 sm:bottom-4 inset-x-2 sm:inset-x-auto sm:right-4 z-40 flex justify-center sm:justify-end pointer-events-none">
-        {showWeatherSwitcher ? (
-          <div className="p-1.5 sm:p-2 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/25 shadow-2xl flex items-center gap-1 sm:gap-1.5 max-w-full overflow-x-auto scrollbar-none animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto">
-            <button
-              onClick={() => { setShowWeatherSwitcher(false); openSettingsTab('location'); }}
-              className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-amber-500/25 text-amber-300 border border-amber-400/50 hover:bg-amber-500/40"
-              title="Mở tab cài đặt Tọa độ lắp đặt trên bản đồ"
-            >
-              <MapPin className="w-3.5 h-3.5 text-amber-400" />
-              <span>Tọa độ lắp đặt</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === null ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-sky-300" />
-              <span>API Thực tế</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'clear' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <Sun className="w-3.5 h-3.5 text-amber-300" />
-              <span>Nắng</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType('clouds'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'clouds' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <Cloud className="w-3.5 h-3.5 text-slate-300" />
-              <span>Mây</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType('rain'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'rain' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <CloudRain className="w-3.5 h-3.5 text-sky-400" />
-              <span>Mưa</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType('thunderstorm'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'thunderstorm' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
-              <span>Giông</span>
-            </button>
-            <button
-              onClick={() => { setCustomWeatherType('night'); setShowWeatherSwitcher(false); }}
-              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${customWeatherType === 'night' ? 'bg-white/30 text-white shadow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-            >
-              <Moon className="w-3.5 h-3.5 text-indigo-300" />
-              <span>Đêm</span>
-            </button>
-            <button
-              onClick={() => setShowWeatherSwitcher(false)}
-              className="p-1 sm:p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-xs cursor-pointer shrink-0"
-            >
-              ✕
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowWeatherSwitcher(true)}
-            className="p-2 sm:p-2.5 rounded-2xl bg-black/40 hover:bg-black/60 backdrop-blur-2xl border border-white/20 text-white/80 hover:text-white shadow-xl transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs pointer-events-auto ml-auto sm:ml-0"
-            title="Đổi hiệu ứng nền thời tiết & chọn tọa độ bản đồ"
-          >
-            <Sparkles className="w-4 h-4 text-sky-300" />
-          </button>
-        )}
-      </div>
 
     </div>
   );

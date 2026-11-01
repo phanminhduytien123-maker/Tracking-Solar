@@ -9,6 +9,12 @@ export function generate30DaysHistory() {
     d.setDate(d.getDate() - i);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 
+    // Giả lập mẫu 1 ngày bị can thiệp tay và 1 ngày bị mất RTC để kiểm thử loại ngày
+    const isDayInvalid = (i === 4 || i === 12);
+    const reasons = i === 4 
+      ? ["MANUAL_JOG_AZ", "SITE_CHANGED_IN_EXPERIMENT"]
+      : (i === 12 ? ["RTC_LOST", "OSF_FLAG_TRIGGERED"] : []);
+
     history.push({
       date: dateStr,
       fullDate: d.toISOString().split('T')[0],
@@ -18,7 +24,13 @@ export function generate30DaysHistory() {
       trackingWh: 0.0,
       gainPercent: 0.0,
       diffKwh: 0.0,
-      diffWh: 0.0
+      diffWh: 0.0,
+      severe_invalid: isDayInvalid,
+      invalid_reasons: reasons,
+      minutes_affected: isDayInvalid ? (i === 4 ? 25 : 180) : 0,
+      start_time: isDayInvalid ? (i === 4 ? "10:15:00" : "05:48:00") : null,
+      end_time: isDayInvalid ? (i === 4 ? "10:40:00" : "08:48:00") : null,
+      actor_uid: isDayInvalid ? (i === 4 ? "admin_uid_42200522" : "system_rtc_ds3231") : null
     });
   }
   return history;

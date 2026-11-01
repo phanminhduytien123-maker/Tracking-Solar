@@ -38,7 +38,7 @@ npm run dev
 ---
 
 ### 2. Khối KPI & Dữ Liệu Tức Thời (So Sánh 2 Tấm Pin)
-Được đo độc lập bằng 2 cảm biến dòng/áp kỹ thuật số INA219 (giao tiếp I2C):
+Được đo độc lập bằng 2 cảm biến dòng/áp kỹ thuật số  INA226 (giao tiếp I2C):
 1. **Tấm pin Tracking (Fuzzy-PID + PSO):**
    - Điện áp ($V_{trk}$), Dòng điện ($I_{trk}$), Công suất tức thời ($P_{trk}$ tính bằng Watt).
    - Năng lượng tích lũy trong ngày (Wh và kWh).
@@ -53,8 +53,8 @@ npm run dev
 
 ### 3. Khối Cơ Cấu Chấp Hành & Cảm Biến Quang
 - **Động cơ bước 2 trục NEMA 23:**
-  - **Trục ngang (Azimuth):** Góc hiện tại (°), góc mục tiêu (°), sai số góc $e$, số xung Encoder (Closed-loop), trạng thái công tắc hành trình Min/Max.
-  - **Trục đứng (Elevation):** Góc hiện tại (°), góc mục tiêu (°), sai số góc $e$, số xung Encoder, trạng thái công tắc hành trình Min/Max.
+  - **Phương vị (quay quanh Z):** Góc hiện tại (°), góc mục tiêu (°), sai số góc $e$, số xung Encoder (Closed-loop), trạng thái công tắc hành trình Min/Max.
+  - **Độ ngửa:** Góc hiện tại (°), góc mục tiêu (°), sai số góc $e$, số xung Encoder, trạng thái công tắc hành trình Min/Max.
 - **Cụm 4 cảm biến quang TEMT6000:**
   - Bố trí trực quan dạng la bàn 4 hướng (Trên / Dưới / Trái / Phải).
   - Hiển thị giá trị quang thông (Lux) và giá trị số ADC 12-bit ($0 - 4095$).
@@ -99,7 +99,7 @@ npm run dev
   1. Chuyển đổi giữa chế độ **Giả lập (Mock Data)** và **Phần cứng ESP32-S3 thật**.
   2. Cấu hình địa chỉ WebSocket (`ws://192.168.4.1/ws` hoặc IP LAN) và REST API.
   3. Xem luồng gói tin **JSON Telemetry** thô thời gian thực.
-  4. Sao chép trực tiếp mã nguồn mẫu C++ cho ESP32 (Arduino IDE / ESP-IDF) phát WebSocket server và đọc dữ liệu INA219.
+  4. Sao chép trực tiếp mã nguồn mẫu C++ cho ESP32 (Arduino IDE / ESP-IDF) phát WebSocket server và đọc dữ liệu  INA226.
 
 ---
 
@@ -122,7 +122,7 @@ d:\ĐỒ ÁN TỐT NGHIỆP\
         │   └── esp32Service.js            # Trình quản lý WebSocket & REST API
         └── components/
             ├── Header.jsx                 # Thanh tiêu đề, RTC, Badges & Alarms
-            ├── KpiCards.jsx               # So sánh INA219 Tracking vs Static + % Gain
+            ├── KpiCards.jsx               # So sánh  INA226 Tracking vs Static + % Gain
             ├── ActuatorsAndSensors.jsx    # Góc trục NEMA 23 & 4 Cảm biến TEMT6000
             ├── AlgorithmMonitor.jsx       # Giám sát Fuzzy-PID & PSO Convergence
             ├── ChartsSection.jsx          # Đồ thị Real-time Line & 30-Day Bar
