@@ -31,18 +31,18 @@ export default function VisualPanelsComparison({
   return (
     <div className="lab-card p-4 sm:p-5 space-y-4">
       {/* Tiêu đề khối & Nút mở chi tiết */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-slate-800">
         <div>
-          <h2 className="text-sm sm:text-base font-bold text-zinc-900">
+          <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100">
             Bảng so sánh đối chứng hai tấm pin
           </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Đối chiếu số đo thời gian thực giữa hệ thống quay hai trục và tấm cố định chuẩn
           </p>
         </div>
         <button
           onClick={onOpenDetails}
-          className="px-3 py-1.5 text-xs font-semibold text-zinc-800 bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 rounded-sm cursor-pointer transition-colors"
+          className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
         >
           Xem thông số chi tiết
         </button>
@@ -53,9 +53,9 @@ export default function VisualPanelsComparison({
         <div className="lg:col-span-9 overflow-x-auto">
           <table className="lab-table text-xs sm:text-sm">
             <thead>
-              <tr className="bg-zinc-50 text-zinc-700">
+              <tr className="bg-zinc-50/80 dark:bg-slate-800/80 text-zinc-700 dark:text-zinc-300">
                 <th className="text-left font-semibold py-2.5 px-3 w-1/3">Thông số đo đạc</th>
-                <th className="text-left font-semibold py-2.5 px-3 w-1/3 text-blue-700">
+                <th className="text-left font-semibold py-2.5 px-3 w-1/3 text-blue-700 dark:text-blue-400">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
                     <span>Tấm tracker (Trục kép)</span>
@@ -64,7 +64,7 @@ export default function VisualPanelsComparison({
                     {trkBadge.text}
                   </span>
                 </th>
-                <th className="text-left font-semibold py-2.5 px-3 w-1/3 text-amber-800">
+                <th className="text-left font-semibold py-2.5 px-3 w-1/3 text-amber-800 dark:text-amber-400">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
                     <span>Tấm cố định (Nam, ngửa 75°)</span>
@@ -75,65 +75,65 @@ export default function VisualPanelsComparison({
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
               {/* 1. Công suất tức thời */}
               <tr>
-                <td className="py-2.5 px-3 text-zinc-600 font-medium">
+                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 font-medium">
                   Công suất tức thời (P)
                 </td>
-                <td className="py-2.5 px-3 font-semibold text-base sm:text-lg text-blue-700">
+                <td className="py-2.5 px-3 font-semibold text-base sm:text-lg text-blue-700 dark:text-blue-400">
                   {formatValueOrDash(tracking.power, 1, 'W')}
                 </td>
-                <td className="py-2.5 px-3 font-semibold text-base sm:text-lg text-amber-800">
+                <td className="py-2.5 px-3 font-semibold text-base sm:text-lg text-amber-800 dark:text-amber-400">
                   {formatValueOrDash(stat.power, 1, 'W')}
                 </td>
               </tr>
 
               {/* 2. Điện áp */}
               <tr>
-                <td className="py-2.5 px-3 text-zinc-600">
+                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400">
                   Điện áp (V)
                 </td>
-                <td className="py-2.5 px-3 text-zinc-800">
+                <td className="py-2.5 px-3 text-zinc-800 dark:text-zinc-200">
                   {formatValueOrDash(tracking.voltage, 2, 'V')}
                 </td>
-                <td className="py-2.5 px-3 text-zinc-800">
+                <td className="py-2.5 px-3 text-zinc-800 dark:text-zinc-200">
                   {formatValueOrDash(stat.voltage, 2, 'V')}
                 </td>
               </tr>
 
               {/* 3. Dòng điện */}
               <tr>
-                <td className="py-2.5 px-3 text-zinc-600">
+                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400">
                   Dòng điện (I)
                 </td>
-                <td className="py-2.5 px-3 text-zinc-800">
+                <td className="py-2.5 px-3 text-zinc-800 dark:text-zinc-200">
                   {formatValueOrDash(tracking.current, 2, 'A')}
                 </td>
-                <td className="py-2.5 px-3 text-zinc-800">
+                <td className="py-2.5 px-3 text-zinc-800 dark:text-zinc-200">
                   {formatValueOrDash(stat.current, 2, 'A')}
                 </td>
               </tr>
 
               {/* 4. Năng lượng tích lũy hôm nay */}
               <tr>
-                <td className="py-2.5 px-3 text-zinc-600 font-medium">
+                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400 font-medium">
                   Năng lượng hôm nay (ΣE)
                 </td>
-                <td className="py-2.5 px-3 font-semibold text-blue-700">
+                <td className="py-2.5 px-3 font-semibold text-blue-700 dark:text-blue-400">
                   {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
                 </td>
-                <td className="py-2.5 px-3 font-semibold text-amber-800">
+                <td className="py-2.5 px-3 font-semibold text-amber-800 dark:text-amber-400">
                   {formatValueOrDash(stat.energyWh, 1, 'Wh')}
                 </td>
               </tr>
 
               {/* 5. Góc định hướng */}
               <tr>
-                <td className="py-2.5 px-3 text-zinc-600">
+                <td className="py-2.5 px-3 text-zinc-600 dark:text-zinc-400">
                   Góc định hướng hiện tại
                 </td>
-                <td className="py-2.5 px-3 text-zinc-800">
+                <td className="py-2.5 px-3 text-zinc-800 dark:text-zinc-200">
                   <div>
                     <span>Quay φ: </span>
                     <span className="font-semibold">{phiAngle !== null ? formatSignedNumber(phiAngle, 1, '°') : '--'}</span>
@@ -141,13 +141,13 @@ export default function VisualPanelsComparison({
                     <span>Ngửa ε: </span>
                     <span className="font-semibold">{epsAngle !== null ? formatValueOrDash(epsAngle, 1, '°') : '--'}</span>
                   </div>
-                  <span className="text-[11px] text-zinc-500 block mt-0.5">
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block mt-0.5">
                     (Nằm ngang = 90°, dựng đứng = 0°)
                   </span>
                 </td>
-                <td className="py-2.5 px-3 text-zinc-700">
+                <td className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300">
                   <div>Hướng Nam 180°, ngửa 75°</div>
-                  <span className="text-[11px] text-zinc-500 block mt-0.5">
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block mt-0.5">
                     (Góc nghiêng cố định 15°)
                   </span>
                 </td>
@@ -156,22 +156,22 @@ export default function VisualPanelsComparison({
           </table>
 
           {/* Dòng kết luận Chênh lệch năng lượng % Gain */}
-          <div className="mt-3 p-3 bg-zinc-50 border border-zinc-200 rounded-sm flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs sm:text-sm font-medium text-zinc-700">
+          <div className="mt-3 p-3 bg-zinc-50 dark:bg-slate-800/70 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Chênh lệch năng lượng hôm nay (đã hiệu chuẩn k = 1,018):
             </span>
             <div className="text-xs sm:text-sm">
               {hasValidGain ? (
-                <span className="font-bold text-zinc-950 text-base">
+                <span className="font-bold text-zinc-950 dark:text-white text-base">
                   {formatSignedNumber(comparison.percentGain, 1, '%')}
                   {comparison.powerDelta !== null && (
-                    <span className="text-xs text-zinc-600 font-normal ml-2">
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal ml-2">
                       (chênh lệch tức thời {formatSignedNumber(comparison.powerDelta, 1, 'W')})
                     </span>
                   )}
                 </span>
               ) : (
-                <span className="text-zinc-500 italic">
+                <span className="text-zinc-500 dark:text-zinc-400 italic">
                   {tracking.connStatus !== 'LIVE' || stat.connStatus !== 'LIVE' 
                     ? 'Chưa đủ dữ liệu (thiết bị mất kết nối)' 
                     : 'Chờ tích lũy đủ ngưỡng 5,0 Wh'}
@@ -182,16 +182,16 @@ export default function VisualPanelsComparison({
         </div>
 
         {/* Cột phụ: Sơ đồ góc cơ cấu bằng SVG kỹ thuật đơn giản (3 cols) */}
-        <div className="lg:col-span-3 border border-zinc-200 rounded-sm p-3 bg-zinc-50 flex flex-col items-center justify-between min-h-[220px]">
-          <span className="text-xs font-semibold text-zinc-700 self-start">
+        <div className="lg:col-span-3 border border-zinc-200 dark:border-slate-700 rounded-sm p-3 bg-zinc-50 dark:bg-slate-800/60 flex flex-col items-center justify-between min-h-[220px]">
+          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 self-start">
             Sơ đồ góc cơ cấu (SVG)
           </span>
 
           <svg viewBox="0 0 140 140" className="w-32 h-32 my-1">
             {/* Vòng tròn tọa độ phương vị */}
-            <circle cx="70" cy="70" r="50" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
-            <line x1="70" y1="15" x2="70" y2="125" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="2,2" />
-            <line x1="15" y1="70" x2="125" y2="70" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="2,2" />
+            <circle cx="70" cy="70" r="50" className="fill-white dark:fill-slate-900 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.5" />
+            <line x1="70" y1="15" x2="70" y2="125" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" strokeDasharray="2,2" />
+            <line x1="15" y1="70" x2="125" y2="70" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" strokeDasharray="2,2" />
 
             {/* Các chữ hướng chính */}
             <text x="70" y="27" textAnchor="middle" fontSize="9" fill="#94a3b8" fontWeight="600">B</text>
@@ -218,24 +218,24 @@ export default function VisualPanelsComparison({
             )}
 
             {/* Tâm quay */}
-            <circle cx="70" cy="70" r="3.5" fill="#1e293b" />
+            <circle cx="70" cy="70" r="3.5" className="fill-slate-800 dark:fill-slate-200" />
           </svg>
 
           {/* Chú giải góc cơ cấu */}
-          <div className="w-full text-[11px] text-zinc-600 space-y-0.5 border-t border-zinc-200 pt-2">
+          <div className="w-full text-[11px] text-zinc-600 dark:text-zinc-400 space-y-0.5 border-t border-zinc-200 dark:border-slate-700 pt-2">
             <div className="flex justify-between">
-              <span className="text-blue-700">── Tracker:</span>
-              <span className="font-medium text-zinc-800">
+              <span className="text-blue-700 dark:text-blue-400">── Tracker:</span>
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">
                 {phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : 'φ: --'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-amber-800">╌╌ Cố định:</span>
-              <span className="font-medium text-zinc-800">Nam 180°</span>
+              <span className="text-amber-800 dark:text-amber-400">╌╌ Cố định:</span>
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">Nam 180°</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-600">Độ ngửa ε:</span>
-              <span className="font-medium text-zinc-800">
+              <span className="text-zinc-600 dark:text-zinc-400">Độ ngửa ε:</span>
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">
                 {epsAngle !== null ? formatValueOrDash(epsAngle, 1, '°') : '--'}
               </span>
             </div>
