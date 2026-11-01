@@ -649,7 +649,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-zinc-900 flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900 font-sans">
+    <div className="min-h-screen text-zinc-900 flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900 font-sans relative overflow-x-hidden">
+
+      {/* 0. DYNAMIC ATMOSPHERIC WEATHER BACKGROUND (REALTIME) */}
+      <WeatherBackground 
+        weatherData={weatherData} 
+        customOverrideType={customWeatherType} 
+      />
 
       {/* BANNER ĐỎ CỐ ĐỊNH KHI DỮ LIỆU LÀ GIẢ LẬP */}
       {(dataSource === 'mock' || telemetry?.system?.isMock || telemetry?.system?.source === 'mock') && (
@@ -762,7 +768,7 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-zinc-200 bg-white py-3 px-4 sm:px-6 text-xs text-zinc-600">
+      <footer className="border-t border-zinc-200 bg-white/90 backdrop-blur-md py-3 px-4 sm:px-6 text-xs text-zinc-600">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div>
             <span className="font-semibold text-zinc-900">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2: VÕ HỒNG PHÁT</span>
@@ -785,6 +791,83 @@ export default function App() {
         onOpenSettings={() => openSettingsTab('config')}
         onLogout={handleLogout}
       />
+
+      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Right corner) */}
+      <div className="fixed bottom-4 right-4 z-40 hidden sm:block">
+        {showWeatherSwitcher ? (
+          <div className="p-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-zinc-300 shadow-lg flex items-center gap-1 animate-in fade-in duration-150">
+            <button
+              onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                customWeatherType === null ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Realtime API</span>
+            </button>
+            <button
+              onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                customWeatherType === 'clear' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span>Nắng</span>
+            </button>
+            <button
+              onClick={() => { setCustomWeatherType('clouds'); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                customWeatherType === 'clouds' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Cloud className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Mây</span>
+            </button>
+            <button
+              onClick={() => { setCustomWeatherType('rain'); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                customWeatherType === 'rain' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <CloudRain className="w-3.5 h-3.5 text-blue-500" />
+              <span>Mưa</span>
+            </button>
+            <button
+              onClick={() => { setCustomWeatherType('thunderstorm'); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                customWeatherType === 'thunderstorm' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <CloudLightning className="w-3.5 h-3.5 text-amber-600" />
+              <span>Giông</span>
+            </button>
+            <button
+              onClick={() => { setCustomWeatherType('night'); setShowWeatherSwitcher(false); }}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                customWeatherType === 'night' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Đêm</span>
+            </button>
+            <button
+              onClick={() => setShowWeatherSwitcher(false)}
+              className="px-1.5 py-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 text-xs cursor-pointer ml-1"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowWeatherSwitcher(true)}
+            className="p-2 rounded-lg bg-white/90 hover:bg-white backdrop-blur-md border border-zinc-300 text-zinc-700 hover:text-blue-700 shadow-md transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+            title="Đổi hiệu ứng nền thời tiết (Nắng/Mưa/Mây/Giông/Đêm)"
+          >
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span className="text-[11px]">Nền thời tiết</span>
+          </button>
+        )}
+      </div>
 
     </div>
   );

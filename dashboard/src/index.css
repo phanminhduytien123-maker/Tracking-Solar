@@ -30,7 +30,7 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: var(--bg-app);
+    background-color: transparent;
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
@@ -78,9 +78,11 @@
 
 /* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 4px, không bóng đổ */
 .lab-card {
-  background-color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .lab-table {
