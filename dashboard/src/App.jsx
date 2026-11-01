@@ -113,6 +113,24 @@ export default function App() {
   const [showWeatherSwitcher, setShowWeatherSwitcher] = useState(false);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
 
+  // Theme Mode (Light / Dark)
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem('solar_theme_mode') || 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('solar_theme_mode', themeMode);
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [themeMode]);
+
+  const toggleTheme = () => {
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Engine instances
   const mockEngineRef = useRef(new MockTelemetryEngine());
   const esp32ServiceRef = useRef(null);
@@ -792,14 +810,14 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* 6. DISCRETE WEATHER PRESET DEMO PILL (Bottom Right corner) */}
-      <div className="fixed bottom-4 right-4 z-40 hidden sm:block">
+      {/* 6. DISCRETE WEATHER PRESET DEMO PILL & DARK/LIGHT MODE TOGGLE (Bottom Right corner) */}
+      <div className="fixed bottom-4 right-4 z-40 hidden sm:flex items-center gap-2">
         {showWeatherSwitcher ? (
-          <div className="p-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-zinc-300 shadow-lg flex items-center gap-1 animate-in fade-in duration-150">
+          <div className="p-1.5 rounded-lg bg-white/95 dark:bg-slate-850/95 backdrop-blur-md border border-zinc-300 dark:border-slate-700 shadow-lg flex items-center gap-1 animate-in fade-in duration-150">
             <button
               onClick={() => { setCustomWeatherType(null); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                customWeatherType === null ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === null ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -808,7 +826,7 @@ export default function App() {
             <button
               onClick={() => { setCustomWeatherType('clear'); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                customWeatherType === 'clear' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === 'clear' ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
               <Sun className="w-3.5 h-3.5 text-amber-500" />
@@ -817,16 +835,16 @@ export default function App() {
             <button
               onClick={() => { setCustomWeatherType('clouds'); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                customWeatherType === 'clouds' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === 'clouds' ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
-              <Cloud className="w-3.5 h-3.5 text-zinc-500" />
+              <Cloud className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Mây</span>
             </button>
             <button
               onClick={() => { setCustomWeatherType('rain'); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                customWeatherType === 'rain' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === 'rain' ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
               <CloudRain className="w-3.5 h-3.5 text-blue-500" />
@@ -835,7 +853,7 @@ export default function App() {
             <button
               onClick={() => { setCustomWeatherType('thunderstorm'); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                customWeatherType === 'thunderstorm' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === 'thunderstorm' ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
               <CloudLightning className="w-3.5 h-3.5 text-amber-600" />
@@ -844,7 +862,7 @@ export default function App() {
             <button
               onClick={() => { setCustomWeatherType('night'); setShowWeatherSwitcher(false); }}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                customWeatherType === 'night' ? 'bg-blue-700 text-white' : 'text-zinc-700 hover:bg-zinc-100'
+                customWeatherType === 'night' ? 'bg-blue-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-slate-700'
               }`}
             >
               <Moon className="w-3.5 h-3.5 text-indigo-500" />
@@ -852,20 +870,44 @@ export default function App() {
             </button>
             <button
               onClick={() => setShowWeatherSwitcher(false)}
-              className="px-1.5 py-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 text-xs cursor-pointer ml-1"
+              className="px-1.5 py-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-slate-700 text-xs cursor-pointer ml-1"
             >
               ✕
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => setShowWeatherSwitcher(true)}
-            className="p-2 rounded-lg bg-white/90 hover:bg-white backdrop-blur-md border border-zinc-300 text-zinc-700 hover:text-blue-700 shadow-md transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
-            title="Đổi hiệu ứng nền thời tiết (Nắng/Mưa/Mây/Giông/Đêm)"
-          >
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span className="text-[11px]">Nền thời tiết</span>
-          </button>
+          <>
+            {/* Nút Chuyển Chế độ Sáng / Tối */}
+            <button
+              id="btn-toggle-theme"
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-white/90 dark:bg-slate-850/90 hover:bg-white dark:hover:bg-slate-700 backdrop-blur-md border border-zinc-300 dark:border-slate-700 text-zinc-700 dark:text-zinc-200 shadow-md transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+              title={themeMode === 'dark' ? 'Chuyển sang Chế độ Sáng (Light mode)' : 'Chuyển sang Chế độ Tối (Dark mode)'}
+            >
+              {themeMode === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="text-[11px]">Chế độ Sáng</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-indigo-600" />
+                  <span className="text-[11px]">Chế độ Tối</span>
+                </>
+              )}
+            </button>
+
+            {/* Nút Nền thời tiết */}
+            <button
+              id="btn-toggle-weather-switcher"
+              onClick={() => setShowWeatherSwitcher(true)}
+              className="p-2 rounded-lg bg-white/90 dark:bg-slate-850/90 hover:bg-white dark:hover:bg-slate-700 backdrop-blur-md border border-zinc-300 dark:border-slate-700 text-zinc-700 dark:text-zinc-200 hover:text-blue-700 dark:hover:text-blue-400 shadow-md transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+              title="Đổi hiệu ứng nền thời tiết (Nắng/Mưa/Mây/Giông/Đêm)"
+            >
+              <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-[11px]">Nền thời tiết</span>
+            </button>
+          </>
         )}
       </div>
 

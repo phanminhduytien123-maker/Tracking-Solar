@@ -56,7 +56,7 @@ export default function Header({
   const weatherLocation = weatherData?.location?.split(',')[0] || 'TP.HCM';
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-zinc-200 text-zinc-900 sticky top-0 z-40">
+    <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-slate-800 text-zinc-900 dark:text-zinc-100 sticky top-0 z-40 transition-colors">
       {/* 1. DÒNG TIÊU ĐỀ CHÍNH VÀ CÁC THAO TÁC */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Khối bên trái: Logo TĐT và Tiêu đề đề tài in hoa */}
@@ -66,7 +66,7 @@ export default function Header({
             alt="Logo TĐT"
             className="h-10 w-auto object-contain shrink-0"
           />
-          <h1 className="text-xs sm:text-sm md:text-base font-bold text-zinc-950 tracking-wide uppercase leading-snug">
+          <h1 className="text-xs sm:text-sm md:text-base font-bold text-zinc-950 dark:text-white tracking-wide uppercase leading-snug">
             ỨNG DỤNG FUZZY LOGIC VÀ PSO TRONG ĐIỀU HƯỚNG PIN NĂNG LƯỢNG MẶT TRỜI
           </h1>
         </div>
@@ -77,12 +77,12 @@ export default function Header({
           {weatherData && (
             <button
               onClick={onOpenMapModal}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs text-zinc-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-sm cursor-pointer transition-colors"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-slate-800/80 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
               title="Nhấn để xem cấu hình tọa độ trạm và thời tiết chi tiết"
             >
-              <CloudSun className="w-3.5 h-3.5 text-zinc-500" />
+              <CloudSun className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Thời tiết:</span>
-              <span className="font-semibold text-zinc-900">
+              <span className="font-semibold text-zinc-900 dark:text-white">
                 {currentTemp !== undefined ? `${String(currentTemp).replace('.', ',')} °C` : '-- °C'}, {weatherLabel} ({weatherLocation})
               </span>
             </button>
@@ -104,7 +104,7 @@ export default function Header({
             <button
               id="btn-open-settings"
               onClick={onOpenSettingsModal}
-              className="px-3 py-1 text-xs font-semibold text-zinc-800 bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 rounded-sm cursor-pointer transition-colors"
+              className="px-3 py-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
             >
               Cài đặt
             </button>
@@ -115,7 +115,7 @@ export default function Header({
             <button
               id="btn-logout"
               onClick={onLogout}
-              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:text-red-700 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-sm cursor-pointer transition-colors"
+              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-700 dark:hover:text-red-400 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
               title="Đăng xuất"
             >
               Đăng xuất
@@ -125,13 +125,13 @@ export default function Header({
       </div>
 
       {/* 2. DẢI TRẠNG THÁI MỘT DÒNG (STATUS BAR) */}
-      <div className="border-t border-zinc-200 bg-zinc-50 text-xs text-zinc-600">
+      <div className="border-t border-zinc-200 dark:border-slate-800 bg-zinc-50/95 dark:bg-slate-950/90 text-xs text-zinc-600 dark:text-zinc-400 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-y-1 gap-x-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {/* Chế độ */}
             <div>
               <span>Chế độ: </span>
-              <span className="font-semibold text-zinc-900">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                 {mode === 'AUTO' ? 'Tự động' : mode === 'MANUAL' ? 'Thủ công' : mode}
               </span>
             </div>
@@ -148,7 +148,7 @@ export default function Header({
             {/* Sai lệch RTC */}
             <div>
               <span>Lệch RTC: </span>
-              <span className="font-semibold text-zinc-900">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                 {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
                   ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
                   : '--'}
@@ -156,7 +156,7 @@ export default function Header({
             </div>
 
             {/* Đồng hồ thực địa */}
-            <div className="hidden lg:block text-zinc-500">
+            <div className="hidden lg:block text-zinc-500 dark:text-zinc-400">
               <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
             </div>
 
