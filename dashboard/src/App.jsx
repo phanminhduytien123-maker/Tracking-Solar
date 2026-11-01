@@ -689,7 +689,7 @@ export default function App() {
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 space-y-4 flex-1">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 space-y-4 flex-1 relative z-10">
 
         {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
         <section aria-label="So sánh đối chứng hai tấm pin">
@@ -768,7 +768,7 @@ export default function App() {
       />
 
       {/* 4. FOOTER */}
-      <footer className="border-t border-zinc-200 bg-white/90 backdrop-blur-md py-3 px-4 sm:px-6 text-xs text-zinc-600">
+      <footer className="border-t border-zinc-200 bg-white/90 backdrop-blur-md py-3 px-4 sm:px-6 text-xs text-zinc-600 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div>
             <span className="font-semibold text-zinc-900">SVTH 1: PHAN MINH DUY TIẾN - SVTH 2: VÕ HỒNG PHÁT</span>
