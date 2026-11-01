@@ -56,24 +56,19 @@ export default function Header({
   const weatherLocation = weatherData?.location?.split(',')[0] || 'TP.HCM';
 
   return (
-    <header className="bg-white border-b border-zinc-200 text-zinc-900 sticky top-0 z-40">
+    <header className="bg-white/90 backdrop-blur-md border-b border-zinc-200 text-zinc-900 sticky top-0 z-40">
       {/* 1. DÒNG TIÊU ĐỀ CHÍNH VÀ CÁC THAO TÁC */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        {/* Khối bên trái: Tên cơ sở nghiên cứu và tên hệ thống */}
+        {/* Khối bên trái: Logo TĐT và Tiêu đề đề tài in hoa */}
         <div className="flex items-center gap-3">
           <img
             src="/tdt_logo.png"
-            alt="Logo"
-            className="h-9 w-auto object-contain hidden sm:block"
+            alt="Logo TĐT"
+            className="h-10 w-auto object-contain shrink-0"
           />
-          <div>
-            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">
-              ĐẠI HỌC BÁCH KHOA - ĐHQG TP.HCM | KHOA ĐIỆN - ĐIỆN TỬ
-            </div>
-            <h1 className="text-sm sm:text-base font-bold text-zinc-950 tracking-tight">
-              Theo dõi pin mặt trời hai trục (Dual-Axis Solar Tracker)
-            </h1>
-          </div>
+          <h1 className="text-xs sm:text-sm md:text-base font-bold text-zinc-950 tracking-wide uppercase leading-snug">
+            ỨNG DỤNG FUZZY LOGIC VÀ PSO TRONG ĐIỀU HƯỚNG PIN NĂNG LƯỢNG MẶT TRỜI
+          </h1>
         </div>
 
         {/* Khối bên phải: Thời tiết + Các nút thao tác */}
