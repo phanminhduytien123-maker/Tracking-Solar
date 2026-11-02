@@ -2971,34 +2971,21 @@ void setup() {
   ArduinoOTA.begin();
   Serial.println(">> [OTA OK] San sang nhan nap firmware qua WiFi (Port 3232, Host: esp32-solar-tracker.local)!");
 
-  // 10. TỰ ĐỘNG KHỞI ĐỘNG VẬN HÀNH 30 NGÀY HANDS-FREE (HOÀN TOÀN TỰ ĐỘNG)
+  // 10. KHỞI ĐỘNG HỆ THỐNG Ở CHẾ ĐỘ IDLE (KHÔNG TỰ ĐỘNG NGỦ, TOÀN QUYỀN ĐIỀU KHIỂN THỦ CÔNG)
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
   if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-    Serial.printf("\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d %02d/%02d/%04d\n", curH, curMin, curS, curD, curM, curY);
-    if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
-      Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%d:00 - %02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
-                    NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
-      enterNightSleepUntil4AM();
-    } else {
-      Serial.println(">> [BOOT DAY] Cap nguon ban ngay -> Tu dong Homing ca 2 truc va bat dau bam Hybrid!");
-      runDualHomingToSwitches();
-      runPsoOptimization();
-      currentTrackSource = TRACK_SRC_HYBRID;
-      autoOpticalTracking = true;
-      trackCyclePhase = TRACK_CYCLE_ADJUSTING;
-      isMaxAzimuthReached = false;
-      systemFsmState = FSM_STATE_TRACKING;
-    }
+    Serial.printf("\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d ngay %02d/%02d/%04d\n", curH, curMin, curS, curD, curM, curY);
   } else {
-    Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay Homing va bat dau Hybrid mac dinh...");
-    runDualHomingToSwitches();
-    runPsoOptimization();
-    currentTrackSource = TRACK_SRC_HYBRID;
-    autoOpticalTracking = true;
-    trackCyclePhase = TRACK_CYCLE_ADJUSTING;
-    systemFsmState = FSM_STATE_TRACKING;
+    Serial.println("\n>> [BOOT RTC] Khong doc duoc RTC DS3231 qua I2C.");
   }
+
+  // Khởi động ở chế độ IDLE an toàn, không tự ý ngủ đêm, không tự ý khóa phanh
+  currentTrackSource = TRACK_SRC_OFF;
+  autoOpticalTracking = false;
+  isMaxAzimuthReached = false;
+  systemFsmState = FSM_STATE_IDLE;
+  Serial.println(">> [BOOT OK] He thong san sang o che do IDLE! (Bam [H] de Homing, [1]/[2] + [Q]/[E] chay tay, [Y] bat Hybrid).");
 
   // 11. In Menu
   printMenu();
@@ -3313,14 +3300,22 @@ void handleCliCommand(const String& cmdStr) {
   } else if (cmdStr.equalsIgnoreCase("park")) {
     parkPanels();
   } else if (cmdStr.equalsIgnoreCase("sleep") || cmdStr.startsWith("sleep ") || cmdStr.startsWith("SLEEP ")) {
-    uint32_t mins = 2;
+    String arg = "";
     if (cmdStr.indexOf(' ') > 0) {
-      mins = cmdStr.substring(cmdStr.indexOf(' ') + 1).toInt();
-      if (mins == 0) mins = 2;
+      arg = cmdStr.substring(cmdStr.indexOf(' ') + 1);
+      arg.trim();
     }
-    systemFsmState = FSM_STATE_PREP_SLEEP;
-    enterNightLightSleep(mins);
-    systemFsmState = FSM_STATE_IDLE;
+    if (arg.equalsIgnoreCase("night")) {
+      Serial.println("\n>> [THU CONG] Kich hoat quy trinh ngu dem toi 04:00 sang...");
+      enterNightSleepUntil4AM();
+    } else {
+      uint32_t mins = arg.toInt();
+      if (mins == 0) mins = 2;
+      Serial.printf("\n>> [THU CONG] Kich hoat Light Sleep %lu phut...\n", (unsigned long)mins);
+      systemFsmState = FSM_STATE_PREP_SLEEP;
+      enterNightLightSleep(mins);
+      systemFsmState = FSM_STATE_IDLE;
+    }
   } else if (cmdStr.equalsIgnoreCase("help") || cmdStr.equalsIgnoreCase("menu") || cmdStr.equalsIgnoreCase("?")) {
     printMenu();
   } else {
@@ -3810,20 +3805,8 @@ void loop() {
     requestTelemetryPrint();
   }
 
-  // 0. TỰ ĐỘNG NGỦ ĐÊM (TỪ 19:00 TỐI ĐẾN 04:00 SÁNG) THEO ĐỒNG HỒ RTC DS3231
-  static unsigned long lastNightCheckMs = 0;
-  if (!isEmergencyCoverActive && (millis() - lastNightCheckMs >= 5000)) {
-    lastNightCheckMs = millis();
-    int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
-    float curTemp = 0.0f;
-    if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-      if ((curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) && (millis() - lastSerialCharMs >= 30000)) {
-        if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE) {
-          enterNightSleepUntil4AM();
-        }
-      }
-    }
-  }
+  // 0. CHẾ ĐỘ NGỦ ĐÊM TỰ ĐỘNG ĐÃ TẮT HOÀN TOÀN (CHỈ KÍCH HOẠT THỦ CÔNG KHI NGƯỜI DÙNG YÊU CẦU: PHÍM [Z] HOẶC LỆNH 'sleep')
+  // (Đảm bảo hệ thống luôn luôn thức, không bao giờ tự ý ngủ hay phanh dừng ngoài ý muốn)
 
   // B. XỬ LÝ CÁC CHẾ ĐỘ TỰ ĐỘNG BÁM MẶT TRỜI (NOAA EPHEMERIS / SENSOR / HYBRID)
   static unsigned long lastOpticalLogTime = 0;
