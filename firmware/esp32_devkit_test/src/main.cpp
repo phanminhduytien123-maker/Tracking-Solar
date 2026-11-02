@@ -3671,9 +3671,16 @@ void loop() {
 
         if (computeSolarTrackingTargets(targetAz, targetEl, azSun, elSun, zenSun, ws, isDaylight)) {
           if (!isDaylight || elSun < 0.0f) {
-            if (systemFsmState != FSM_STATE_PARK) {
-              Serial.println("\n>> [AUTO PARK] Mat troi da lan duoi chan troi (el < 0°) -> Tu dong dua gian pin ve the Park!");
-              parkPanels();
+            // Khi mặt trời lặn (sau ~17:30 chiều):
+            // Tuyệt đối KHÔNG tự ý Park về 90°/0°, mà GIỮ NGUYÊN VỊ TRÍ CUỐI NGÀY ĐỨNG IM GIỮ BƯỚC ĐẾN 19:00:00!
+            if (stepper1 && stepper1->isRunning()) stepper1->stopMove();
+            if (stepper2 && stepper2->isRunning()) stepper2->stopMove();
+            isMaxAzimuthReached = true;
+
+            static unsigned long lastSunsetLogMs = 0;
+            if (millis() - lastSunsetLogMs >= 30000) {
+              lastSunsetLogMs = millis();
+              Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° < 0°). Gian pin DUNG IM GIU BUOC tai vi tri chieu den 19:00 toi!\n", elSun);
             }
           } else {
             systemFsmState = FSM_STATE_TRACKING;
