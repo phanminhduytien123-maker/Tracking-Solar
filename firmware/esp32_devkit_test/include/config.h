@@ -4,11 +4,9 @@
 // =========================================================================
 // CẤU HÌNH WIFI NHÀ
 // =========================================================================
-#define WIFI_SSID     "Duy Loc 2.4GHz"
-#define WIFI_PASSWORD "0947202895"
+#define WIFI_SSID     "Tyny"
+#define WIFI_PASSWORD "11860868"
 
-// =========================================================================
-// CẤU HÌNH FIREBASE REALTIME DATABASE (ĐỒNG BỘ TẤM CỐ ĐỊNH)
 // =========================================================================
 #define API_KEY       "AIzaSyD0i6DhiIncmRaEd6D3UZjLJ1EHNBzXces"
 #define DATABASE_URL  "final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -20,9 +18,15 @@
 // =========================================================================
 // SƠ ĐỒ CHÂN (PINOUT) CHO ESP32 DEVKIT V1 (30 pins / 36 pins)
 // =========================================================================
-// 1. Giao tiếp I2C Cảm biến INA226
-#define I2C_SDA_PIN   21       // D21 (GPIO 21) nối chân SDA của INA226
-#define I2C_SCL_PIN   22       // D22 (GPIO 22) nối chân SCL của INA226
+#ifndef I2C_SDA_PIN
+#define I2C_SDA_PIN   8        // ESP32-S3: GPIO 8
+#endif
+#ifndef I2C_SCL_PIN
+#define I2C_SCL_PIN   9        // ESP32-S3: GPIO 9
+#endif
+#ifndef DS3231_SQW_PIN
+#define DS3231_SQW_PIN 47      // ESP32-S3: GPIO 47 (Chân ngắt báo thức Alarm 1 RTC DS3231 - J3 Pin 17)
+#endif
 #define INA226_ADDR   0x40     // Địa chỉ I2C mặc định của INA226 (hoặc quét tự động)
 
 // Thông số mạch đo INA226
@@ -40,10 +44,18 @@
 #define PIN_LDR_LEFT   32      // D32 (GPIO 32)
 #define PIN_LDR_RIGHT  33      // D33 (GPIO 33)
 
-// =========================================================================
-// THỜI GIAN ĐỊNH KỲ (Mili-giây)
-// =========================================================================
-#define SENSOR_READ_INTERVAL_MS 500    // Đọc cảm biến mỗi 500ms
-#define TELEMETRY_INTERVAL_MS   1000   // Gửi Firebase & in Serial mỗi 1000ms
+// Cấu trúc dữ liệu cảm biến quang TEMT6000
+struct OpticalData {
+  int top;
+  int bot;
+  int lft;
+  int rgt;
+  int diffAz;       // Raw diff: Lft - Rgt
+  int diffEl;       // Raw diff: Top - Bot
+  float normDiffAz; // Sai số chuẩn hóa Azimuth: (Lft - Rgt)/(Lft + Rgt) trong khoảng [-1.0, +1.0]
+  float normDiffEl; // Sai số chuẩn hóa Elevation: (Top - Bot)/(Top + Bot) trong khoảng [-1.0, +1.0]
+  int avg;          // Cường độ sáng trung bình 4 mắt
+  uint32_t timestamp; // Mốc thời gian đo (ms)
+};
 
 #endif // CONFIG_H

@@ -3,14 +3,14 @@
 // PlatformIO Framework: Arduino (espressif32)
 // =========================================================================
 
+#include <Adafruit_ INA226.h>
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <Firebase_ESP_Client.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <Firebase_ESP_Client.h>
-#include <Adafruit_INA219.h>
-#include <ArduinoJson.h>
-#include <addons/TokenHelper.h>
 #include <addons/RTDBHelper.h>
+#include <addons/TokenHelper.h>
 
 #include "config.h"
 
@@ -21,17 +21,17 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
 // Cảm biến đo dòng & áp pin mặt trời
-Adafruit_INA219 ina219(INA219_I2C_ADDR);
+Adafruit_ INA226 INA226(INA226_I2C_ADDR);
 
 // Trạng thái hệ thống & Góc quay
-float currentAzimuth = 142.5;     // Góc phương vị hiện tại (Độ)
-float currentElevation = 45.0;   // Góc nâng hiện tại (Độ)
+float currentAzimuth = 142.5;  // Góc phương vị hiện tại (Độ)
+float currentElevation = 45.0; // Góc nâng hiện tại (Độ)
 float targetAzimuth = 143.0;
 float targetElevation = 45.5;
 
 float totalEnergyWh = 0.0;
 unsigned long lastTelemetryTime = 0;
-String systemMode = "AUTO";       // "AUTO" | "MANUAL" | "CALIBRATION" | "PARK"
+String systemMode = "AUTO"; // "AUTO" | "MANUAL" | "CALIBRATION" | "PARK"
 bool isEstop = false;
 
 // Hàm xử lý lệnh điều khiển từ xa từ Web Dashboard
@@ -42,33 +42,33 @@ void handleControlStream(FirebaseStream data) {
   if (data.dataType() == "json") {
     JsonDocument doc;
     deserializeJson(doc, data.jsonString());
-    
-    const char* cmd = doc["cmd"] | "";
+
+    const char *cmd = doc["cmd"] | "";
     if (strcmp(cmd, "set_mode") == 0) {
       systemMode = doc["mode"] | "AUTO";
       Serial.println("[LỆNH] Đổi chế độ sang: " + systemMode);
-    } 
-    else if (strcmp(cmd, "jog") == 0) {
-      const char* axis = doc["axis"] | "azimuth";
-      const char* dir = doc["direction"] | "CW";
+    } else if (strcmp(cmd, "jog") == 0) {
+      const char *axis = doc["axis"] | "azimuth";
+      const char *dir = doc["direction"] | "CW";
       float step = doc["step"] | 5.0;
-      
+
       if (strcmp(axis, "azimuth") == 0) {
         currentAzimuth += (strcmp(dir, "CW") == 0) ? step : -step;
       } else {
         currentElevation += (strcmp(dir, "CW") == 0) ? step : -step;
       }
-      Serial.printf("[LỆNH JOG] Axis: %s, Dir: %s, Step: %.1f\n", axis, dir, step);
-    }
-    else if (strcmp(cmd, "estop") == 0) {
+      Serial.printf("[LỆNH JOG] Axis: %s, Dir: %s, Step: %.1f\n", axis, dir,
+                    step);
+    } else if (strcmp(cmd, "estop") == 0) {
       isEstop = doc["state"] | false;
-      Serial.println(isEstop ? "[LỆNH] DỪNG KHẨN CẤP (E-STOP)!" : "[LỆNH] Huỷ dừng khẩn cấp.");
-    }
-    else if (strcmp(cmd, "park") == 0) {
+      Serial.println(isEstop ? "[LỆNH] DỪNG KHẨN CẤP (E-STOP)!"
+                             : "[LỆNH] Huỷ dừng khẩn cấp.");
+    } else if (strcmp(cmd, "park") == 0) {
       currentAzimuth = 180.0;
       currentElevation = 10.0;
       systemMode = "PARK";
-      Serial.println("[LỆNH] Đã đưa tấm pin về vị trí nghỉ an toàn (Park Mode).");
+      Serial.println(
+          "[LỆNH] Đã đưa tấm pin về vị trí nghỉ an toàn (Park Mode).");
     }
   }
 }
@@ -93,9 +93,11 @@ void connectWiFi() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi Connected! IP Address: " + WiFi.localIP().toString());
+    Serial.println("\nWiFi Connected! IP Address: " +
+                   WiFi.localIP().toString());
   } else {
-    Serial.println("\nWiFi Connection Failed! Sẽ tự động kết nối lại trong vòng lặp loop.");
+    Serial.println("\nWiFi Connection Failed! Sẽ tự động kết nối lại trong "
+                   "vòng lặp loop.");
   }
 }
 
@@ -111,8 +113,10 @@ void initFirebase() {
   if (!Firebase.RTDB.beginStream(&fbdoStream, "/solar/control")) {
     Serial.println("[Firebase Stream Error]: " + fbdoStream.errorReason());
   } else {
-    Firebase.RTDB.setStreamCallback(&fbdoStream, handleControlStream, streamTimeoutCallback);
-    Serial.println("[Firebase Stream] Đã mở kênh lắng nghe lệnh điều khiển (/solar/control)");
+    Firebase.RTDB.setStreamCallback(&fbdoStream, handleControlStream,
+                                    streamTimeoutCallback);
+    Serial.println("[Firebase Stream] Đã mở kênh lắng nghe lệnh điều khiển "
+                   "(/solar/control)");
   }
 }
 
@@ -123,12 +127,13 @@ void setup() {
   Serial.println("  ESP32-S3 SOLAR TRACKER FIRMWARE (FUZZY-PID & PSO)");
   Serial.println("=======================================================");
 
-  // Khởi tạo I2C & INA219
+  // Khởi tạo I2C &  INA226
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  if (!ina219.begin()) {
-    Serial.println("[CẢNH BÁO] Không tìm thấy cảm biến INA219 (0x40). Kiểm tra dây nối I2C!");
+  if (!INA226.begin()) {
+    Serial.println("[CẢNH BÁO] Không tìm thấy cảm biến  INA226 (0x40). Kiểm "
+                   "tra dây nối I2C!");
   } else {
-    Serial.println("[OK] Đã kết nối cảm biến INA219.");
+    Serial.println("[OK] Đã kết nối cảm biến  INA226.");
   }
 
   // Cấu hình chân Analog LDR
@@ -147,11 +152,12 @@ void loop() {
   if (millis() - lastTelemetryTime >= TELEMETRY_INTERVAL_MS) {
     lastTelemetryTime = millis();
 
-    // 1. Đọc số liệu cảm biến INA219
-    float voltage = ina219.getBusVoltage_V();
-    float current = ina219.getCurrent_mA() / 1000.0; // Chuyển sang Ampe
-    float power = voltage * current;                // Công suất Watt
-    if (power < 0) power = 0;
+    // 1. Đọc số liệu cảm biến  INA226
+    float voltage = INA226.getBusVoltage_V();
+    float current = INA226.getCurrent_mA() / 1000.0; // Chuyển sang Ampe
+    float power = voltage * current;                 // Công suất Watt
+    if (power < 0)
+      power = 0;
 
     // Tích luỹ năng lượng Wh (Wh = P(W) * dt(h))
     totalEnergyWh += (power * (TELEMETRY_INTERVAL_MS / 3600000.0));
@@ -183,8 +189,10 @@ void loop() {
 
     if (Firebase.ready()) {
       if (Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &json)) {
-        Serial.printf("[ESP32-1 TELEMETRY] V=%.2fV | I=%.3fA | P=%.2fW | Az=%.1f° | El=%.1f°\n", 
-                      voltage, current, power, currentAzimuth, currentElevation);
+        Serial.printf("[ESP32-1 TELEMETRY] V=%.2fV | I=%.3fA | P=%.2fW | "
+                      "Az=%.1f° | El=%.1f°\n",
+                      voltage, current, power, currentAzimuth,
+                      currentElevation);
       } else {
         Serial.println("[ESP32-1 Gửi lỗi]: " + fbdo.errorReason());
       }

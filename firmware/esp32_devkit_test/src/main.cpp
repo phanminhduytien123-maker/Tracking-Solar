@@ -2449,6 +2449,7 @@ void setup() {
   // Khởi tạo Bảng tham số trung tâm (ParamRegistry) & Nạp dữ liệu NVS Flash (CalibrationStore)
   CalibrationStore.begin();
   ParamRegistry.set("L_EL_MIN_SOFT", 10.0f);
+  ParamRegistry.set("TRACK_INTERVAL_MS", 900000.0f);
 
   // Khởi tạo Bench Wizard (16 bước B0-B15 & Operation Gating)
   BenchWizard.begin();
@@ -3564,7 +3565,8 @@ void loop() {
       if (stepper2 && stepper2->isRunning()) stepper2->stopMove();
       systemFsmState = FSM_STATE_TRACKING;
 
-      unsigned long holdDuration = (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f); // Mặc định 15 phút (900,000 ms)
+      unsigned long holdDuration = (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f);
+      if (holdDuration < 60000UL) holdDuration = 900000UL; // Bao ve: Luon giu buoc toi thieu 15 phut (900,000 ms)
       unsigned long elapsedHold = millis() - trackHoldStartTimeMs;
 
       if (elapsedHold >= holdDuration) {

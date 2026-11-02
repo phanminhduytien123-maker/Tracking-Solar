@@ -109,44 +109,73 @@ public:
 };
 
 /**
- * @brief Giao tiếp đồng hồ thời gian thực DS3231 qua I2C
+ * @brief Giao diện phần cứng trừu tượng đồng hồ thời gian thực RTC DS3231 (IRtc)
+ * @details Quy ước: Lưu theo giờ địa phương UTC+7 (TZ_OFFSET_MIN = 420).
+ *          Có pin dự phòng CR2032 (3V), VCC cấp 3.3V trực tiếp từ hệ thống.
  */
-class IRtcDriver {
+class IRtc {
 public:
-    virtual ~IRtcDriver() = default;
+    virtual ~IRtc() = default;
 
     /**
-     * @brief Lấy thời gian thực từ DS3231
-     * @param[out] year Năm
-     * @param[out] month Tháng (1..12)
-     * @param[out] day Ngày (1..31)
-     * @param[out] hour Giờ (0..23)
-     * @param[out] minute Phút (0..59)
-     * @param[out] second Giây (0..59)
-     * @param[out] epoch_sec Giây Unix epoch (UTC)
-     * @return true nếu đọc RTC hợp lệ, false nếu mất nguồn RTC / I2C error
+     * @brief Đọc thời gian thực từ DS3231 (Giờ địa phương UTC+7)
      */
     virtual bool getDateTime(uint16_t& year, uint8_t& month, uint8_t& day,
                              uint8_t& hour, uint8_t& minute, uint8_t& second,
                              uint32_t& epoch_sec) = 0;
 
     /**
-     * @brief Cài đặt báo thức ngắt chân INT trên DS3231 để đánh thức ESP32 khỏi Deep Sleep
-     * @param hour Giờ báo thức
-     * @param minute Phút báo thức
+     * @brief Ghi đặt thời gian cho DS3231 (thường dùng khi đồng bộ NTP thành công hoặc đặt tay)
+     */
+    virtual bool setDateTime(uint16_t year, uint8_t month, uint8_t day,
+                             uint8_t hour, uint8_t minute, uint8_t second) = 0;
+
+    /**
+     * @brief Đọc cờ Oscillator Stop Flag (OSF) trong thanh ghi trạng thái (Status Register 0Fh)
+     * @param[out] osf_set true nếu cờ OSF = 1 (bộ dao động từng dừng do mất nguồn và mất pin, giờ không đáng tin)
+     */
+    virtual bool readOscillatorStopFlag(bool& osf_set) = 0;
+
+    /**
+     * @brief Xóa cờ OSF (ghi bit OSF về 0) sau khi đã cập nhật lại thời gian đáng tin cậy
+     */
+    virtual bool clearOscillatorStopFlag() = 0;
+
+    /**
+     * @brief Cài đặt báo thức Alarm 1 ngắt chân INT trên DS3231 để đánh thức ESP32 khỏi Deep Sleep
+     * @param hour Giờ báo thức địa phương
+     * @param minute Phút báo thức địa phương
      */
     virtual bool setWakeupAlarm(uint8_t hour, uint8_t minute) = 0;
 
     /**
-     * @brief Xóa cờ ngắt báo thức trên DS3231 sau khi thức dậy
+     * @brief Tắt và xóa cấu hình báo thức Alarm
+     */
+    virtual bool clearWakeupAlarm() = 0;
+
+    /**
+     * @brief Xóa cờ ngắt báo thức (A1F) trên DS3231 sau khi thức dậy để chân INT giải phóng mức tích cực
      */
     virtual void clearAlarmInterrupt() = 0;
 
     /**
-     * @brief Kiểm tra RTC có hợp lệ hay đang bị reset mất giờ
+     * @brief Đọc nhiệt độ từ cảm biến nhiệt độ tích hợp của DS3231 (độ chính xác ±0.25°C) để log telemetry
+     */
+    virtual bool readTemperature(float& temp_c) = 0;
+
+    /**
+     * @brief Đọc trạng thái logic thực tế của chân INT DS3231 nối với chân ngắt ESP32
+     * @param[out] pin_active true nếu chân INT đang tích cực (mức LOW do ngắt open-drain)
+     */
+    virtual bool readIntPinState(bool& pin_active) = 0;
+
+    /**
+     * @brief Kiểm tra tính hợp lệ toàn diện của RTC (OSF=0, năm >= 2026, không trôi ngược)
      */
     virtual bool isValid() const = 0;
 };
+
+using IRtcDriver = IRtc;
 
 /**
  * @brief Đọc cảm biến công suất INA226 qua I2C (cho cả tấm xoay Tracker và tấm cố định Static)
@@ -182,6 +211,26 @@ public:
      * @brief Tải lại trạng thái hệ thống khi khởi động / thức dậy
      */
     virtual bool loadSystemState(TrackerState& state, float& az_deg, float& el_deg, bool& is_homed) = 0;
+
+    /**
+     * @brief Lưu cấu hình SiteConfig hợp lệ cuối cùng vào NVS Flash (dự phòng khi mất mạng)
+     */
+    virtual bool saveSiteConfig(const SiteConfig& site) = 0;
+
+    /**
+     * @brief Tải cấu hình SiteConfig từ NVS Flash
+     */
+    virtual bool loadSiteConfig(SiteConfig& outSite) = 0;
+
+    /**
+     * @brief Lưu mốc thời gian Unix timestamp cuối cùng hợp lệ để phát hiện nhảy lùi giờ
+     */
+    virtual bool saveLastTimestamp(uint32_t epoch_sec) = 0;
+
+    /**
+     * @brief Đọc mốc thời gian Unix timestamp lần chạy trước
+     */
+    virtual bool loadLastTimestamp(uint32_t& epoch_sec) = 0;
 };
 
 /**

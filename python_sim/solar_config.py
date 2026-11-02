@@ -8,16 +8,40 @@ Mọi đơn vị, công thức và giá trị placeholder được đồng bộ 
 from dataclasses import dataclass
 
 # =============================================================================
-# SECTION 1: HẰNG SỐ ĐỊA LÝ & THỜI GIAN (GEOGRAPHIC & TIME)
+# SECTION 1: HẰNG SỐ ĐỊA LÝ, THỜI GIAN & RTC DS3231 (GEOGRAPHIC, TIME & RTC)
 # =============================================================================
-# [A] Vĩ độ TP.HCM (Độ thập phân, Bắc = dương)
-CFG_A_LATITUDE_DEG: float = 10.8231
+# [A] Vĩ độ TP.HCM (Độ thập phân, Bắc = dương, 5 số thập phân)
+CFG_A_LATITUDE_DEG: float = 10.78310
 
-# [B] Kinh độ TP.HCM (Độ thập phân, Đông = dương)
-CFG_B_LONGITUDE_DEG: float = 106.6297
+# [B] Kinh độ TP.HCM (Độ thập phân, Đông = dương, 5 số thập phân)
+CFG_B_LONGITUDE_DEG: float = 106.67210
 
-# Múi giờ UTC+7 cố định (Giờ)
+# Múi giờ UTC+7 cố định (Việt Nam không có DST). RTC DS3231 lưu theo giờ địa phương UTC+7.
+CFG_TZ_OFFSET_MIN: int = 420
 CFG_TIMEZONE_OFFSET_HOURS: float = 7.0
+
+# Pin dự phòng RTC DS3231: Pin CR2032 (3V). VCC 3.3V, tháo mạch sạc trên module ZS-042.
+CFG_RTC_BACKUP_BATTERY: bool = True
+
+# Khóa thí nghiệm: True khi chạy đợt đo 30 ngày chính thức
+CFG_EXPERIMENT_LOCK: bool = False
+
+# Nguồn tạo góc mục tiêu
+CFG_TRACK_SOURCE_EPHEMERIS_ONLY: int = 0
+CFG_TRACK_SOURCE_SENSOR_ONLY: int = 1
+CFG_TRACK_SOURCE_HYBRID: int = 2
+CFG_TRACK_SOURCE_DEFAULT: int = CFG_TRACK_SOURCE_HYBRID
+
+# Tự động cập nhật H: Mặc định tắt trong đợt đo 30 ngày
+CFG_AUTO_UPDATE_H: bool = False
+
+# Bù khúc xạ khí quyển cho góc nâng el_sun nhỏ
+CFG_USE_REFRACTION: bool = True
+
+# Quy ước tên hiển thị chuẩn
+CFG_LABEL_MOTOR_1: str = "Góc quay"
+CFG_LABEL_MOTOR_2: str = "Độ ngửa"
+
 
 
 # =============================================================================
@@ -62,19 +86,34 @@ CFG_J_EL_HOME_SW_DEG: float = 90.0
 CFG_K_EL_STOW_DEG: float = 90.0
 
 # [L] epsilon_min_soft giới hạn mềm đầu HẠ THẤP NHẤT trục Elevation (Độ)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO CƠ KHÍ THỰC TẾ]
+# DÙNG CHUNG DUY NHẤT CHO CẢ BA BỘ ĐIỀU KHIỂN: PID / FUZZY-PID / PSO (KHÔNG HARD-CODE Ở FILE KHÁC)
 # Tấm KHÔNG THỂ dựng đứng vuông góc mặt đất (0°) vì sẽ VA CHẠM VÀO TRỤC Z (Phần khung)!
-# Cần đo cơ khí góc cấn thực tế và đặt L lớn hơn góc cấn ít nhất 3° - 5°.
+# Cần đo cơ khí góc cấn thực tế trên giàn thật và đặt L lớn hơn góc cấn ít nhất 3° - 5°.
 CFG_L_EL_MIN_SOFT_LIMIT_DEG: float = 25.0
 
 # Hành trình ngửa tối đa cho phép tính từ HOME (Độ)
 CFG_EL_MAX_STROKE_FROM_HOME_DEG: float = 70.0
 
 # Ngưỡng góc nâng mặt trời tối thiểu để bắt đầu bám (Độ)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO CƠ KHÍ THỰC TẾ]
+# DÙNG CHUNG DUY NHẤT CHO CẢ BA BỘ ĐIỀU KHIỂN: PID / FUZZY-PID / PSO (KHÔNG HARD-CODE Ở FILE KHÁC)
+# Dưới góc này, bức xạ yếu (AM > 5.76), năng lượng thu được không bù nổi năng lượng quay động cơ.
 CFG_EL_SUN_TRACKING_THRESHOLD_DEG: float = 10.0
 
-# Thông số lắp đặt tấm cố định đối chứng (Static Panel) dùng trong báo cáo và mô phỏng pvlib
-CFG_STATIC_PANEL_AZIMUTH_DEG: float = 180.0  # Hướng chính Nam (South 180°)
-CFG_STATIC_PANEL_TILT_DEG: float = 15.0     # Góc nghiêng cố định 15° so với mặt phẳng ngang
+# Thời gian đánh thức DS3231 trước khi mặt trời đạt ngưỡng bám (Phút)
+CFG_WAKEUP_LEAD_TIME_MIN: int = 20
+
+# Thông số lắp đặt tấm cố định đối chứng (Static Panel) lưu bằng 2 field riêng:
+CFG_FIXED_AZ_DEG: float = 180.0         # Hướng chính Nam (South 180°)
+CFG_FIXED_TILT_BETA_DEG: float = 15.0   # Góc nghiêng cố định beta 15° so với mặt đất
+CFG_STATIC_PANEL_AZIMUTH_DEG: float = CFG_FIXED_AZ_DEG
+CFG_STATIC_PANEL_TILT_DEG: float = CFG_FIXED_TILT_BETA_DEG
+
+def get_fixed_epsilon_deg(beta: float = CFG_FIXED_TILT_BETA_DEG) -> float:
+    """Góc ngửa epsilon = 90 - beta (tính ra khi hiển thị, không lưu thành field thứ 3)."""
+    return 90.0 - beta
+
 
 
 # =============================================================================
@@ -125,19 +164,31 @@ CFG_V_GAIN_LDR_LEFT: float = 1.00
 CFG_V_GAIN_LDR_RIGHT: float = 1.00
 
 # [W] Ngưỡng bão hòa ADC 12-bit
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
 CFG_W_ADC_SATURATION_THRESHOLD: int = 3950
 
-# [X] T_dark: Ngưỡng tối xác nhận đi ngủ
+# [X] T_dark: Ngưỡng tối xác nhận đi ngủ (ADC sum)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
 CFG_X_T_DARK_THRESHOLD: float = 400.0
 
-# [Y] T_bright: Ngưỡng sáng xác nhận thức dậy bám chủ động
+# [Y] T_bright: Ngưỡng sáng xác nhận thức dậy bám chủ động (ADC sum)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
 CFG_Y_T_BRIGHT_THRESHOLD: float = 900.0
 
 # [Z] k_s: Hệ số chuyển sai số quang thành góc lệch (Độ)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
 CFG_Z_OPTICAL_CONV_FACTOR_DEG: float = 12.0
 
 # [Z2] Delta_s_max: Giới hạn hiệu chỉnh tối đa từ quang (Độ)
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
 CFG_Z2_MAX_OPTICAL_CORRECTION_DEG: float = 6.0
+
+# Vùng chết sai số quang học normalized
+# TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]
+CFG_OPTICAL_DEADBAND: float = 0.04
+
+# Số mẫu oversampling ADC
+CFG_ADC_OVERSAMPLE_COUNT: int = 64
 
 
 # =============================================================================
