@@ -11,6 +11,7 @@ export default function Header({
   onLogout,
   onOpenManualModal,
   onOpenSettingsModal,
+  onOpenEmergencyModal,
   onResetEstop,
   weatherData = null,
   isLoadingWeather = false,
@@ -85,6 +86,22 @@ export default function Header({
               <span className="font-semibold text-zinc-900 dark:text-white">
                 {currentTemp !== undefined ? `${String(currentTemp).replace('.', ',')} °C` : '-- °C'}, {weatherLabel} ({weatherLocation})
               </span>
+            </button>
+          )}
+
+          {/* Nút Dừng Khẩn Cấp / Phủ Bạt hoặc Mở Khóa */}
+          {isAdmin && (
+            <button
+              id="btn-emergency-cover"
+              onClick={onOpenEmergencyModal}
+              className={`px-3 py-1 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${
+                system?.emergencyActive
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse border border-amber-300'
+                  : 'bg-red-700 hover:bg-red-800 text-white font-bold'
+              }`}
+              title={system?.emergencyActive ? "Nhấn để nhập mật khẩu mở khóa hệ thống" : "Nhấn để dừng khẩn cấp & hạ góc Max phủ bạt che mưa bão"}
+            >
+              {system?.emergencyActive ? '🔓 MỞ KHÓA HOẠT ĐỘNG' : '🔴 DỪNG KHẨN CẤP (PHỦ BẠT)'}
             </button>
           )}
 

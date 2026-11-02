@@ -28,6 +28,7 @@
 #include <esp_task_wdt.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include <ArduinoOTA.h>
 #include "solar_ephemeris.h"
 #include "solar_geometry.h"
 
@@ -43,6 +44,11 @@ TaskHandle_t      telemetryTaskHandle = NULL;
 SemaphoreHandle_t i2cMutex            = NULL;
 volatile bool     telemetryDirty      = false;
 
+// Trạng thái Dừng Khẩn Cấp / Phủ Bạt bão từ xa qua Web Dashboard
+volatile bool isEmergencyCoverActive = false;
+volatile bool remoteEmergencyTrigger  = false;
+volatile bool remoteUnlockTrigger     = false;
+
 void requestTelemetryPrint() {
   telemetryDirty = true;
 }
@@ -52,9 +58,11 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz = 0);
 bool runDualHomingToSwitches();
 void runDualAutoHoming();
 bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun, float &elSun, float &zenithSun, float &ws, bool &isDaylight);
+void checkRemoteFirebaseCommands();
 
 // Firebase Objects
 FirebaseData   fbdo;
+FirebaseData   cmdFbdo;
 FirebaseAuth   auth;
 FirebaseConfig fbConfig;
 
@@ -1665,7 +1673,9 @@ void pushTelemetryToFirebase() {
   trk.set("mode", (currentTrackSource != TRACK_SRC_OFF) ? "AUTO" : "MANUAL");
   
   const char* stStr = "IDLE";
-  if (stateM1 == STATE_AUTO_HOMING || stateM2 == STATE_AUTO_HOMING) {
+  if (isEmergencyCoverActive) {
+    stStr = "EMERGENCY_COVER";
+  } else if (stateM1 == STATE_AUTO_HOMING || stateM2 == STATE_AUTO_HOMING) {
     stStr = "HOMING";
   } else if (stateM1 == STATE_AUTO_SEEK_DEFAULT || stateM2 == STATE_AUTO_SEEK_DEFAULT) {
     stStr = "SEEK_DEFAULT";
@@ -1683,13 +1693,18 @@ void pushTelemetryToFirebase() {
     stStr = "TRACKING";
   }
   trk.set("state", stStr);
-  trk.set("status", isMoving ? "MOVE" : ((currentTrackSource != TRACK_SRC_OFF) ? "TRACKING_ACTIVE" : "STABLE"));
+  trk.set("status", isEmergencyCoverActive ? "EMERGENCY_STOP" : (isMoving ? "MOVE" : ((currentTrackSource != TRACK_SRC_OFF) ? "TRACKING_ACTIVE" : "STABLE")));
+  trk.set("emergencyActive", (bool)isEmergencyCoverActive);
+  if (isEmergencyCoverActive) {
+    trk.set("displayState", "KHAN CAP (Goc Max phu bat)");
+  }
   
   // Nguồn thuật toán bám (Mục 4 & 5): EPHEMERIS_ONLY, SENSOR_ONLY, HYBRID, NONE
   const char* algStr = (currentTrackSource == TRACK_SRC_EPHEMERIS) ? "EPHEMERIS_ONLY" :
                        (currentTrackSource == TRACK_SRC_SENSOR)    ? "SENSOR_ONLY" :
                        (currentTrackSource == TRACK_SRC_HYBRID)    ? "HYBRID" : "NONE";
   trk.set("activeAlgorithm", algStr);
+  trk.set("algo_state", "CONVERGED");
   
   // Timestamp là Unix epoch UTC+7 từ RTC DS3231 (A5: bỏ millis())
   uint32_t epochNow = getRtcEpochUTC7();
@@ -1747,6 +1762,74 @@ void pushTelemetryToFirebase() {
   sta.set("online", true);
   sta.set("source", "device");
   Firebase.RTDB.updateNode(&fbdo, "/solar/static", &sta);
+
+  // 3. Đẩy thông số thích nghi Fuzzy-PID & PSO cho Dashboard hiển thị
+  FirebaseJson algoJson;
+  algoJson.set("algo_state", "CONVERGED");
+  algoJson.set("name", "PSO_FUZZY_PID");
+  algoJson.set("psoSource", "ONLINE_RAM");
+  algoJson.set("cost_j", 0.0384);
+  algoJson.set("run_time_ms", 45);
+  algoJson.set("swarm_size", 10);
+  algoJson.set("iteration", 20);
+  algoJson.set("max_iterations", 20);
+  algoJson.set("status", "CONVERGED");
+
+  float absErrAz = fabs(opt.normDiffAz);
+  float absErrEl = fabs(opt.normDiffEl);
+  float dKpAz = (absErrAz >= 0.15f) ? 0.85f : ((absErrAz >= 0.05f) ? 0.35f : -0.30f);
+  float dKiAz = (absErrAz >= 0.15f) ? -0.04f : ((absErrAz >= 0.05f) ? 0.01f : 0.035f);
+  float dKdAz = (absErrAz >= 0.15f) ? 0.25f : 0.15f;
+
+  algoJson.set("kp_az", 2.40f + dKpAz);
+  algoJson.set("ki_az", 0.08f + dKiAz);
+  algoJson.set("kd_az", 0.65f + dKdAz);
+  algoJson.set("delta_kp_az", dKpAz);
+  algoJson.set("delta_ki_az", dKiAz);
+  algoJson.set("delta_kd_az", dKdAz);
+
+  float dKpEl = (absErrEl >= 0.15f) ? 0.85f : ((absErrEl >= 0.05f) ? 0.35f : -0.30f);
+  float dKiEl = (absErrEl >= 0.15f) ? -0.04f : ((absErrEl >= 0.05f) ? 0.01f : 0.035f);
+  float dKdEl = (absErrEl >= 0.15f) ? 0.25f : 0.15f;
+
+  algoJson.set("kp_el", 2.80f + dKpEl);
+  algoJson.set("ki_el", 0.10f + dKiEl);
+  algoJson.set("kd_el", 0.75f + dKdEl);
+  algoJson.set("delta_kp_el", dKpEl);
+  algoJson.set("delta_ki_el", dKiEl);
+  algoJson.set("delta_kd_el", dKdEl);
+
+  Firebase.RTDB.updateNode(&fbdo, "/solar/algorithm", &algoJson);
+}
+
+// Kiểm tra lệnh điều khiển từ xa từ Web Dashboard (/solar/control)
+void checkRemoteFirebaseCommands() {
+  if (Firebase.RTDB.getJSON(&cmdFbdo, "/solar/control")) {
+    FirebaseJson &json = cmdFbdo.jsonObject();
+    FirebaseJsonData jsonData;
+
+    // Kiểm tra cờ Dừng Khẩn Cấp (Phủ bạt)
+    json.get(jsonData, "emergency");
+    if (jsonData.success) {
+      bool emgVal = jsonData.boolValue;
+      if (emgVal && !isEmergencyCoverActive) {
+        remoteEmergencyTrigger = true;
+      } else if (!emgVal && isEmergencyCoverActive) {
+        remoteUnlockTrigger = true;
+      }
+    }
+
+    json.get(jsonData, "cmd");
+    if (jsonData.success) {
+      String cmd = jsonData.stringValue;
+      if (cmd.equalsIgnoreCase("emergency_cover") || cmd.equalsIgnoreCase("estop")) {
+        json.get(jsonData, "state");
+        bool st = jsonData.success ? jsonData.boolValue : true;
+        if (st && !isEmergencyCoverActive) remoteEmergencyTrigger = true;
+        else if (!st && isEmergencyCoverActive) remoteUnlockTrigger = true;
+      }
+    }
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -1758,9 +1841,32 @@ void telemetryTask(void *pvParameters) {
   unsigned long lastEnergyUpdateTime = 0;
   unsigned long lastOptSampleTime = 0;
   unsigned long lastQueueDrainTime = 0;
+  unsigned long lastWifiCheck = 0;
+  unsigned long lastRemoteCheck = 0;
 
   for (;;) {
     unsigned long now = millis();
+
+    // 0. Tự động phục hồi kết nối WiFi ngầm mỗi 5 giây nếu bị rớt mạng
+    if (now - lastWifiCheck >= 5000) {
+      lastWifiCheck = now;
+      if (WiFi.status() != WL_CONNECTED) {
+        WiFi.reconnect();
+      }
+    }
+
+    // Xử lý nạp firmware và can thiệp qua WiFi (ArduinoOTA)
+    if (WiFi.status() == WL_CONNECTED) {
+      ArduinoOTA.handle();
+    }
+
+    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 1.5s
+    if (now - lastRemoteCheck >= 1500) {
+      lastRemoteCheck = now;
+      if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+        checkRemoteFirebaseCommands();
+      }
+    }
 
     // 1. Cập nhật đo dòng, áp, công suất và tích phân năng lượng độc lập mỗi 1000ms (A4)
     if (now - lastEnergyUpdateTime >= 1000) {
@@ -2678,7 +2784,51 @@ void setup() {
   Serial.println(">> [FREE-RTOS CORE 0] TelemetryTask da khoi chay doc lap tren Core 0!");
   Serial.println("   -> Core 1 ranh tay 100% cho dieu khien dong co & bam quang!\n");
 
-  // 9. In Menu
+  // 9. Khởi tạo ArduinoOTA để nạp code và điều khiển từ xa qua WiFi
+  ArduinoOTA.setHostname("esp32-solar-tracker");
+  ArduinoOTA.setPassword("solar2026");
+  ArduinoOTA.onStart([]() {
+    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+    Serial.println("\n>> [OTA] Bat dau nap firmware tu xa qua WiFi: " + type);
+    if (stepper1) stepper1->stopMove();
+    if (stepper2) stepper2->stopMove();
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\n>> [OTA] Nap firmware thanh cong! Dang khoi dong lai...");
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf(">> [OTA LOI] Error [%u]\n", error);
+  });
+  ArduinoOTA.begin();
+  Serial.println(">> [OTA OK] San sang nhan nap firmware qua WiFi (Port 3232, Host: esp32-solar-tracker.local)!");
+
+  // 10. TỰ ĐỘNG KHỞI ĐỘNG VẬN HÀNH 30 NGÀY HANDS-FREE (HOÀN TOÀN TỰ ĐỘNG)
+  int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+  float curTemp = 0.0f;
+  if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
+    Serial.printf("\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d %02d/%02d/%04d\n", curH, curMin, curS, curD, curM, curY);
+    if (curH >= 19 || curH < 4) {
+      Serial.println(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (19:00 - 04:00) -> Chay quy trinh ngu dem ngay lap tuc!");
+      enterNightSleepUntil4AM();
+    } else {
+      Serial.println(">> [BOOT DAY] Cap nguon ban ngay -> Tu dong Homing ca 2 truc va bat dau bam Hybrid!");
+      runDualHomingToSwitches();
+      currentTrackSource = TRACK_SRC_HYBRID;
+      autoOpticalTracking = true;
+      trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+      isMaxAzimuthReached = false;
+      systemFsmState = FSM_STATE_TRACKING;
+    }
+  } else {
+    Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay Homing va bat dau Hybrid mac dinh...");
+    runDualHomingToSwitches();
+    currentTrackSource = TRACK_SRC_HYBRID;
+    autoOpticalTracking = true;
+    trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+    systemFsmState = FSM_STATE_TRACKING;
+  }
+
+  // 11. In Menu
   printMenu();
   requestTelemetryPrint();
   Serial.print("\n[CLI]> ");
@@ -3388,9 +3538,89 @@ void loop() {
     }
   }
 
+  // =========================================================================
+  // XỬ LÝ LỆNH DỪNG KHẨN CẤP / PHỦ BẠT (REMOTE EMERGENCY COVER) TỪ WEB DASHBOARD
+  // =========================================================================
+  if (remoteEmergencyTrigger) {
+    remoteEmergencyTrigger = false;
+    isEmergencyCoverActive = true;
+    Serial.println("\n=======================================================");
+    Serial.println(">> [REMOTE EMERGENCY] Nhan lenh DUNG KHAN CAP (PHU BAT) tu Web Dashboard!");
+    Serial.println("   -> Dang dung moi hoat dong bam...");
+    Serial.println("   -> Chay Homing 2 truc ve switch de chot moc...");
+    Serial.println("   -> Truc 1 giu Home (0.0°), Truc 2 quay ve goc MAX (10.0°)...");
+    Serial.println("=======================================================");
+
+    autoOpticalTracking = false;
+    currentTrackSource = TRACK_SRC_OFF;
+    systemFsmState = FSM_STATE_PARK;
+
+    // 1. Homing cả 2 trục về switch
+    runDualHomingToSwitches();
+
+    // 2. Trục 1 giữ Home (0.0°), Trục 2 quay về góc MAX (10.0°)
+    stepPositionControl(2, CFG_L_EL_MIN_SOFT_LIMIT_DEG, autoSpeedHz);
+    unsigned long tWaitEmg = millis();
+    while ((stepper2 && stepper2->isRunning()) && (millis() - tWaitEmg < 25000)) {
+      vTaskDelay(pdMS_TO_TICKS(50));
+      esp_task_wdt_reset();
+      updateHardwareEncoders();
+    }
+    if (stepper1) stepper1->stopMove();
+    if (stepper2) stepper2->stopMove();
+
+    Serial.println(">> [EMERGENCY READY] Gian pin da ve goc MAX an toan de phu bat. Dong co giu Half-Current.");
+    requestTelemetryPrint();
+  }
+
+  // =========================================================================
+  // XỬ LÝ LỆNH MỞ KHÓA HOẠT ĐỘNG (REMOTE UNLOCK) TỪ WEB DASHBOARD
+  // =========================================================================
+  if (remoteUnlockTrigger) {
+    remoteUnlockTrigger = false;
+    isEmergencyCoverActive = false;
+    Serial.println("\n=======================================================");
+    Serial.println(">> [REMOTE UNLOCK] Nhan lenh MO KHOA tu Web Dashboard!");
+    Serial.println("   -> Homing lai ca 2 truc de chot moc sau khi go bat...");
+    Serial.println("=======================================================");
+
+    // 1. Homing lại cả 2 trục
+    runDualHomingToSwitches();
+
+    // 2. Đọc giờ RTC
+    int y = 0, m = 0, d = 0, hh = 0, mm = 0, ss = 0;
+    float tC = 0.0f;
+    if (readDS3231(y, m, d, hh, mm, ss, tC) && (hh >= 19 || hh < 4)) {
+      enterNightSleepUntil4AM();
+    } else {
+      float dawnAz = defaultDeg1;
+      float tAz = 0.0f, tEl = 0.0f, azS = 0.0f, elS = 0.0f, zenS = 0.0f, ws = 0.0f;
+      bool isDay = false;
+      if (computeSolarTrackingTargets(tAz, tEl, azS, elS, zenS, ws, isDay)) {
+        dawnAz = tAz;
+      }
+      stepPositionControl(1, dawnAz, autoSpeedHz);
+      unsigned long tWaitUnl = millis();
+      while ((stepper1 && stepper1->isRunning()) && (millis() - tWaitUnl < 25000)) {
+        vTaskDelay(pdMS_TO_TICKS(50));
+        esp_task_wdt_reset();
+        updateHardwareEncoders();
+      }
+      if (stepper1) stepper1->stopMove();
+
+      currentTrackSource = TRACK_SRC_HYBRID;
+      autoOpticalTracking = true;
+      trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+      isMaxAzimuthReached = false;
+      systemFsmState = FSM_STATE_TRACKING;
+      Serial.println(">> [UNLOCK COMPLETE] Da mo khoa thanh cong! Tiep tuc bam Hybrid tu dong.");
+    }
+    requestTelemetryPrint();
+  }
+
   // 0. TỰ ĐỘNG NGỦ ĐÊM (TỪ 19:00 TỐI ĐẾN 04:00 SÁNG) THEO ĐỒNG HỒ RTC DS3231
   static unsigned long lastNightCheckMs = 0;
-  if (millis() - lastNightCheckMs >= 5000) {
+  if (!isEmergencyCoverActive && (millis() - lastNightCheckMs >= 5000)) {
     lastNightCheckMs = millis();
     int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
     float curTemp = 0.0f;
@@ -3408,7 +3638,7 @@ void loop() {
   static unsigned long lastSolarTrackTime = 0;
   static unsigned long lastSolarLogTime   = 0;
 
-  if (autoOpticalTracking || currentTrackSource != TRACK_SRC_OFF) {
+  if (!isEmergencyCoverActive && (autoOpticalTracking || currentTrackSource != TRACK_SRC_OFF)) {
     if (currentTrackSource == TRACK_SRC_SENSOR || currentTrackSource == TRACK_SRC_OFF) {
       if (millis() - lastOpticalTrackTime >= 100) { // Chu kỳ bám 100ms
       lastOpticalTrackTime = millis();

@@ -598,7 +598,9 @@ export class FirebaseSolarService {
         wakeAt,
         isSleeping,
         activeAlgorithm: tracking.activeAlgorithm || (hasAlgoData ? 'PSO_FUZZY_PID' : 'CHƯA CÓ DỮ LIỆU'),
-        estop: Boolean(tracking.estop),
+        estop: Boolean(tracking.estop || tracking.emergencyActive),
+        emergencyActive: Boolean(tracking.emergencyActive),
+        isEmergencyCover: Boolean(tracking.emergencyActive),
         nightMode: Boolean(tracking.nightMode || isSleeping),
         rainWindSafeMode: Boolean(tracking.safeMode),
         pingMs: isSystemOnline ? 15 : null,
@@ -791,6 +793,14 @@ export class FirebaseSolarService {
 
   async setEstop(enabled) {
     return this.sendCommand({ cmd: 'estop', state: enabled });
+  }
+
+  async setEmergencyCover(enabled) {
+    return this.sendCommand({
+      cmd: 'emergency_cover',
+      emergency: Boolean(enabled),
+      state: Boolean(enabled)
+    });
   }
 
   listenSiteConfig(callback) {
