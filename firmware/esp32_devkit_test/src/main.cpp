@@ -47,8 +47,11 @@ void requestTelemetryPrint() {
   telemetryDirty = true;
 }
 
-// Khai báo trước hàm điều khiển vị trí góc
+// Khai báo trước hàm điều khiển vị trí góc & Homing cả 2 trục
 bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz = 0);
+bool runDualHomingToSwitches();
+void runDualAutoHoming();
+bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun, float &elSun, float &zenithSun, float &ws, bool &isDaylight);
 
 // Firebase Objects
 FirebaseData   fbdo;
@@ -860,30 +863,40 @@ void enterNightLightSleep(uint32_t sleepMinutes = 2) {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
-// Quy trình ngủ đêm chính thức: Đưa giàn pin về tư thế Park an toàn, hẹn giờ thức dậy lúc 04:00 AM bằng DS3231 Alarm 1
+// Quy trình ngủ đêm chính thức: Homing 2 trục -> Trục 1 giữ Home, Trục 2 về Góc Max -> Ngủ tới 04:00 AM -> Homing lại -> Đón bình minh
 void enterNightSleepUntil4AM() {
   Serial.println("\n=======================================================");
-  Serial.println(">> [NIGHT SLEEP] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
+  Serial.println(">> [NIGHT SLEEP 19:00] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
+  Serial.println("   1. Auto Homing 2 truc ve switch (chot goc 0.0°)");
+  Serial.println("   2. Truc 1 giu nguyen Home, Truc 2 quay ve goc MAX (tua co cau dong co an toan)");
+  Serial.println("   3. Driver DM556 tu ngat xung -> Chuyen Half-Current giu buoc 50%");
+  Serial.println("   4. ESP32-S3 Light Sleep tiet kiem dien");
+  Serial.println("   5. 04:00 sang: Thuc day -> Homing 2 truc -> Truc 2 cham switch Home 2 -> Truc 1 quay don binh minh");
   Serial.println("=======================================================");
 
   systemFsmState = FSM_STATE_PREP_SLEEP;
 
-  // 1. Đưa giàn pin về tư thế đỗ an toàn (Park position: Az=0.0°, El=90.0°)
-  Serial.println("   [1/5] Dang dua gian pin ve the Park an toan (Az: 0.0°, El: 90.0°)...");
-  stepPositionControl(2, 90.0f, 1500);
-  stepPositionControl(1, 0.0f, 1500);
+  // 1. Tự động về Home cả 2 trục để chốt mốc tuyệt đối 0.0°
+  Serial.println("   [1/6] Dang chay Homing ca 2 truc ve switch...");
+  runDualHomingToSwitches();
 
-  // Chờ động cơ chạy về vị trí Park và dừng hẳn (tối đa 20 giây)
+  // 2. Trục 1 giữ nguyên Home (0.0°). Trục 2 quay về góc MAX (CFG_L_EL_MIN_SOFT_LIMIT_DEG) để tựa cơ cấu an toàn khi ngủ
+  Serial.printf("   [2/6] Truc 1 giu moc Home (0.0°). Truc 2 quay ve goc MAX (%.1f°)...\n", CFG_L_EL_MIN_SOFT_LIMIT_DEG);
+  stepPositionControl(2, CFG_L_EL_MIN_SOFT_LIMIT_DEG, autoSpeedHz);
+
+  // Chờ Trục 2 chạy đến góc MAX và dừng hẳn (tối đa 25 giây)
   unsigned long startWait = millis();
-  while (((stepper1 && stepper1->isRunning()) || (stepper2 && stepper2->isRunning())) && (millis() - startWait < 20000)) {
+  while ((stepper2 && stepper2->isRunning()) && (millis() - startWait < 25000)) {
     vTaskDelay(pdMS_TO_TICKS(50));
     esp_task_wdt_reset();
+    updateHardwareEncoders();
   }
   if (stepper1) stepper1->stopMove();
   if (stepper2) stepper2->stopMove();
-  Serial.println("   -> Gian pin da ve the Park an toan thanh cong!");
+  Serial.printf("   -> Gian pin da chot vi tri ngu an toan: Truc 1 = %+.2f°, Truc 2 = %+.2f°!\n",
+                getAngleDeg1(), getElevationEpsilon());
 
-  // 2. Lấy giờ hiện tại từ RTC và hẹn báo thức Alarm 1 lúc 04:00:00 sáng
+  // 3. Lấy giờ hiện tại từ RTC và hẹn báo thức Alarm 1 lúc 04:00:00 sáng
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
   uint32_t totalSleepSec = 9 * 3600; // Mặc định 9 tiếng nếu không đọc được RTC
@@ -894,43 +907,44 @@ void enterNightSleepUntil4AM() {
       totalSleepSec = (4 - curH) * 3600 - curMin * 60 - curS;
     }
     setDS3231Alarm1(4, 0, 0); // Đặt báo thức chính xác lúc 04:00:00 AM
-    Serial.printf("   [2/5] Hen gio RTC DS3231 Alarm 1 luc 04:00:00 sang (Hien tai: %02d:%02d:%02d, Ngu trong: %u phut)\n",
+    Serial.printf("   [3/6] Hen gio RTC DS3231 Alarm 1 luc 04:00:00 sang (Hien tai: %02d:%02d:%02d, Ngu trong: %u phut)\n",
                   curH, curMin, curS, (unsigned int)(totalSleepSec / 60));
   } else {
-    Serial.println("   [2/5] [CANH BAO] Khong doc duoc RTC! Su dung Timer du phong 9 tieng.");
+    Serial.println("   [3/6] [CANH BAO] Khong doc duoc RTC! Su dung Timer du phong 9 tieng.");
   }
 
-  // 3. Đẩy thông báo trạng thái ngủ đêm lên Firebase
+  // 4. Đẩy thông báo trạng thái ngủ đêm lên Firebase
   if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
     FirebaseJson sleepJson;
     sleepJson.set("state", "DEEP_SLEEP");
     sleepJson.set("status", "SLEEPING");
     sleepJson.set("wake_at", "04:00");
     sleepJson.set("isSleeping", true);
+    sleepJson.set("displayState", "Ngu dem an toan (Truc 2 tai goc Max)");
     sleepJson.set("source", "device");
     Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &sleepJson);
-    Serial.println("   [3/5] Da cap nhat trang thai DEEP_SLEEP (wake_at: 04:00) len Firebase.");
+    Serial.println("   [4/6] Da cap nhat trang thai DEEP_SLEEP (wake_at: 04:00) len Firebase.");
   }
 
-  // 4. Tắt WiFi để giảm thiểu dòng điện
-  Serial.println("   [4/5] Ngat ket noi WiFi de tiet kiem nang luong ban dem...");
+  // 5. Tắt WiFi để giảm thiểu dòng điện
+  Serial.println("   [5/6] Ngat ket noi WiFi de tiet kiem nang luong ban dem (Driver DM556 giu Half-Current 50%)...");
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   delay(100);
 
-  // 5. Cấu hình ngắt ngoài GPIO 47 và khởi động Light Sleep
+  // 6. Cấu hình ngắt ngoài GPIO 47 và khởi động Light Sleep
   gpio_wakeup_enable((gpio_num_t)DS3231_SQW_PIN, GPIO_INTR_LOW_LEVEL);
   esp_sleep_enable_gpio_wakeup();
 
   // Timer dự phòng bảo vệ an toàn (thêm 2 phút trừ hao)
   esp_sleep_enable_timer_wakeup((uint64_t)(totalSleepSec + 120) * 1000000ULL);
 
-  Serial.println("   [5/5] ESP32-S3 bat dau Light Sleep. Hen gap lai luc 04:00 sang!\n");
+  Serial.println("   [6/6] ESP32-S3 bat dau Light Sleep. Hen gap lai luc 04:00 sang!\n");
   Serial.flush();
 
   systemFsmState = FSM_STATE_LIGHT_SLEEP;
 
-  // 6. BẮT ĐẦU LIGHT SLEEP (RAM VÀ TRẠNG THÁI CPU NGUYÊN VẸN 100%)
+  // 7. BẮT ĐẦU LIGHT SLEEP (RAM VÀ TRẠNG THÁI CPU NGUYÊN VẸN 100%)
   esp_light_sleep_start();
 
   // ================== THỨC DẬY TẠI ĐÂY LÚC 04:00 SÁNG ==================
@@ -945,7 +959,7 @@ void enterNightSleepUntil4AM() {
     Serial.printf(">> [WAKEUP CAUSE] Nguyen nhan khac: %d\n", (int)cause);
   }
 
-  // 7. Xóa cờ báo thức A1F trên DS3231
+  // 8. Xóa cờ báo thức A1F trên DS3231
   clearDS3231Alarm1Flag();
   Serial.println(">> [RTC] Da xoa co bao thuc A1F tren DS3231. Chan SQW da tro ve muc HIGH.");
 
@@ -953,13 +967,44 @@ void enterNightSleepUntil4AM() {
     Serial.printf(">> [RTC GIO THUC] Thoi gian khi thuc day: %02d:%02d:%02d %02d/%02d/%04d\n",
                   curH, curMin, curS, curD, curM, curY);
   }
-  Serial.println(">> =======================================================\n");
 
-  // 8. Bật lại WiFi và tiếp tục hoạt động ngày mới
+  // 9. Bật lại WiFi
+  Serial.println(">> [WIFI] Bat lai WiFi ket noi he thong...");
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // 9. Đặt lại các biến trạng thái ngày mới
+  // 10. Homing lại cả 2 trục: Trục 2 quay từ góc Max về Home 2 (Epsilon=90° chạm switch), Trục 1 về Home 1 (0°)
+  Serial.println(">> [DAWN HOMING] Tu dong Homing lai ca 2 truc sau khi thuc day...");
+  runDualHomingToSwitches();
+
+  // Trục 2 giữ nguyên ở Home 2 (Epsilon = 90.0°, chạm công tắc hành trình 2 đón bình minh)
+  Serial.println(">> [TRUC 2 DAWN] Truc 2 giu nguyen tai Home 2 (Epsilon=90.0° - cham CTHT 2 cho mat troi moc).");
+
+  // Trục 1: Tính toán góc phương vị mặt trời mọc hôm nay theo NOAA và quay đón sẵn
+  float dawnAzTarget = defaultDeg1; // Mặc định hướng đón
+  float tAz = 0.0f, tEl = 0.0f, azS = 0.0f, elS = 0.0f, zenS = 0.0f, ws = 0.0f;
+  bool isDay = false;
+  if (computeSolarTrackingTargets(tAz, tEl, azS, elS, zenS, ws, isDay)) {
+    dawnAzTarget = tAz;
+    Serial.printf(">> [TRUC 1 DAWN] Tinh toan thien van NOAA: Muc tieu don binh minh Az = %+.2f° (Sun Az=%+.1f°, El=%+.1f°)\n",
+                  dawnAzTarget, azS, elS);
+  } else {
+    Serial.printf(">> [TRUC 1 DAWN] Su dung goc mac dinh don binh minh Az = %+.2f°\n", dawnAzTarget);
+  }
+
+  stepPositionControl(1, dawnAzTarget, autoSpeedHz);
+  unsigned long tWaitDawn = millis();
+  while ((stepper1 && stepper1->isRunning()) && (millis() - tWaitDawn < 25000)) {
+    vTaskDelay(pdMS_TO_TICKS(50));
+    esp_task_wdt_reset();
+    updateHardwareEncoders();
+  }
+  if (stepper1) stepper1->stopMove();
+
+  Serial.println(">> [DAWN READY] Gian pin da vao vi tri don binh minh san sang cho ngay moi!");
+  Serial.println(">> =======================================================\n");
+
+  // 11. Đặt lại các biến trạng thái ngày mới
   isMaxAzimuthReached = false;
   trackCyclePhase = TRACK_CYCLE_ADJUSTING;
   systemFsmState = FSM_STATE_IDLE;
@@ -2083,10 +2128,10 @@ void runSingleAutoHoming(int axis) {
 }
 
 // -------------------------------------------------------------------------
-// 10. DUAL AUTO HOMING: CẢ 2 TRỤC VỀ HOME RỒI VỀ MẶC ĐỊNH [H] (2 TỐC ĐỘ ĐỒNG THỜI + LÙI ĐỘNG A9)
+// 10. DUAL HOMING VỀ SWITCH: CẢ 2 TRỤC TÌM GỐC 2 TỐC ĐỘ (NHANH -> LÙI -> RÀ CHẬM -> RESET 0)
 // -------------------------------------------------------------------------
-void runDualAutoHoming() {
-  if (!stepper1 || !stepper2) return;
+bool runDualHomingToSwitches() {
+  if (!stepper1 || !stepper2) return false;
 
   Serial.println("\n=======================================================");
   Serial.println(">> [KICH HOAT DUAL AUTO HOMING CUNG LUC CHO CA 2 TRUC (H)]");
@@ -2164,7 +2209,7 @@ void runDualAutoHoming() {
 
   // VÒNG LẶP HOMING 2 TỐC ĐỘ ĐỒNG THỜI CHO CẢ 2 TRỤC
   while (stage1 != STAGE_DONE || stage2 != STAGE_DONE) {
-    if (checkCancel()) return;
+    if (checkCancel()) return false;
 
     if (millis() - p1Start > 45000) {
       stepper1->stopMove();
@@ -2172,7 +2217,7 @@ void runDualAutoHoming() {
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
       Serial.println("\n>> [CANH BAO AN TOAN] Timeout 45s Dual Homing! Da dung.");
       requestTelemetryPrint();
-      return;
+      return false;
     }
 
     // Xử lý trục 1
@@ -2200,7 +2245,7 @@ void runDualAutoHoming() {
           stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
           Serial.println("\n>> [LOI AN TOAN M1] Switch 1 bi ket dinh (Stuck LOW)! Da dung.");
           requestTelemetryPrint();
-          return;
+          return false;
         }
         break;
 
@@ -2259,7 +2304,7 @@ void runDualAutoHoming() {
           stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
           Serial.println("\n>> [LOI AN TOAN M2] Switch 2 bi ket dinh (Stuck LOW)! Da dung.");
           requestTelemetryPrint();
-          return;
+          return false;
         }
         break;
 
@@ -2296,9 +2341,39 @@ void runDualAutoHoming() {
     delay(1);
   }
 
+  stateM1 = STATE_IDLE;
+  stateM2 = STATE_IDLE;
+  systemHomed = true;
   Serial.println("\n>> [PHA 1 HOAN TAT 100%] Ca 2 truc da chot diem Home 0.0° voi do chinh xac tuyet doi!");
+  requestTelemetryPrint();
+  return true;
+}
+
+// -------------------------------------------------------------------------
+// 10B. DUAL AUTO HOMING & SEEK DEFAULT (PHÍM H): TÌM GỐC 2 TỐC ĐỘ + VỀ DEFAULT
+// -------------------------------------------------------------------------
+void runDualAutoHoming() {
+  if (!runDualHomingToSwitches()) return;
+
   Serial.println(">> Nghi 0.25s triet tieu quan tinh truoc khi sang Pha 2...");
   delay(250);
+
+  auto checkCancel = [&]() -> bool {
+    esp_task_wdt_reset();
+    updateHardwareEncoders();
+    if (Serial.available() > 0) {
+      char c = Serial.read();
+      if (c == ' ' || c == 'x' || c == 'X') {
+        stepper1->stopMove();
+        stepper2->stopMove();
+        stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
+        Serial.println("\n>> [STOP] Da dung khan cap Seek Default!");
+        requestTelemetryPrint();
+        return true;
+      }
+    }
+    return false;
+  };
 
   // PHA 2: CHẠY ĐỒNG THỜI VỀ VỊ TRÍ MẶC ĐỊNH M1 VÀ M2
   Serial.println(">> Pha 2: Ca 2 truc dang DONG THOI quay ve vi tri mac dinh (FastAccelStepper)...");
