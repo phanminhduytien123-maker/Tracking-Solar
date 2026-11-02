@@ -12,36 +12,46 @@ from solar_ephemeris import wrap360
 def is_zenith_singularity(el_sun: float) -> bool:
     return el_sun >= 88.0
 
-def compute_axis_targets(sun_pos: SolarPosition) -> Tuple[bool, AxisTarget, AxisTarget]:
+import math
+
+def compute_axis_targets(sun_pos: SolarPosition, base_az_deg: float = 90.0) -> Tuple[bool, AxisTarget, AxisTarget]:
     target_az = AxisTarget()
     target_el = AxisTarget()
 
-    # 1. Tính toán góc Feedforward thô
-    phi_raw = wrap360(sun_pos.azimuth_deg - cfg.CFG_G_AZ_HOME_SW_DEG - cfg.CFG_H_AZ_OFFSET_DEG)
+    # 1. Động học hệ cơ cấu giàn pin:
+    # Trục 1: Trục bù góc mùa Bắc - Nam quanh hướng Đông mặc định (base_az_deg)
+    el_rad = math.radians(sun_pos.elevation_deg)
+    az_rad = math.radians(sun_pos.azimuth_deg)
+    sy = max(-1.0, min(1.0, math.cos(el_rad) * math.cos(az_rad)))
+    delta_phi = math.degrees(math.asin(sy))
+
+    phi_raw = base_az_deg - delta_phi
     target_az.feedforward_deg = round(phi_raw, 4)
 
+    # Trục 2: Trục nhật động Đông - Tây theo góc nâng mặt trời
     eps_raw = sun_pos.elevation_deg
     target_el.feedforward_deg = round(eps_raw, 4)
 
-    # 2. Kẹp góc mềm trục Azimuth: phi trong [CFG_AZ_MIN_SOFT_LIMIT_DEG, CFG_I_AZ_MAX_SOFT_LIMIT_DEG]
+    # 2. Kẹp góc mềm trục Azimuth (Trục 1): [base_az - 45°, base_az + 45°]
+    min_az_allowed = max(0.0, base_az_deg - 45.0)
+    max_az_allowed = min(cfg.CFG_I_AZ_MAX_SOFT_LIMIT_DEG, base_az_deg + 45.0)
     phi_clamped = phi_raw
-    if phi_raw < cfg.CFG_AZ_MIN_SOFT_LIMIT_DEG:
-        phi_clamped = cfg.CFG_AZ_MIN_SOFT_LIMIT_DEG
+    if phi_raw < min_az_allowed:
+        phi_clamped = min_az_allowed
         target_az.is_clamped = True
-        target_az.clamp_reason = "CABLE_LIMIT_MIN"
-    elif phi_raw > cfg.CFG_I_AZ_MAX_SOFT_LIMIT_DEG:
-        phi_clamped = cfg.CFG_I_AZ_MAX_SOFT_LIMIT_DEG
+        target_az.clamp_reason = "SEASONAL_MIN_45"
+    elif phi_raw > max_az_allowed:
+        phi_clamped = max_az_allowed
         target_az.is_clamped = True
-        target_az.clamp_reason = "CABLE_LIMIT_MAX"
+        target_az.clamp_reason = "SEASONAL_MAX_45"
     target_az.final_ref_deg = round(phi_clamped, 4)
 
-    # 3. Kẹp góc mềm trục Elevation: epsilon trong [CFG_L_EL_MIN_SOFT_LIMIT_DEG, CFG_J_EL_HOME_SW_DEG]
-    # BẢO VỆ CHỐNG VA CHẠM TRỤC Z
+    # 3. Kẹp góc mềm trục Elevation (Trục 2): [CFG_L_EL_MIN_SOFT_LIMIT_DEG (10.0°), CFG_J_EL_HOME_SW_DEG (90.0°)]
     eps_clamped = eps_raw
     if eps_raw < cfg.CFG_L_EL_MIN_SOFT_LIMIT_DEG:
         eps_clamped = cfg.CFG_L_EL_MIN_SOFT_LIMIT_DEG
         target_el.is_clamped = True
-        target_el.clamp_reason = "Z_AXIS_CLASH_PROTECT"
+        target_el.clamp_reason = "WEST_HORIZON_LIMIT_10"
     elif eps_raw > cfg.CFG_J_EL_HOME_SW_DEG:
         eps_clamped = cfg.CFG_J_EL_HOME_SW_DEG
         target_el.is_clamped = True
@@ -51,9 +61,9 @@ def compute_axis_targets(sun_pos: SolarPosition) -> Tuple[bool, AxisTarget, Axis
     is_tracking_active = (sun_pos.elevation_deg >= cfg.CFG_EL_SUN_TRACKING_THRESHOLD_DEG)
     return is_tracking_active, target_az, target_el
 
-def compute_morning_wakeup(sunrise_min: int) -> Tuple[int, int]:
-    # Báo thức sáng = max(03:00 = 180 phút, sunrise_min - 30 phút)
-    wake_min = sunrise_min - 30
+def compute_morning_wakeup(tracking_start_min: int, lead_minutes: int = cfg.CFG_WAKEUP_LEAD_TIME_MIN) -> Tuple[int, int]:
+    # Báo thức sáng = max(03:00 = 180 phút, tracking_start_min - lead_minutes)
+    wake_min = tracking_start_min - lead_minutes
     min_allowed = cfg.CFG_NIGHT_SLEEP_END_HOUR * 60 + cfg.CFG_NIGHT_SLEEP_END_MINUTE
     if wake_min < min_allowed:
         wake_min = min_allowed
