@@ -19,7 +19,7 @@ export default function VisualPanelsComparison({
   const az = motors?.azimuth || { currentAngle: null, phi: null };
   const el = motors?.elevation || { currentAngle: null, epsilon: null };
 
-  const phiAngle = az.phi !== undefined ? az.phi : (az.currentAngle !== null ? az.currentAngle - 180 : null);
+  const phiAngle = az.phi !== undefined && az.phi !== null ? az.phi : az.currentAngle;
   const epsAngle = el.epsilon !== undefined ? el.epsilon : (el.currentAngle !== null ? el.currentAngle : null);
 
   // Chỉ báo kết nối 2 tấm
@@ -204,7 +204,7 @@ export default function VisualPanelsComparison({
 
             {/* Kim chỉ hướng Tấm Tracker (Xanh dương / xanh sáng nét liền) */}
             {phiAngle !== null ? (() => {
-              const rad = ((180 + phiAngle) - 90) * (Math.PI / 180);
+              const rad = (phiAngle - 90) * (Math.PI / 180);
               const x2 = 70 + 44 * Math.cos(rad);
               const y2 = 70 + 44 * Math.sin(rad);
               return (

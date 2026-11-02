@@ -304,6 +304,16 @@ export default function DetailedTelemetryModal({
                       {sensors.adc_saturated ? 'Bão hòa quang học' : 'Bình thường trong thang đo'}
                     </td>
                   </tr>
+                  <tr>
+                    <td className="py-2 px-3 text-zinc-600">Nhiệt độ mạch đo (DS3231 RTC Temp)</td>
+                    <td colSpan={2} className="py-2 px-3 font-semibold text-zinc-900">
+                      {system?.rtcTemp !== null && system?.rtcTemp !== undefined
+                        ? `${Number(system.rtcTemp).toFixed(1)} °C`
+                        : (sensors?.temperature !== null && sensors?.temperature !== undefined
+                          ? `${Number(sensors.temperature).toFixed(1)} °C`
+                          : '--')}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
