@@ -16,19 +16,63 @@ extern "C" {
 #endif
 
 // =============================================================================
-// SECTION 1: HẰNG SỐ ĐỊA LÝ & THỜI GIAN (GEOGRAPHIC & TIME)
+// SECTION 1: HẰNG SỐ ĐỊA LÝ, THỜI GIAN & RTC DS3231 (GEOGRAPHIC, TIME & RTC)
 // =============================================================================
 
 /** [A] Vĩ độ nơi lắp đặt hệ thống (Độ thập phân, Dương = Bắc, Âm = Nam).
- *  Placeholder: 10.8231° N (TP. Hồ Chí Minh). Cần người dùng xác nhận tọa độ GPS thực tế. */
-#define CFG_A_LATITUDE_DEG                  (10.8231f)
+ *  Giá trị mặc định: 10.78310° N (TP. Hồ Chí Minh).
+ *  Thứ tự ưu tiên: 1. Firebase SiteConfig -> 2. NVS Flash -> 3. Giá trị mặc định này. */
+#define CFG_A_LATITUDE_DEG                  (10.78310)
 
 /** [B] Kinh độ nơi lắp đặt hệ thống (Độ thập phân, Dương = Đông, Âm = Tây).
- *  Placeholder: 106.6297° E (TP. Hồ Chí Minh). Cần người dùng xác nhận tọa độ GPS thực tế. */
-#define CFG_B_LONGITUDE_DEG                 (106.6297f)
+ *  Giá trị mặc định: 106.67210° E (TP. Hồ Chí Minh).
+ *  Thứ tự ưu tiên: 1. Firebase SiteConfig -> 2. NVS Flash -> 3. Giá trị mặc định này. */
+#define CFG_B_LONGITUDE_DEG                 (106.67210)
 
-/** Múi giờ UTC cố định (Giờ). Việt Nam = UTC+7. */
+/** Múi giờ địa phương cố định UTC+7 (Việt Nam không có giờ mùa hè DST).
+ *  Quy ước bất biến: RTC DS3231 LƯU THEO MỘT QUY ƯỚC DUY NHẤT LÀ GIỜ ĐỊA PHƯƠNG UTC+7. */
+#define CFG_TZ_OFFSET_MIN                   (420)
 #define CFG_TIMEZONE_OFFSET_HOURS           (7.0f)
+
+/** Cấu hình nguồn pin dự phòng RTC DS3231:
+ *  - RTC_BACKUP_BATTERY = true: Module DS3231 có lắp pin cúc áo CR2032 (3V).
+ *  - CẢNH BÁO PHẦN CỨNG BẮT BUỘC: VCC cấp 3.3V trực tiếp từ hệ thống, KHÔNG dùng 5V cho I2C.
+ *  - Module ZS-042 thương mại có mạch sạc diode + trở từ VCC vào pin: BẮT BUỘC tháo diode/trở
+ *    hoặc ngắt mạch sạc khi dùng pin CR2032 không sạc để chống phù/cháy pin.
+ *  - Phải kiểm tra cờ OSF (Oscillator Stop Flag) sau mỗi lần khởi động. */
+#define CFG_RTC_BACKUP_BATTERY              (true)
+
+/** Cờ khóa cấu hình thí nghiệm (EXPERIMENT_LOCK):
+ *  - true: Đang trong đợt đo 30 ngày chính thức. Mọi lệnh đổi tọa độ từ Firebase bị TỪ CHỐI,
+ *          ghi log cờ SITE_CHANGE_REJECTED.
+ *  - false: Cho phép cập nhật SiteConfig mới từ Firebase ở các trạng thái an toàn (BOOT, PARK, DAWN_POLL). */
+#define CFG_EXPERIMENT_LOCK                 (false)
+
+/** Nguồn tạo góc mục tiêu (TRACK_SOURCE):
+ *  - 0 (EPHEMERIS_ONLY): theta_ref = theta_ff thuần thiên văn NOAA.
+ *  - 1 (SENSOR_ONLY): Hoàn toàn dùng cảm biến quang TEMT6000 (cho thí nghiệm đối chứng).
+ *  - 2 (HYBRID): theta_ref = theta_ff + sat(w_s * Z * e_s, +/- Z2). (MẶC ĐỊNH ĐỢT ĐO 30 NGÀY). */
+#define CFG_TRACK_SOURCE_EPHEMERIS_ONLY     (0)
+#define CFG_TRACK_SOURCE_SENSOR_ONLY        (1)
+#define CFG_TRACK_SOURCE_HYBRID             (2)
+#define CFG_TRACK_SOURCE_DEFAULT            (CFG_TRACK_SOURCE_HYBRID)
+
+/** Tự động cập nhật bù lệch lắp đặt H (AUTO_UPDATE_H):
+ *  - Mặc định BẮT BUỘC TẮT (false) suốt đợt đo 30 ngày để đảm bảo tính nhất quán điều kiện thí nghiệm.
+ *  - Hệ thống chỉ tính trung bình trượt e_s lúc trời quang và cảnh báo cờ CALIB_DRIFT. */
+#define CFG_AUTO_UPDATE_H                   (false)
+
+/** Bù khúc xạ khí quyển (USE_REFRACTION):
+ *  - true (mặc định): Bù khúc xạ khí quyển cho el_sun nhỏ lúc sáng sớm / chiều tà.
+ *  - Luôn ghi đồng thời cả el_sun chưa bù và đã bù vào struct telemetry. */
+#define CFG_USE_REFRACTION                  (true)
+
+/** QUY ƯỚC TÊN HIỂN THỊ CHUẨN HAI TRỤC ĐỘNG CƠ:
+ *  - Động cơ 1 (Azimuth / phi): "Góc quay" (Góc phương vị tính từ mốc HOME công tắc hành trình).
+ *  - Động cơ 2 (Elevation / epsilon): "Độ ngửa" (Góc nâng giàn pin tính từ mặt đất 0° -> đỉnh 90°). */
+#define CFG_LABEL_MOTOR_1                   "Góc quay"
+#define CFG_LABEL_MOTOR_2                   "Độ ngửa"
+
 
 
 // =============================================================================
@@ -96,22 +140,37 @@ extern "C" {
 #define CFG_K_EL_STOW_DEG                   (90.0f)
 
 /** [L] epsilon_min_soft: Giới hạn mềm đầu HẠ THẤP NHẤT của trục Elevation (Độ).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO CƠ KHÍ THỰC TẾ].
+ *  DÙNG CHUNG DUY NHẤT CHO CẢ BA BỘ ĐIỀU KHIỂN: PID / FUZZY-PID / PSO (KHÔNG HARD-CODE Ở FILE KHÁC).
  *  RẤT QUAN TRỌNG: Tấm KHÔNG THỂ dựng đứng vuông góc mặt đất (epsilon = 0°) vì sẽ VA CHẠM VÀO TRỤC Z (Phần khung)!
- *  Cần đo cơ khí góc cấn khung thực tế và đặt L lớn hơn góc cấn đó ít nhất 3° - 5° để an toàn tuyệt đối.
- *  Placeholder: 25.0° (cần đo góc cấn thực tế của tấm với trục Z). */
-#define CFG_L_EL_MIN_SOFT_LIMIT_DEG         (25.0f)
+ *  Cần đo cơ khí góc cấn khung thực tế trên giàn thật và đặt L lớn hơn góc cấn đó ít nhất 3° - 5° để an toàn.
+ *  Giá trị tạm tính hiện tại: 25.0° */
+#define CFG_L_EL_MIN_SOFT_LIMIT_DEG         (10.0f)
 
 /** Góc ngửa tối đa cho phép của trục Elevation tính từ mốc HOME (Độ).
  *  Dùng để kiểm soát hành trình an toàn của tấm qua bộ đếm xung Encoder. */
 #define CFG_EL_MAX_STROKE_FROM_HOME_DEG     (70.0f)
 
 /** Ngưỡng góc nâng mặt trời tối thiểu để bắt đầu bám (Độ).
- *  Dưới góc này, bức xạ yếu, năng lượng thu được không bù nổi năng lượng quay động cơ. */
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO CƠ KHÍ THỰC TẾ].
+ *  DÙNG CHUNG DUY NHẤT CHO CẢ BA BỘ ĐIỀU KHIỂN: PID / FUZZY-PID / PSO (KHÔNG HARD-CODE Ở FILE KHÁC).
+ *  Dưới góc này, bức xạ yếu (AM > 5.76), năng lượng thu được không bù nổi năng lượng quay động cơ.
+ *  Giá trị tạm tính hiện tại: 10.0° */
 #define CFG_EL_SUN_TRACKING_THRESHOLD_DEG   (10.0f)
 
-/** Thông số lắp đặt tấm cố định đối chứng (Static Panel) dùng trong báo cáo và mô phỏng pvlib */
-#define CFG_STATIC_PANEL_AZIMUTH_DEG        (180.0f) ///< Hướng chính Nam (South 180°)
-#define CFG_STATIC_PANEL_TILT_DEG           (15.0f)  ///< Góc nghiêng cố định 15° so với mặt phẳng ngang
+/** Thời gian đánh thức DS3231 trước khi mặt trời đạt ngưỡng bám (Phút).
+ *  Hệ thống thức dậy trước khi bám để kiểm tra kết nối, cảm biến và căn chỉnh tấm về hướng đón nắng sáng. */
+#define CFG_WAKEUP_LEAD_TIME_MIN            (20)
+
+/** Thông số lắp đặt tấm cố định đối chứng (Static Panel) lưu bằng 2 field riêng biệt:
+ *  - fixed_az_deg = 180° (Hướng chính Nam).
+ *  - fixed_tilt_beta_deg = 15° (Góc nghiêng beta so với mặt đất).
+ *  Góc ngửa epsilon = 90° - beta = 75° được TÍNH RA khi hiển thị/tính toán, KHÔNG lưu thành field thứ 3. */
+#define CFG_FIXED_AZ_DEG                    (180.0f)
+#define CFG_FIXED_TILT_BETA_DEG             (15.0f)
+#define CFG_STATIC_PANEL_AZIMUTH_DEG        (CFG_FIXED_AZ_DEG)
+#define CFG_STATIC_PANEL_TILT_DEG           (CFG_FIXED_TILT_BETA_DEG)
+#define CFG_FIXED_EPSILON_DEG(beta)         (90.0f - (beta))
 
 
 // =============================================================================
@@ -172,23 +231,32 @@ extern "C" {
 #define CFG_V_GAIN_LDR_RIGHT                (1.00f)
 
 /** [W] Ngưỡng bão hòa của ADC (ESP32-S3 12-bit ADC: 0..4095).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ].
  *  Nếu giá trị raw vượt quá ngưỡng này, coi như cảm biến bị bão hòa. */
 #define CFG_W_ADC_SATURATION_THRESHOLD      (3950)
 
-/** [X] T_dark: Ngưỡng tổng cường độ sáng tối (Lux hoặc ADC sum), xác định trời đã tối / mây mù nặng. */
+/** [X] T_dark: Ngưỡng tổng cường độ sáng tối (ADC sum), xác định trời đã tối / mây mù nặng.
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]. */
 #define CFG_X_T_DARK_THRESHOLD              (400.0f)
 
-/** [Y] T_bright: Ngưỡng tổng cường độ sáng đủ để kích hoạt bám chủ động (Hysteresis: Y > X). */
+/** [Y] T_bright: Ngưỡng tổng cường độ sáng đủ để kích hoạt bám chủ động (Hysteresis: Y > X).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]. */
 #define CFG_Y_T_BRIGHT_THRESHOLD            (900.0f)
 
-/** [Z] k_s: Hệ số chuyển đổi từ tỷ số quang sai lệch normalized e_s = (L-R)/(L+R) sang góc lệch (Độ).
+/** [Z] k_s: Hệ số chuyển đổi từ tỷ số quang sai lệch normalized e_s sang góc lệch (Độ).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ].
  *  Delta_theta_optical = k_s * e_s. Cần hiệu chuẩn thực nghiệm trên bench quang. */
 #define CFG_Z_OPTICAL_CONV_FACTOR_DEG       (12.0f)
 
 /** [Z2] Delta_s_max: Biên độ hiệu chỉnh góc tối đa cho phép từ TEMT6000 (Độ).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ].
  *  Để bảo vệ chống lại hiện tượng mây lừa (albedo) hoặc vật cản che một phần.
  *  Phải lớn hơn sai số lắp đặt cơ khí của G và H. Placeholder: 6.0°. */
 #define CFG_Z2_MAX_OPTICAL_CORRECTION_DEG   (6.0f)
+
+/** Vùng chết sai số quang học normalized (|e_s| < deadband thì coi như đã cân bằng tâm sáng).
+ *  TRẠNG THÁI: [TẠM, CHỜ ĐO THỰC TẾ]. */
+#define CFG_OPTICAL_DEADBAND                (0.04f)
 
 /** Số mẫu Oversampling đọc ADC cảm biến TEMT6000. */
 #define CFG_ADC_OVERSAMPLE_COUNT            (64)

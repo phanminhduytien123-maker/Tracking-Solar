@@ -19,8 +19,25 @@ export default function VisualPanelsComparison({
   const az = motors?.azimuth || { currentAngle: null, phi: null };
   const el = motors?.elevation || { currentAngle: null, epsilon: null };
 
-  const phiAngle = az.phi !== undefined ? az.phi : (az.currentAngle !== null ? az.currentAngle - 180 : null);
+  const phiAngle = az.phi !== undefined && az.phi !== null ? az.phi : az.currentAngle;
   const epsAngle = el.epsilon !== undefined ? el.epsilon : (el.currentAngle !== null ? el.currentAngle : null);
+
+  // Tính phương vị địa lý thực tế (Compass Azimuth) của giàn pin tracker từ cơ cấu (φ, ε):
+  // - Trục 2 lật từ Đông sang Tây theo nhật động (Sáng hướng Đông, Chiều hướng Tây).
+  // - Trục 1 bù lệch xích vĩ Bắc - Nam (tháng 11 lệch Nam ~+18.4°).
+  const compassAzimuth = (() => {
+    if (phiAngle === null || phiAngle === undefined) return null;
+    const eps = epsAngle !== null && epsAngle !== undefined ? epsAngle : 45.0;
+    const hour = new Date().getHours();
+    const isAfternoon = hour >= 12;
+    const deltaPhiRad = ((phiAngle - 91.4) * Math.PI) / 180.0;
+    const epsRad = (eps * Math.PI) / 180.0;
+    const nEW = Math.cos(epsRad);
+    const nS = Math.sin(deltaPhiRad);
+    const angleFromSouth = Math.atan2(nEW, Math.max(0.01, nS)) * (180.0 / Math.PI);
+    const az = isAfternoon ? (180.0 + angleFromSouth) : (180.0 - angleFromSouth);
+    return Math.round(az * 10) / 10;
+  })();
 
   // Chỉ báo kết nối 2 tấm
   const trkBadge = getConnectionStatusBadge(tracking.connStatus, tracking.staleDurationMs);
@@ -142,7 +159,9 @@ export default function VisualPanelsComparison({
                     <span className="font-bold text-zinc-900 dark:text-white">{epsAngle !== null ? formatValueOrDash(epsAngle, 1, '°') : '--'}</span>
                   </div>
                   <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
-                    (Nằm ngang = 90°, dựng đứng = 0°)
+                    {compassAzimuth !== null 
+                      ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${compassAzimuth >= 180 && compassAzimuth <= 270 ? 'Tây Nam' : 'Đông Nam'})` 
+                      : '(Nằm ngang = 90°, dựng đứng = 0°)'}
                   </span>
                 </td>
                 <td className="py-2.5 px-3 text-zinc-800 dark:text-slate-100">
@@ -202,9 +221,10 @@ export default function VisualPanelsComparison({
             {/* Kim chỉ hướng Tấm Cố Định (Nam 180° cố định - nét đứt cam) */}
             <line x1="70" y1="70" x2="70" y2="112" stroke="#ea580c" strokeWidth="1.75" strokeDasharray="3,2" />
 
-            {/* Kim chỉ hướng Tấm Tracker (Xanh dương / xanh sáng nét liền) */}
-            {phiAngle !== null ? (() => {
-              const rad = ((180 + phiAngle) - 90) * (Math.PI / 180);
+            {/* Kim chỉ hướng Tấm Tracker (Xanh dương / xanh sáng nét liền - chỉ đúng hướng la bàn thực tế) */}
+            {compassAzimuth !== null || phiAngle !== null ? (() => {
+              const displayAz = compassAzimuth !== null ? compassAzimuth : phiAngle;
+              const rad = (displayAz - 90) * (Math.PI / 180);
               const x2 = 70 + 44 * Math.cos(rad);
               const y2 = 70 + 44 * Math.sin(rad);
               return (
@@ -221,19 +241,23 @@ export default function VisualPanelsComparison({
             <circle cx="70" cy="70" r="3.5" className="fill-slate-800 dark:fill-slate-200" />
           </svg>
 
-          {/* Chú giải góc cơ cấu */}
+          {/* Chú giải góc cơ cấu & phương vị la bàn */}
           <div className="w-full text-[11px] text-zinc-600 dark:text-slate-300 space-y-1 border-t border-zinc-200 dark:border-slate-700 pt-2">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-blue-700 dark:text-sky-300 font-semibold">── Tracker:</span>
               <span className="font-bold text-zinc-900 dark:text-white">
-                {phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : 'φ: --'}
+                {compassAzimuth !== null ? `${formatSignedNumber(compassAzimuth, 1, '°')} (${compassAzimuth >= 180 && compassAzimuth <= 270 ? 'Tây Nam' : 'Đông Nam'})` : (phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : '--')}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center text-[10px] text-zinc-500 dark:text-slate-400 pl-2">
+              <span>Góc cơ cấu:</span>
+              <span className="font-mono">{phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : '--'}</span>
+            </div>
+            <div className="flex justify-between items-center">
               <span className="text-amber-800 dark:text-amber-300 font-semibold">╌╌ Cố định:</span>
               <span className="font-bold text-zinc-900 dark:text-white">Nam 180°</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-zinc-700 dark:text-slate-300 font-medium">Độ ngửa ε:</span>
               <span className="font-bold text-zinc-900 dark:text-white">
                 {epsAngle !== null ? formatValueOrDash(epsAngle, 1, '°') : '--'}

@@ -43,10 +43,11 @@ def run_solar_validation():
               f"| Panel(phi={tgt_az.final_ref_deg:6.2f}°, eps={tgt_el.final_ref_deg:6.2f}°) "
               f"| Active={active} | Clamp=[Az:{tgt_az.clamp_reason}, El:{tgt_el.clamp_reason}]")
 
-    wake_h, wake_m = compute_morning_wakeup(pos.sunrise_min)
+    wake_h, wake_m = compute_morning_wakeup(pos.tracking_start_min, cfg.CFG_WAKEUP_LEAD_TIME_MIN)
     print(f"-> Mặt trời mọc: {sr_h:02d}:{sr_m:02d}, Lặn: {ss_h:02d}:{ss_m:02d}")
-    print(f"-> Giờ báo thức DS3231 buổi sáng: {wake_h:02d}:{wake_m:02d} (Thức trước bình minh 30 phút)")
-    assert (wake_h * 60 + wake_m) == (pos.sunrise_min - 30), "Lỗi tính toán giờ báo thức!"
+    print(f"-> Bắt đầu bám (El >= 10°): {pos.tracking_start_min//60:02d}:{pos.tracking_start_min%60:02d}, Kết thúc: {pos.tracking_end_min//60:02d}:{pos.tracking_end_min%60:02d}")
+    print(f"-> Giờ báo thức DS3231 buổi sáng: {wake_h:02d}:{wake_m:02d} (Thức trước khi bám {cfg.CFG_WAKEUP_LEAD_TIME_MIN} phút)")
+    assert (wake_h * 60 + wake_m) == (pos.tracking_start_min - cfg.CFG_WAKEUP_LEAD_TIME_MIN), "Lỗi tính toán giờ báo thức!"
 
     # 2. Kiểm thử 4 mùa trong năm tại TP.HCM (Hạ chí, Đông chí, Xuân phân, Thu phân)
     print("\n--- 2. KIỂM THỬ BIÊN HÀNH TRÌNH PHƯƠNG VỊ CẢ NĂM ---")
@@ -103,8 +104,26 @@ def run_solar_validation():
     print(f"   -> Epsilon tấm bị kẹp tại: {tgt_el.final_ref_deg:.2f}° (Lý do: {tgt_el.clamp_reason})")
     assert tgt_el.final_ref_deg == cfg.CFG_L_EL_MIN_SOFT_LIMIT_DEG, "Bảo vệ va chạm trục Z không hoạt động!"
 
+    # 5. Kiểm thử lọc Revision (rev) và xác nhận tọa độ site_confirmed
+    print("\n--- 5. KIỂM THỬ LỌC REVISION VÀ CỜ SITE_CONFIRMED ---")
+    from site_config_validator import validate_and_normalize, is_revision_newer
+    current_rev = 1
+    assert not is_revision_newer(1, current_rev), "Lỗi: Trùng rev không bị chặn!"
+    assert not is_revision_newer(0, current_rev), "Lỗi: Rev cũ hơn không bị chặn!"
+    assert is_revision_newer(2, current_rev), "Lỗi: Rev mới hơn bị từ chối!"
+    assert is_revision_newer(5, current_rev), "Lỗi: Rev mới hơn nhảy bước bị từ chối!"
+    print("   -> Lọc Revision: ĐẠT 100% (chỉ chấp nhận rev mới hơn)")
+
+    cfg_init = validate_and_normalize(10.78310, 106.67210, rev=1)
+    cfg_init.confirmed = True
+    cfg_init.confirmed_by = "admin"
+    assert cfg_init.confirmed
+    cfg_edit = validate_and_normalize(10.79000, 106.68000, rev=2)
+    assert not cfg_edit.confirmed, "Lỗi: Khi đổi tọa độ cờ confirmed không tự về False!"
+    print("   -> Cờ site_confirmed: ĐẠT 100% (tự động reset về False khi đổi tọa độ)")
+
     print("\n" + "=" * 75)
-    print("TẤT CẢ KIỂM THỬ THIÊN VĂN & HÌNH HỌC PHASE 1 ĐẠT 100%!")
+    print("TẤT CẢ KIỂM THỬ THIÊN VĂN, HÌNH HỌC & SITE CONFIG ĐẠT 100%!")
     print("=" * 75)
 
 if __name__ == "__main__":

@@ -4,8 +4,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/database';
 
 export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
-export const STALE_THRESHOLD_MS = 3 * LIVE_PUSH_INTERVAL_MS; // 3 giây (3 lần chu kỳ đẩy) -> Dữ liệu bắt đầu CŨ
-export const DISCONNECT_THRESHOLD_MS = 10000; // 10 giây không có gói tin mới -> MẤT KẾT NỐI
+export const STALE_THRESHOLD_MS = 6000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
+export const DISCONNECT_THRESHOLD_MS = 15000; // 15 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
  * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.
@@ -169,8 +169,10 @@ export class FirebaseSolarService {
     // Heartbeat Tracking: Lưu mốc thời gian nhận gói tin mới nhất của từng tấm
     this.lastTrackingRawUpdate = null;
     this.lastTrackingReceivedTime = 0;
+    this.lastTrackingUpdateCount = 0;
     this.lastStaticRawUpdate = null;
     this.lastStaticReceivedTime = 0;
+    this.lastStaticUpdateCount = 0;
     this.latestRawData = null;
     this.watchdogTimer = null;
   }
@@ -241,19 +243,21 @@ export class FirebaseSolarService {
 
           // Cập nhật mốc thời gian nhận dữ liệu mới cho Tấm Xoay
           if (data.tracking) {
-            const trkUpdate = data.tracking.lastUpdate;
-            if (trkUpdate !== this.lastTrackingRawUpdate) {
+            let trkUpdate = data.tracking.server_time || data.tracking.lastUpdate || (data.tracking.data_ts ? data.tracking.data_ts * 1000 : null) || now;
+            if (trkUpdate !== this.lastTrackingRawUpdate || !this.lastTrackingReceivedTime) {
               this.lastTrackingRawUpdate = trkUpdate;
               this.lastTrackingReceivedTime = now;
+              this.lastTrackingUpdateCount = (this.lastTrackingUpdateCount || 0) + 1;
             }
           }
 
           // Cập nhật mốc thời gian nhận dữ liệu mới cho Tấm Cố Định
           if (data.static) {
-            const staUpdate = data.static.lastUpdate;
-            if (staUpdate !== this.lastStaticRawUpdate) {
+            let staUpdate = data.static.server_time || data.static.lastUpdate || (data.static.data_ts ? data.static.data_ts * 1000 : null) || now;
+            if (staUpdate !== this.lastStaticRawUpdate || !this.lastStaticReceivedTime) {
               this.lastStaticRawUpdate = staUpdate;
               this.lastStaticReceivedTime = now;
+              this.lastStaticUpdateCount = (this.lastStaticUpdateCount || 0) + 1;
             }
           }
 
@@ -327,11 +331,29 @@ export class FirebaseSolarService {
     // Tấm Xoay:
     let trkAgeMs = Infinity;
     if (fbData.tracking && Object.keys(fbData.tracking).length > 0) {
-      const trkUpdate = Number(tracking.lastUpdate || 0);
-      if (trkUpdate > 1700000000000) {
-        trkAgeMs = Math.max(0, serverTimeNow - trkUpdate);
-      } else if (this.lastTrackingReceivedTime > 0) {
+      if (this.lastTrackingReceivedTime > 0) {
+        // Ưu tiên thời gian thực tế trình duyệt nhận gói tin qua WebSocket
         trkAgeMs = Math.max(0, now - this.lastTrackingReceivedTime);
+      }
+      
+      // Nếu mới tải trang lần đầu (chưa nhận gói tin thứ 2), kiểm tra độ tuổi của dữ liệu ban đầu
+      if ((this.lastTrackingUpdateCount || 0) < 2) {
+        let trkServerTime = Number(tracking.server_time || 0);
+        if (trkServerTime > 1700000000000) {
+          trkAgeMs = Math.max(0, serverTimeNow - trkServerTime);
+        } else {
+          let trkUpdate = Number(tracking.lastUpdate || 0);
+          if (!trkUpdate && tracking.data_ts) {
+            trkUpdate = Number(tracking.data_ts) > 1700000000000 ? Number(tracking.data_ts) : Number(tracking.data_ts) * 1000;
+          }
+          if (trkUpdate > 1700000000000) {
+            // Chỉ coi là cũ nếu chênh lệch vượt quá 3 phút (tránh trường hợp RTC DS3231 bị lệch vài chục giây)
+            let diff = Math.max(0, serverTimeNow - trkUpdate);
+            if (diff > 180000) {
+              trkAgeMs = diff;
+            }
+          }
+        }
       }
     }
 
@@ -347,11 +369,27 @@ export class FirebaseSolarService {
     // Tấm Cố Định:
     let staAgeMs = Infinity;
     if (fbData.static && Object.keys(fbData.static).length > 0) {
-      const staUpdate = Number(staticPanel.lastUpdate || 0);
-      if (staUpdate > 1700000000000) {
-        staAgeMs = Math.max(0, serverTimeNow - staUpdate);
-      } else if (this.lastStaticReceivedTime > 0) {
+      if (this.lastStaticReceivedTime > 0) {
         staAgeMs = Math.max(0, now - this.lastStaticReceivedTime);
+      }
+
+      // Nếu mới tải trang lần đầu, kiểm tra độ tuổi dữ liệu ban đầu
+      if ((this.lastStaticUpdateCount || 0) < 2) {
+        let staServerTime = Number(staticPanel.server_time || 0);
+        if (staServerTime > 1700000000000) {
+          staAgeMs = Math.max(0, serverTimeNow - staServerTime);
+        } else {
+          let staUpdate = Number(staticPanel.lastUpdate || 0);
+          if (!staUpdate && staticPanel.data_ts) {
+            staUpdate = Number(staticPanel.data_ts) > 1700000000000 ? Number(staticPanel.data_ts) : Number(staticPanel.data_ts) * 1000;
+          }
+          if (staUpdate > 1700000000000) {
+            let diff = Math.max(0, serverTimeNow - staUpdate);
+            if (diff > 180000) {
+              staAgeMs = diff;
+            }
+          }
+        }
       }
     }
 
@@ -384,6 +422,12 @@ export class FirebaseSolarService {
     } else if (isSleeping) {
       displayState = wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG';
       rawState = 'DEEP_SLEEP';
+    } else if (tracking.state === 'MAX_HOLD' || tracking.status === 'MAX_HOLD') {
+      displayState = 'GÓC MAX (GIỮ ĐẾN 19H)';
+      rawState = 'MAX_HOLD';
+    } else if (tracking.state === 'HOLD_15M' || tracking.status === 'HOLD_15M') {
+      displayState = 'GIỮ BƯỚC (CHỜ 15P)';
+      rawState = 'HOLD_15M';
     } else if (tracking.state === 'TRACKING' || tracking.status === 'TRACKING_ACTIVE') {
       displayState = 'TRACKING (ĐANG BÁM)';
       rawState = 'TRACKING';
@@ -484,8 +528,8 @@ export class FirebaseSolarService {
     const ldrR = isTrackingLive && tracking.ldrRight !== undefined ? Number(tracking.ldrRight) : null;
     const adcSaturated = Boolean(tracking.adc_saturated || (ldrT !== null && Math.max(ldrT, ldrB, ldrL, ldrR) >= 3950));
 
-    // Chỉ tính Lux khi firmware gửi hệ số quy đổi lux_conv_factor; nếu không, giữ null để hiển thị ADC thô
-    const luxConvFactor = tracking.lux_conv_factor ? Number(tracking.lux_conv_factor) : null;
+    // Tính Lux từ hệ số lux_conv_factor hoặc ước lượng qua hệ số 0.5 lx/count cho TEMT6000
+    const luxConvFactor = tracking.lux_conv_factor ? Number(tracking.lux_conv_factor) : 0.5;
     const totalLightAdc = (ldrT !== null && ldrB !== null && ldrL !== null && ldrR !== null) ? (ldrT + ldrB + ldrL + ldrR) : null;
     const totalLux = (luxConvFactor !== null && totalLightAdc !== null) ? Math.round(totalLightAdc * luxConvFactor) : (tracking.total_lux !== undefined ? Number(tracking.total_lux) : null);
 
@@ -563,6 +607,7 @@ export class FirebaseSolarService {
         uptimeSeconds: tracking.uptimeSeconds !== undefined ? Number(tracking.uptimeSeconds) : null,
         rtcOffsetMs,
         rtcTime: tracking.rtcTime || null,
+        rtcTemp: tracking.rtcTemp !== undefined ? Number(tracking.rtcTemp) : null,
         errors: {
           sensorLost: Boolean(tracking.sensorLost),
           driverFault: Boolean(tracking.estop || tracking.driverFault),
@@ -673,7 +718,8 @@ export class FirebaseSolarService {
         diffAzimuth: (ldrL !== null && ldrR !== null) ? (ldrL - ldrR) : null,
         diffElevation: (ldrT !== null && ldrB !== null) ? (ldrT - ldrB) : null,
         sunCentroidX: (ldrL !== null && ldrR !== null) ? Number(Math.max(-1, Math.min(1, (ldrL - ldrR) / 2000)).toFixed(3)) : null,
-        sunCentroidY: (ldrT !== null && ldrB !== null) ? Number(Math.max(-1, Math.min(1, (ldrT - ldrB) / 2000)).toFixed(3)) : null
+        sunCentroidY: (ldrT !== null && ldrB !== null) ? Number(Math.max(-1, Math.min(1, (ldrT - ldrB) / 2000)).toFixed(3)) : null,
+        temperature: tracking.rtcTemp !== undefined ? Number(tracking.rtcTemp) : null
       },
       fuzzy: fuzzyData,
       pso: psoData,

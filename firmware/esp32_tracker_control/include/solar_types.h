@@ -52,7 +52,47 @@ enum class TrackerState : uint8_t {
 };
 
 /**
- * @brief Cờ lỗi hệ thống (Bitmask 32-bit)
+ * @brief Nguồn góc mục tiêu (TrackSource)
+ */
+enum class TrackSource : uint8_t {
+    EPHEMERIS_ONLY = 0,  ///< Chỉ dùng thiên văn NOAA thuần (theta_ref = theta_ff)
+    SENSOR_ONLY = 1,     ///< Chỉ dùng cảm biến TEMT6000 (cho thí nghiệm đối chứng)
+    HYBRID = 2           ///< Kết hợp Feedforward thiên văn + Feedback quang TEMT6000 (Mặc định)
+};
+
+/**
+ * @brief Nguồn gốc giá trị tọa độ địa lý đang áp dụng
+ */
+#ifdef DEFAULT
+#undef DEFAULT
+#endif
+enum class SiteSource : uint8_t {
+    FIREBASE = 0,        ///< Đọc hợp lệ từ Firebase Realtime Database
+    NVS = 1,             ///< Đọc từ bộ nhớ Flash NVS lưu lần trước
+    DEFAULT = 2          ///< Đọc từ hằng số mặc định trong solar_config.h
+};
+
+/**
+ * @brief Hợp đồng dữ liệu cấu hình tọa độ lắp đặt (SiteConfig)
+ * @details Thuần C++17, độc lập mạng, nhận qua ICommandSource hoặc NVS.
+ */
+struct SiteConfig {
+    double lat_deg;              ///< Vĩ độ A (độ, Dương = Bắc, Âm = Nam, 5 chữ số thập phân)
+    double lon_deg;              ///< Kinh độ B (độ, Dương = Đông, Âm = Tây, 5 chữ số thập phân)
+    uint32_t rev;                ///< Số thứ tự phiên bản, tăng mỗi lần sửa trên web
+    uint64_t updated_at;         ///< Thời điểm sửa (ms Unix timestamp)
+    char updated_by[32];         ///< Định danh người sửa ("admin", "operator", ...)
+    bool valid;                  ///< Cờ hợp lệ sau kiểm tra (firmware tính)
+    bool warning_outside_vn;     ///< Cảnh báo tọa độ nằm ngoài lãnh thổ Việt Nam
+    bool warning_inverted;       ///< Cảnh báo có dấu hiệu bị đảo kinh/vĩ độ
+    SiteSource source;           ///< Nguồn gốc của tọa độ hiện tại
+    bool confirmed;              ///< Cờ xác nhận tọa độ thực địa bởi người dùng/admin
+    char confirmed_by[32];       ///< Định danh người bấm xác nhận tọa độ
+    uint64_t confirmed_at;       ///< Thời điểm bấm xác nhận tọa độ (ms Unix timestamp)
+};
+
+/**
+ * @brief Cờ lỗi và cảnh báo hệ thống (Bitmask 32-bit)
  */
 enum class FaultFlag : uint32_t {
     NONE                     = 0,
@@ -66,13 +106,25 @@ enum class FaultFlag : uint32_t {
     MOVE_TIMEOUT_EL          = (1 << 7),   ///< Quá thời gian quay trục Elevation
     ESTOP_TRIGGERED          = (1 << 8),   ///< Nút dừng khẩn cấp E-Stop được kích hoạt
     LOW_BATTERY              = (1 << 9),   ///< Điện áp ắc quy dưới ngưỡng bảo vệ
-    RTC_INVALID              = (1 << 10),  ///< DS3231 mất nguồn / thời gian không hợp lệ
+    RTC_INVALID              = (1 << 10),  ///< DS3231 mất nguồn / thời gian không hợp lệ (RTC_LOST)
+    RTC_LOST                 = (1 << 10),  ///< Bí danh chuẩn: DS3231 OSF=1 hoặc giờ không đáng tin
     PSO_TIMEOUT              = (1 << 11),  ///< PSO online vượt quá ngân sách thời gian trên ESP32
     ADC_SATURATION           = (1 << 12),  ///< TEMT6000 bị bão hòa ADC
     ENCODER_GLITCH           = (1 << 13),  ///< Tín hiệu Encoder bị nhiễu nhảy bước bất thường
     HOMING_FAILED            = (1 << 14),  ///< Không tìm thấy công tắc hành trình trong cự ly quy định
     DIR_POLARITY_UNCERTAIN   = (1 << 15),  ///< Cực tính DIR chưa được xác nhận kiểm thử
-    SEVERE_DATA_INVALID      = (1 << 16)   ///< Lỗi nghiêm trọng: Đánh dấu hủy mẫu ngày thí nghiệm (cả 2 tấm)
+    SEVERE_DATA_INVALID      = (1 << 16),  ///< Lỗi nghiêm trọng: Đánh dấu hủy mẫu ngày thí nghiệm (cả 2 tấm)
+    RTC_JUMP                 = (1 << 17),  ///< Phát hiện RTC nhảy giờ bất thường giữa 2 lần đọc
+    RTC_NO_BATTERY_SUSPECT   = (1 << 18),  ///< Cờ OSF bật nhiều lần, nghi ngờ mất/hết pin CR2032
+    SITE_CONFIG_INVALID      = (1 << 19),  ///< Tọa độ SiteConfig không hợp lệ sau khi validate
+    SITE_FROM_NVS            = (1 << 20),  ///< Đang sử dụng tọa độ dự phòng từ NVS Flash
+    SITE_FROM_DEFAULT        = (1 << 21),  ///< Đang sử dụng tọa độ mặc định từ solar_config.h
+    SITE_CHANGE_REJECTED     = (1 << 22),  ///< Lệnh đổi tọa độ bị từ chối (do EXPERIMENT_LOCK hoặc đang MOVE)
+    SITE_CHANGED_IN_EXPERIMENT = (1 << 23),///< Cố tình đổi tọa độ giữa đợt đo: Loại ngày khỏi thống kê!
+    AZ_CLAMP                 = (1 << 24),  ///< Góc phi_ff bị kẹp vào giới hạn mềm cáp xoay [0, I]
+    EL_LOW_CLAMP             = (1 << 25),  ///< Góc eps_ff bị kẹp cận dưới L=25° chống va chạm trục Z
+    ZENITH_CLAMP             = (1 << 26),  ///< Góc eps_ff bị kẹp cận trên J=90° (hoặc vùng kỳ dị thiên đỉnh)
+    CALIB_DRIFT              = (1 << 27)   ///< Phát hiện lệch hiệu chuẩn quang e_s lệch 1 phía liên tục
 };
 
 inline FaultFlag operator|(FaultFlag a, FaultFlag b) {
@@ -91,12 +143,14 @@ inline bool hasFault(FaultFlag mask, FaultFlag check) {
  * @brief Tọa độ mặt trời tính toán từ mô hình thiên văn NOAA
  */
 struct SolarPosition {
-    float azimuth_deg;       ///< Phương vị mặt trời (0° = Bắc, 90° = Đông, 180° = Nam, 270° = Tây)
-    float elevation_deg;     ///< Góc cao mặt trời (0° = Chân trời, 90° = Thiên đỉnh)
-    float zenith_deg;        ///< Góc thiên đỉnh = 90° - elevation_deg
+    double azimuth_deg;       ///< Phương vị mặt trời (0° = Bắc, 90° = Đông, 180° = Nam, 270° = Tây)
+    double elevation_deg;     ///< Góc cao mặt trời (0° = Chân trời, 90° = Thiên đỉnh)
+    double zenith_deg;        ///< Góc thiên đỉnh = 90° - elevation_deg
     bool is_daylight;        ///< True nếu elevation_deg > ngưỡng bám tối thiểu
     uint16_t sunrise_min;    ///< Phút trong ngày mặt trời mọc (tính từ 00:00)
     uint16_t sunset_min;     ///< Phút trong ngày mặt trời lặn (tính từ 00:00)
+    uint16_t tracking_start_min; ///< Phút trong ngày mặt trời đạt ngưỡng bám (el_sun >= threshold)
+    uint16_t tracking_end_min;   ///< Phút trong ngày mặt trời hạ dưới ngưỡng bám (el_sun < threshold)
     bool atmospheric_refract_applied; ///< Đã bù khúc xạ khí quyển hay chưa
 };
 
@@ -148,6 +202,18 @@ struct InaReadings {
 };
 
 /**
+ * @brief Thông số biên dạng chuyển động hình thang (Trapezoidal Motion Profile)
+ */
+struct MotionProfile {
+    int32_t total_pulses;     ///< Tổng số xung cần phát
+    float total_time_sec;     ///< Tổng thời gian di chuyển (giây)
+    float accel_time_sec;     ///< Thời gian tăng tốc (giây)
+    float cruise_time_sec;    ///< Thời gian chạy đều (giây)
+    float peak_freq_hz;       ///< Tần số xung đỉnh đạt được (Hz)
+    bool is_triangular;       ///< Cờ báo biên dạng hình tam giác (không đạt f_max)
+};
+
+/**
  * @brief Bộ hệ số PID
  */
 struct PidGains {
@@ -166,8 +232,8 @@ struct FuzzyAdjustment {
 };
 
 /**
- * @brief Struct TelemetryPacket phục vụ ghi Log và gửi ra TelemetrySink (Yêu cầu Phase 9)
- * @details Chứa dữ liệu thô, góc tính toán, công suất và trạng thái toàn diện của 1 chu kỳ bám.
+ * @brief Struct TelemetryPacket phục vụ ghi Log và gửi ra TelemetrySink (Yêu cầu Phase 0, 7, 8, 9)
+ * @details Chứa dữ liệu thô, góc tính toán, thông số RTC, công suất và trạng thái toàn diện của 1 chu kỳ bám.
  */
 struct TelemetryPacket {
     uint32_t timestamp_epoch;            ///< Thời gian UTC (giây từ epoch)
@@ -176,15 +242,44 @@ struct TelemetryPacket {
 
     TrackerState state;                  ///< Trạng thái máy hữu hạn
     ControlMode control_mode;            ///< Chế độ điều khiển hiện hành
+    TrackSource track_source;            ///< Nguồn tạo góc mục tiêu: EPHEMERIS_ONLY | SENSOR_ONLY | HYBRID
 
-    // Dữ liệu thiên văn & mục tiêu
-    SolarPosition solar_pos;
-    AxisTarget target_az;
-    AxisTarget target_el;
+    // Dữ liệu vị trí lắp đặt (SiteConfig telemetry)
+    double lat_deg;                      ///< Vĩ độ A đang dùng (độ, 5 số thập phân)
+    double lon_deg;                      ///< Kinh độ B đang dùng (độ, 5 số thập phân)
+    uint32_t site_rev;                   ///< Số thứ tự phiên bản SiteConfig
+    SiteSource site_source;              ///< Nguồn tọa độ: FIREBASE | NVS | DEFAULT
+
+    // Trạng thái đồng hồ thời gian thực RTC DS3231
+    bool rtc_osf;                        ///< Cờ Oscillator Stop Flag (1: từng mất nguồn/pin, giờ không đáng tin)
+    float rtc_temp_c;                    ///< Nhiệt độ cảm biến tích hợp trong chip DS3231 (°C)
+    float ntp_minus_rtc_s;               ///< Độ lệch giữa NTP và RTC DS3231 (giây, để đánh giá độ trôi)
+
+    // Dữ liệu thiên văn & góc mặt trời
+    SolarPosition solar_pos;             ///< Struct thiên văn chuẩn
+    float el_sun_raw_deg;                ///< Góc nâng mặt trời el_sun CHƯA bù khúc xạ khí quyển (độ)
+    float el_sun_refracted_deg;          ///< Góc nâng mặt trời el_sun ĐÃ bù khúc xạ khí quyển (độ)
+    float az_sun_deg;                    ///< Phương vị mặt trời az_sun (độ, tính từ Bắc theo chiều KĐH)
+
+    // Góc Feedforward (θ_ff) và Mục tiêu cuối cùng (θ_ref) cho hai trục
+    float theta_ff_az_deg;               ///< phi_ff (Động cơ 1 - Góc quay)
+    float theta_ff_el_deg;               ///< epsilon_ff (Động cơ 2 - Độ ngửa)
+    float theta_ref_az_deg;              ///< phi_ref = phi_ff + sat(w_s * Z * e_s, ±Z2)
+    float theta_ref_el_deg;              ///< epsilon_ref = epsilon_ff + sat(w_s * Z * e_s, ±Z2)
+
+    AxisTarget target_az;                ///< Chi tiết mục tiêu trục Azimuth (Động cơ 1 - Góc quay)
+    AxisTarget target_el;                ///< Chi tiết mục tiêu trục Elevation (Động cơ 2 - Độ ngửa)
+
+    // Góc lệch thực giữa pháp tuyến tấm và tia nắng (Chỉ số đánh giá bám cosΘ)
+    // cosΘ = sin ε · sin el_sun + cos ε · cos el_sun · cos(az_tấm − az_sun)
+    float cos_theta_target;              ///< cosΘ tính toán theo góc mục tiêu mong muốn
+    float cos_theta_actual_est;          ///< cosΘ ước lượng theo góc thực tế đọc từ Encoder 3806
+    float theta_misalignment_deg;        ///< Góc lệch thực Θ mong muốn (độ)
+    float theta_actual_misalignment_deg; ///< Góc lệch thực Θ thực tế ước lượng (độ)
 
     // Trạng thái cơ điện 2 trục
-    AxisState state_az;
-    AxisState state_el;
+    AxisState state_az;                  ///< Trạng thái Động cơ 1 (Góc quay)
+    AxisState state_el;                  ///< Trạng thái Động cơ 2 (Độ ngửa)
 
     // Tham số điều khiển thực tế
     PidGains base_gains_az;
@@ -192,8 +287,16 @@ struct TelemetryPacket {
     FuzzyAdjustment fuzzy_adj_az;
     FuzzyAdjustment fuzzy_adj_el;
 
-    // Cảm biến quang TEMT6000
+    // Cảm biến quang TEMT6000 & sai số quang học
     TemtReadings temt;
+    float optical_es_az;                 ///< e_s trục Azimuth = (L - R) / (L + R)
+    float optical_es_el;                 ///< e_s trục Elevation = (T - B) / (T + B)
+    float optical_ws;                    ///< Trọng số tin cậy w_s [0.0 .. 1.0]
+
+    // Cờ giới hạn mềm (Clamps)
+    bool az_clamp;                       ///< Bị kẹp bởi hành trình cáp [0, I]
+    bool el_low_clamp;                   ///< Bị kẹp cận dưới L=25° chống va chạm trục Z
+    bool zenith_clamp;                   ///< Bị kẹp cận trên hoặc vùng kỳ dị thiên đỉnh
 
     // Công suất 2 tấm (Tấm xoay Tracker & Tấm cố định Static)
     InaReadings ina_tracker;             ///< Đo tấm xoay theo vết
@@ -205,9 +308,9 @@ struct TelemetryPacket {
     float final_rms_error_deg;           ///< Sai số RMS còn lại sau khi dừng
 
     // Cờ trạng thái & Lỗi
-    FaultFlag fault_flags;               ///< Bitmask lỗi
+    FaultFlag fault_flags;               ///< Bitmask lỗi toàn diện
     bool is_pso_converged;               ///< PSO có hội tụ không
-    bool is_day_invalid;                 ///< Ngày có lỗi nặng, loại cả 2 tấm khỏi thống kê 30 ngày
+    bool is_day_invalid;                 ///< Ngày có lỗi nặng (RTC_LOST, JUMP, SITE_CHANGED_IN_EXP...), loại cả 2 tấm
 };
 
 /**
@@ -222,7 +325,8 @@ struct CommandPacket {
         FORCE_STATE,        ///< Cưỡng bức chuyển trạng thái (vd: PARK, HOMING)
         MANUAL_JOG,         ///< Jog cơ khí từng trục (dùng cho hiệu chuẩn bench)
         TRIGGER_ESTOP,      ///< Kích hoạt hoặc giải phóng E-Stop phần mềm
-        CLEAR_FAULTS        ///< Xóa cờ lỗi sau khi khắc phục sự cố
+        CLEAR_FAULTS,       ///< Xóa cờ lỗi sau khi khắc phục sự cố
+        SET_SITE_CONFIG     ///< Cập nhật SiteConfig từ Firebase
     } type;
 
     union {
@@ -252,6 +356,10 @@ struct CommandPacket {
         struct {
             bool active;
         } estop;
+
+        struct {
+            SiteConfig site;
+        } set_site;
     } params;
 };
 

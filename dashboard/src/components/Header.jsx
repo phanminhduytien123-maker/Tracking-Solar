@@ -160,6 +160,16 @@ export default function Header({
               <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
             </div>
 
+            {/* Nhiệt độ RTC DS3231 */}
+            <div>
+              <span>Nhiệt độ RTC: </span>
+              <span className="font-semibold text-zinc-900 dark:text-white">
+                {system?.rtcTemp !== null && system?.rtcTemp !== undefined
+                  ? `${Number(system.rtcTemp).toFixed(1)}°C`
+                  : '--'}
+              </span>
+            </div>
+
             {/* Nguồn dữ liệu */}
             <div>
               <span>Nguồn: </span>

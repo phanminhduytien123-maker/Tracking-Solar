@@ -30,7 +30,7 @@ export default function ManualControlModal({
   const az = motors?.azimuth || { currentAngle: null, phi: null, limitHome: false, softLimitViolated: false };
   const el = motors?.elevation || { currentAngle: null, epsilon: null, limitSwitch90: false, softLimitViolated: false };
 
-  const phiVal = az.phi !== undefined && az.phi !== null ? az.phi : (az.currentAngle !== null ? az.currentAngle - 180 : null);
+  const phiVal = az.phi !== undefined && az.phi !== null ? az.phi : az.currentAngle;
   const epsVal = el.epsilon !== undefined && el.epsilon !== null ? el.epsilon : el.currentAngle;
 
   const azSoftLimitStr = (az.soft_min !== null && az.soft_max !== null) 

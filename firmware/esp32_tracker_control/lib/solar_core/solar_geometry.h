@@ -32,14 +32,17 @@ public:
      */
     static bool computeAxisTargets(const SolarPosition& sun_pos,
                                   AxisTarget& out_target_az,
-                                  AxisTarget& out_target_el);
+                                  AxisTarget& out_target_el,
+                                  float base_az_deg = 90.0f);
 
     /**
-     * @brief Tính giờ báo thức thức dậy buổi sáng
-     * @param sunrise_min Thời điểm mặt trời mọc tính từ 00:00 (phút)
+     * @brief Tính giờ báo thức thức dậy buổi sáng theo giờ bắt đầu bám thực tế (khi el_sun >= ngưỡng bám)
+     * @param tracking_start_min Thời điểm mặt trời vượt ngưỡng bám tính từ 00:00 (phút)
+     * @param lead_minutes Số phút đánh thức trước khi bắt đầu bám (mặc định CFG_WAKEUP_LEAD_TIME_MIN = 20 phút)
      * @return Struct WakeupTime (hour, minute)
      */
-    static WakeupTime computeMorningWakeup(uint16_t sunrise_min);
+    static WakeupTime computeMorningWakeup(uint16_t tracking_start_min,
+                                          uint8_t lead_minutes = CFG_WAKEUP_LEAD_TIME_MIN);
 
     /**
      * @brief Kiểm tra mặt trời có đang nằm trong vùng kỳ dị gần thiên đỉnh hay không

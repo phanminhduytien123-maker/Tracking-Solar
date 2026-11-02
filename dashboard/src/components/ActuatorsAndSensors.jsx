@@ -214,8 +214,10 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             <div className="absolute top-0 flex flex-col items-center">
               <div className="panel-subtle px-2.5 py-1 text-center border-[#2c303d] shadow-sm">
                 <span className="text-[9px] font-mono text-zinc-400 block font-semibold">TRÊN (TOP)</span>
-                <span className="text-xs font-mono font-bold text-zinc-100">{sTop.lux.toLocaleString()} <span className="text-[9px] font-normal text-zinc-400">lx</span></span>
-                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sTop.adc}</span>
+                <span className="text-xs font-mono font-bold text-zinc-100">
+                  {sTop?.lux != null ? sTop.lux.toLocaleString() : (sTop?.adc != null ? Math.round(sTop.adc * 0.5).toLocaleString() : '--')} <span className="text-[9px] font-normal text-zinc-400">lx</span>
+                </span>
+                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sTop?.adc ?? '--'}</span>
               </div>
             </div>
 
@@ -223,8 +225,10 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             <div className="absolute bottom-0 flex flex-col items-center">
               <div className="panel-subtle px-2.5 py-1 text-center border-[#2c303d] shadow-sm">
                 <span className="text-[9px] font-mono text-zinc-400 block font-semibold">DƯỚI (BOTTOM)</span>
-                <span className="text-xs font-mono font-bold text-zinc-100">{sBottom.lux.toLocaleString()} <span className="text-[9px] font-normal text-zinc-400">lx</span></span>
-                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sBottom.adc}</span>
+                <span className="text-xs font-mono font-bold text-zinc-100">
+                  {sBottom?.lux != null ? sBottom.lux.toLocaleString() : (sBottom?.adc != null ? Math.round(sBottom.adc * 0.5).toLocaleString() : '--')} <span className="text-[9px] font-normal text-zinc-400">lx</span>
+                </span>
+                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sBottom?.adc ?? '--'}</span>
               </div>
             </div>
 
@@ -232,8 +236,10 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             <div className="absolute left-0 flex flex-col items-center">
               <div className="panel-subtle px-2.5 py-1 text-center border-[#2c303d] shadow-sm">
                 <span className="text-[9px] font-mono text-zinc-400 block font-semibold">TRÁI (LEFT)</span>
-                <span className="text-xs font-mono font-bold text-zinc-100">{sLeft.lux.toLocaleString()} <span className="text-[9px] font-normal text-zinc-400">lx</span></span>
-                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sLeft.adc}</span>
+                <span className="text-xs font-mono font-bold text-zinc-100">
+                  {sLeft?.lux != null ? sLeft.lux.toLocaleString() : (sLeft?.adc != null ? Math.round(sLeft.adc * 0.5).toLocaleString() : '--')} <span className="text-[9px] font-normal text-zinc-400">lx</span>
+                </span>
+                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sLeft?.adc ?? '--'}</span>
               </div>
             </div>
 
@@ -241,8 +247,10 @@ export default function ActuatorsAndSensors({ motors, sensors }) {
             <div className="absolute right-0 flex flex-col items-center">
               <div className="panel-subtle px-2.5 py-1 text-center border-[#2c303d] shadow-sm">
                 <span className="text-[9px] font-mono text-zinc-400 block font-semibold">PHẢI (RIGHT)</span>
-                <span className="text-xs font-mono font-bold text-zinc-100">{sRight.lux.toLocaleString()} <span className="text-[9px] font-normal text-zinc-400">lx</span></span>
-                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sRight.adc}</span>
+                <span className="text-xs font-mono font-bold text-zinc-100">
+                  {sRight?.lux != null ? sRight.lux.toLocaleString() : (sRight?.adc != null ? Math.round(sRight.adc * 0.5).toLocaleString() : '--')} <span className="text-[9px] font-normal text-zinc-400">lx</span>
+                </span>
+                <span className="text-[9px] font-mono text-zinc-400 block">ADC: {sRight?.adc ?? '--'}</span>
               </div>
             </div>
 

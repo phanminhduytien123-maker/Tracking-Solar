@@ -33,6 +33,31 @@ class TrackerState(IntEnum):
     DAWN_POLL = 13
     FAULT = 14
 
+class TrackSource(IntEnum):
+    EPHEMERIS_ONLY = 0
+    SENSOR_ONLY = 1
+    HYBRID = 2
+
+class SiteSource(IntEnum):
+    FIREBASE = 0
+    NVS = 1
+    DEFAULT = 2
+
+@dataclass
+class SiteConfig:
+    lat_deg: float = 10.78310
+    lon_deg: float = 106.67210
+    rev: int = 1
+    updated_at: int = 0
+    updated_by: str = "default"
+    valid: bool = True
+    warning_outside_vn: bool = False
+    warning_inverted: bool = False
+    source: SiteSource = SiteSource.DEFAULT
+    confirmed: bool = False
+    confirmed_by: str = ""
+    confirmed_at: int = 0
+
 class FaultFlag(IntEnum):
     NONE = 0
     STEP_LOSS_AZ = 1 << 0
@@ -46,12 +71,25 @@ class FaultFlag(IntEnum):
     ESTOP_TRIGGERED = 1 << 8
     LOW_BATTERY = 1 << 9
     RTC_INVALID = 1 << 10
+    RTC_LOST = 1 << 10
     PSO_TIMEOUT = 1 << 11
     ADC_SATURATION = 1 << 12
     ENCODER_GLITCH = 1 << 13
     HOMING_FAILED = 1 << 14
     DIR_POLARITY_UNCERTAIN = 1 << 15
     SEVERE_DATA_INVALID = 1 << 16
+    RTC_JUMP = 1 << 17
+    RTC_NO_BATTERY_SUSPECT = 1 << 18
+    SITE_CONFIG_INVALID = 1 << 19
+    SITE_FROM_NVS = 1 << 20
+    SITE_FROM_DEFAULT = 1 << 21
+    SITE_CHANGE_REJECTED = 1 << 22
+    SITE_CHANGED_IN_EXPERIMENT = 1 << 23
+    AZ_CLAMP = 1 << 24
+    EL_LOW_CLAMP = 1 << 25
+    ZENITH_CLAMP = 1 << 26
+    CALIB_DRIFT = 1 << 27
+
 
 @dataclass
 class SolarPosition:
@@ -61,6 +99,8 @@ class SolarPosition:
     is_daylight: bool = False
     sunrise_min: int = 360
     sunset_min: int = 1080
+    tracking_start_min: int = 396
+    tracking_end_min: int = 1000
     atmospheric_refract_applied: bool = True
 
 @dataclass
@@ -97,6 +137,15 @@ class InaReadings:
     shunt_current_a: float = 0.0
     power_w: float = 0.0
     energy_wh: float = 0.0
+
+@dataclass
+class MotionProfile:
+    total_pulses: int = 0
+    total_time_sec: float = 0.0
+    accel_time_sec: float = 0.0
+    cruise_time_sec: float = 0.0
+    peak_freq_hz: float = 0.0
+    is_triangular: bool = False
 
 @dataclass
 class PidGains:

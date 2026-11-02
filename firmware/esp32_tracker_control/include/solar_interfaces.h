@@ -51,6 +51,16 @@ public:
     virtual bool pollCommand(CommandPacket& outCmd) = 0;
 
     /**
+     * @brief Thăm dò cấu hình tọa độ SiteConfig mới từ Firebase (Non-blocking)
+     * @param[out] outSite Struct cấu hình tọa độ nhận được
+     * @return true nếu có bản cập nhật SiteConfig mới từ Firebase, false nếu không có
+     */
+    virtual bool pollSiteConfig(SiteConfig& outSite) {
+        (void)outSite;
+        return false;
+    }
+
+    /**
      * @brief Kiểm tra xem có lệnh dừng khẩn cấp (E-Stop) hay không
      */
     virtual bool isEstopTriggered() const = 0;
