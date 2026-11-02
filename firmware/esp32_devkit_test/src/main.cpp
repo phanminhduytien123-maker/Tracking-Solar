@@ -337,6 +337,10 @@ const uint32_t HOME_FAST_SPEED_HZ  = 1200; // Giai đoạn 1: Tiếp cận nhanh
 const uint32_t HOME_CREEP_SPEED_HZ = 200;  // Giai đoạn 3: Rà chậm tiếp xúc chính xác (Hz, sai số <= 1 bước)
 const int32_t  HOME_RETRACT_STEPS  = 300;  // Giai đoạn 2: Lùi nhả switch (~1.5 vòng vi bước)
 
+// Cấu hình khung giờ ngủ đêm và thức dậy (20:00 tối đến 04:00 sáng)
+const int NIGHT_SLEEP_START_HOUR   = 20;   // 20:00 (8:00 PM) - Người dùng yêu cầu chỉnh xuống 20h
+const int NIGHT_SLEEP_END_HOUR     = 4;    // 04:00 (4:00 AM)
+
 // -------------------------------------------------------------------------
 // 3. VỊ TRÍ MẶC ĐỊNH M1 VÀ M2 (LƯU VĨNH VIỄN TRONG FLASH NVS)
 // -------------------------------------------------------------------------
@@ -909,10 +913,10 @@ void enterNightSleepUntil4AM() {
   float curTemp = 0.0f;
   uint32_t totalSleepSec = 9 * 3600; // Mặc định 9 tiếng nếu không đọc được RTC
   if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-    if (curH >= 19) {
-      totalSleepSec = ((24 - curH) + 4) * 3600 - curMin * 60 - curS;
-    } else if (curH < 4) {
-      totalSleepSec = (4 - curH) * 3600 - curMin * 60 - curS;
+    if (curH >= NIGHT_SLEEP_START_HOUR) {
+      totalSleepSec = ((24 - curH) + NIGHT_SLEEP_END_HOUR) * 3600 - curMin * 60 - curS;
+    } else if (curH < NIGHT_SLEEP_END_HOUR) {
+      totalSleepSec = (NIGHT_SLEEP_END_HOUR - curH) * 3600 - curMin * 60 - curS;
     }
     setDS3231Alarm1(4, 0, 0); // Đặt báo thức chính xác lúc 04:00:00 AM
     Serial.printf("   [3/6] Hen gio RTC DS3231 Alarm 1 luc 04:00:00 sang (Hien tai: %02d:%02d:%02d, Ngu trong: %u phut)\n",
@@ -2494,7 +2498,7 @@ bool runDualHomingToSwitches() {
     // Xử lý trục 1
     switch (stage1) {
       case STAGE_FAST:
-        if (isHome1Triggered()) {
+        if (isHome1Triggered() || isHome1Raw()) {
           stepper1->forceStopAndNewPosition(0);
           Serial.println(">> [M1 FAST OK] Da cham switch 1 lan dau! Dang lui dong ra xa...");
           stepper1->setSpeedInHz(manualSpeedHz);
@@ -2531,7 +2535,7 @@ bool runDualHomingToSwitches() {
         break;
 
       case STAGE_CREEP:
-        if (isHome1Triggered()) {
+        if (isHome1Triggered() || isHome1Raw()) {
           stepper1->forceStopAndNewPosition(0);
           int32_t touchCnt1 = getEncoderCount1();
           int32_t diff1 = touchCnt1 - lastHomeTouchCount1;
@@ -2553,7 +2557,7 @@ bool runDualHomingToSwitches() {
     // Xử lý trục 2
     switch (stage2) {
       case STAGE_FAST:
-        if (isHome2Triggered()) {
+        if (isHome2Triggered() || isHome2Raw()) {
           stepper2->forceStopAndNewPosition(0);
           Serial.println(">> [M2 FAST OK] Da cham switch 2 lan dau! Dang lui dong ra xa...");
           stepper2->setSpeedInHz(manualSpeedHz);
@@ -2590,7 +2594,7 @@ bool runDualHomingToSwitches() {
         break;
 
       case STAGE_CREEP:
-        if (isHome2Triggered()) {
+        if (isHome2Triggered() || isHome2Raw()) {
           stepper2->forceStopAndNewPosition(0);
           int32_t touchCnt2 = getEncoderCount2();
           int32_t diff2 = touchCnt2 - lastHomeTouchCount2;
@@ -2972,8 +2976,9 @@ void setup() {
   float curTemp = 0.0f;
   if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
     Serial.printf("\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d %02d/%02d/%04d\n", curH, curMin, curS, curD, curM, curY);
-    if (curH >= 19 || curH < 4) {
-      Serial.println(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (19:00 - 04:00) -> Chay quy trinh ngu dem ngay lap tuc!");
+    if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
+      Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%d:00 - %02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
+                    NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
       enterNightSleepUntil4AM();
     } else {
       Serial.println(">> [BOOT DAY] Cap nguon ban ngay -> Tu dong Homing ca 2 truc va bat dau bam Hybrid!");
@@ -3757,7 +3762,7 @@ void loop() {
     // 2. Đọc giờ RTC
     int y = 0, m = 0, d = 0, hh = 0, mm = 0, ss = 0;
     float tC = 0.0f;
-    if (readDS3231(y, m, d, hh, mm, ss, tC) && (hh >= 19 || hh < 4)) {
+    if (readDS3231(y, m, d, hh, mm, ss, tC) && (hh >= NIGHT_SLEEP_START_HOUR || hh < NIGHT_SLEEP_END_HOUR)) {
       enterNightSleepUntil4AM();
     } else {
       float dawnAz = defaultDeg1;
@@ -3792,7 +3797,7 @@ void loop() {
     int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
     float curTemp = 0.0f;
     if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-      if ((curH >= 19 || curH < 4) && (millis() - lastSerialCharMs >= 30000)) {
+      if ((curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) && (millis() - lastSerialCharMs >= 30000)) {
         if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE) {
           enterNightSleepUntil4AM();
         }
