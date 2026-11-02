@@ -337,8 +337,8 @@ const uint32_t HOME_FAST_SPEED_HZ  = 1200; // Giai đoạn 1: Tiếp cận nhanh
 const uint32_t HOME_CREEP_SPEED_HZ = 200;  // Giai đoạn 3: Rà chậm tiếp xúc chính xác (Hz, sai số <= 1 bước)
 const int32_t  HOME_RETRACT_STEPS  = 300;  // Giai đoạn 2: Lùi nhả switch (~1.5 vòng vi bước)
 
-// Cấu hình khung giờ ngủ đêm và thức dậy (20:00 tối đến 04:00 sáng)
-const int NIGHT_SLEEP_START_HOUR   = 20;   // 20:00 (8:00 PM) - Người dùng yêu cầu chỉnh xuống 20h
+// Cấu hình khung giờ ngủ đêm và thức dậy (22:00 tối đến 04:00 sáng)
+const int NIGHT_SLEEP_START_HOUR   = 22;   // 22:00 (10:00 PM) - Người dùng yêu cầu chỉnh sang 22h
 const int NIGHT_SLEEP_END_HOUR     = 4;    // 04:00 (4:00 AM)
 
 // -------------------------------------------------------------------------
@@ -2971,21 +2971,37 @@ void setup() {
   ArduinoOTA.begin();
   Serial.println(">> [OTA OK] San sang nhan nap firmware qua WiFi (Port 3232, Host: esp32-solar-tracker.local)!");
 
-  // 10. KHỞI ĐỘNG HỆ THỐNG Ở CHẾ ĐỘ IDLE (KHÔNG TỰ ĐỘNG NGỦ, TOÀN QUYỀN ĐIỀU KHIỂN THỦ CÔNG)
+  // 10. TỰ ĐỘNG HOMING 1 LẦN KHI ĐƯỢC CẤP ĐIỆN VÀ VẬN HÀNH THEO GIỜ RTC (HANDS-FREE 30 NGÀY)
+  Serial.println("\n=======================================================");
+  Serial.println(">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU HOMING CHOT MOC GOC...");
+  Serial.println("=======================================================");
+  runDualHomingToSwitches();
+
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
   if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
     Serial.printf("\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d ngay %02d/%02d/%04d\n", curH, curMin, curS, curD, curM, curY);
+    if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
+      Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%02d:00 - %02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
+                    NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
+      enterNightSleepUntil4AM();
+    } else {
+      Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 22:00) -> Chay PSO va bat dau bam Hybrid!");
+      runPsoOptimization();
+      currentTrackSource = TRACK_SRC_HYBRID;
+      autoOpticalTracking = true;
+      trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+      isMaxAzimuthReached = false;
+      systemFsmState = FSM_STATE_TRACKING;
+    }
   } else {
-    Serial.println("\n>> [BOOT RTC] Khong doc duoc RTC DS3231 qua I2C.");
+    Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay PSO va bat dau bam Hybrid mac dinh...");
+    runPsoOptimization();
+    currentTrackSource = TRACK_SRC_HYBRID;
+    autoOpticalTracking = true;
+    trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+    systemFsmState = FSM_STATE_TRACKING;
   }
-
-  // Khởi động ở chế độ IDLE an toàn, không tự ý ngủ đêm, không tự ý khóa phanh
-  currentTrackSource = TRACK_SRC_OFF;
-  autoOpticalTracking = false;
-  isMaxAzimuthReached = false;
-  systemFsmState = FSM_STATE_IDLE;
-  Serial.println(">> [BOOT OK] He thong san sang o che do IDLE! (Bam [H] de Homing, [1]/[2] + [Q]/[E] chay tay, [Y] bat Hybrid).");
 
   // 11. In Menu
   printMenu();
@@ -3805,8 +3821,20 @@ void loop() {
     requestTelemetryPrint();
   }
 
-  // 0. CHẾ ĐỘ NGỦ ĐÊM TỰ ĐỘNG ĐÃ TẮT HOÀN TOÀN (CHỈ KÍCH HOẠT THỦ CÔNG KHI NGƯỜI DÙNG YÊU CẦU: PHÍM [Z] HOẶC LỆNH 'sleep')
-  // (Đảm bảo hệ thống luôn luôn thức, không bao giờ tự ý ngủ hay phanh dừng ngoài ý muốn)
+  // 0. TỰ ĐỘNG NGỦ ĐÊM (TỪ 22:00 TỐI ĐẾN 04:00 SÁNG) THEO ĐỒNG HỒ RTC DS3231
+  static unsigned long lastNightCheckMs = 0;
+  if (!isEmergencyCoverActive && (millis() - lastNightCheckMs >= 5000)) {
+    lastNightCheckMs = millis();
+    int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+    float curTemp = 0.0f;
+    if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
+      if ((curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) && (millis() - lastSerialCharMs >= 30000)) {
+        if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE) {
+          enterNightSleepUntil4AM();
+        }
+      }
+    }
+  }
 
   // B. XỬ LÝ CÁC CHẾ ĐỘ TỰ ĐỘNG BÁM MẶT TRỜI (NOAA EPHEMERIS / SENSOR / HYBRID)
   static unsigned long lastOpticalLogTime = 0;
@@ -4026,7 +4054,7 @@ void loop() {
     float safeMaxAz = maxAzLimit - 0.2f;
 
     // 1. TRƯỜNG HỢP ĐÃ ĐẠT GÓC MAX (Buổi chiều sau khi quay hết hành trình cho phép):
-    // Giữ nguyên vị trí đó, không quay nhấp nháy, đứng im giữ bước đến 19:00
+    // Giữ nguyên vị trí đó, không quay nhấp nháy, đứng im giữ bước đến 22:00
     if (isMaxAzimuthReached) {
       if (stepper1 && stepper1->isRunning()) stepper1->stopMove();
       if (stepper2 && stepper2->isRunning()) stepper2->stopMove();
@@ -4035,7 +4063,7 @@ void loop() {
       static unsigned long lastMaxHoldLogMs = 0;
       if (millis() - lastMaxHoldLogMs >= 30000) {
         lastMaxHoldLogMs = millis();
-        Serial.printf(">> [MAX ANGLE HOLD] Gian pin dang GIU BUOC tai goc toi da (Phi=%+.1f° / Max=%+.1f°). Khoa goc dung im den 19:00 toi!\n",
+        Serial.printf(">> [MAX ANGLE HOLD] Gian pin dang GIU BUOC tai goc toi da (Phi=%+.1f° / Max=%+.1f°). Khoa goc dung im den 22:00 toi!\n",
                       getAngleDeg1(), maxAzLimit);
       }
     }
@@ -4078,7 +4106,7 @@ void loop() {
         if (computeSolarTrackingTargets(targetAz, targetEl, azSun, elSun, zenSun, ws, isDaylight)) {
           if (!isDaylight || elSun < 0.0f) {
             // Khi mặt trời lặn (sau ~17:30 chiều):
-            // Tuyệt đối KHÔNG tự ý Park về 90°/0°, mà GIỮ NGUYÊN VỊ TRÍ CUỐI NGÀY ĐỨNG IM GIỮ BƯỚC ĐẾN 19:00:00!
+            // Tuyệt đối KHÔNG tự ý Park về 90°/0°, mà GIỮ NGUYÊN VỊ TRÍ CUỐI NGÀY ĐỨNG IM GIỮ BƯỚC ĐẾN 22:00:00!
             if (stepper1 && stepper1->isRunning()) stepper1->stopMove();
             if (stepper2 && stepper2->isRunning()) stepper2->stopMove();
             isMaxAzimuthReached = true;
@@ -4086,7 +4114,7 @@ void loop() {
             static unsigned long lastSunsetLogMs = 0;
             if (millis() - lastSunsetLogMs >= 30000) {
               lastSunsetLogMs = millis();
-              Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° < 0°). Gian pin DUNG IM GIU BUOC tai vi tri chieu den 19:00 toi!\n", elSun);
+              Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° < 0°). Gian pin DUNG IM GIU BUOC tai vi tri chieu den 22:00 toi!\n", elSun);
             }
           } else {
             systemFsmState = FSM_STATE_TRACKING;
