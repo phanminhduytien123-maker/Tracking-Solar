@@ -3014,6 +3014,8 @@ void handleCliCommand(const String& cmdStr) {
     stateM1 = STATE_IDLE;
     stateM2 = STATE_IDLE;
     autoOpticalTracking = false;
+    currentTrackSource = TRACK_SRC_OFF;
+    isMaxAzimuthReached = false;
     if (stepper1) stepper1->stopMove();
     if (stepper2) stepper2->stopMove();
     BenchWizard.abort("Nguoi dung nhan E-Stop (stop)");
@@ -3403,6 +3405,8 @@ void loop() {
       stateM1 = STATE_IDLE;
       stateM2 = STATE_IDLE;
       autoOpticalTracking = false;
+      currentTrackSource = TRACK_SRC_OFF;
+      isMaxAzimuthReached = false;
       if (stepper1) stepper1->stopMove();
       if (stepper2) stepper2->stopMove();
       Serial.println("\n>> [STOP] DA DUNG KHAN CAP TOAN BO HE THONG (FastAccelStepper Decel)!");
@@ -3425,16 +3429,25 @@ void loop() {
 
     switch (cmd) {
       case 'a': case 'A':
+        currentTrackSource = TRACK_SRC_OFF;
+        autoOpticalTracking = false;
+        isMaxAzimuthReached = false;
         stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
         moveMotorSteps(activeAxis, DIR_TOWARD_HOME, stepsPerPress);
         break;
 
       case 'd': case 'D':
+        currentTrackSource = TRACK_SRC_OFF;
+        autoOpticalTracking = false;
+        isMaxAzimuthReached = false;
         stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
         moveMotorSteps(activeAxis, DIR_AWAY_HOME, stepsPerPress);
         break;
 
       case 'q': case 'Q':
+        currentTrackSource = TRACK_SRC_OFF;
+        autoOpticalTracking = false;
+        isMaxAzimuthReached = false;
         if (activeAxis == 1) {
           if (isHome1Triggered()) {
             Serial.println(">> [TRUC 1] Dang cham Home, khong the chay tiep ve Home!");
@@ -3459,6 +3472,9 @@ void loop() {
         break;
 
       case 'e': case 'E':
+        currentTrackSource = TRACK_SRC_OFF;
+        autoOpticalTracking = false;
+        isMaxAzimuthReached = false;
         if (activeAxis == 1) {
           if (getAngleDeg1() >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG) {
             Serial.printf(">> [TRUC 1] Goc phi = %+.1f° da cham gioi han mem %+.1f° (Chong xoan cap)! Khong chay.\n",
@@ -3529,12 +3545,16 @@ void loop() {
       // PHÍM G: SINGLE AUTO HOMING CHO TRỤC ĐANG CHỌN
       case 'g': case 'G':
         autoOpticalTracking = false;
+        currentTrackSource = TRACK_SRC_OFF;
+        isMaxAzimuthReached = false;
         runSingleAutoHoming(activeAxis);
         break;
 
       // PHÍM H: DUAL AUTO HOMING & VỀ MỐC MẶC ĐỊNH
       case 'h': case 'H':
         autoOpticalTracking = false;
+        currentTrackSource = TRACK_SRC_OFF;
+        isMaxAzimuthReached = false;
         runDualAutoHoming();
         break;
 
