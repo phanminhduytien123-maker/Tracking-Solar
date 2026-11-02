@@ -5,6 +5,7 @@ import ChartsSection from './components/ChartsSection';
 import DetailedTelemetryModal from './components/DetailedTelemetryModal';
 import ManualControlModal from './components/ManualControlModal';
 import SettingsModal from './components/SettingsModal';
+import EmergencyModal from './components/EmergencyModal';
 import WeatherBackground from './components/WeatherBackground';
 import MobileBottomNav from './components/MobileBottomNav';
 import SignInPage from './components/SignInPage';
@@ -90,6 +91,7 @@ export default function App() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('config');
   const [isExperimentLocked, setIsExperimentLocked] = useState(() => {
     return localStorage.getItem('solar_experiment_locked') === 'true';
@@ -642,6 +644,29 @@ export default function App() {
     }));
   };
 
+  const handleConfirmEmergencyAction = async (targetActive) => {
+    try {
+      if (dataSource === 'firebase') {
+        await firebaseServiceRef.current.setEmergencyCover(targetActive);
+      } else if (dataSource === 'mock') {
+        mockEngineRef.current.setEstop(targetActive);
+      }
+      setTelemetry((prev) => ({
+        ...prev,
+        system: {
+          ...prev.system,
+          emergencyActive: targetActive,
+          displayState: targetActive ? 'KHẨN CẤP (Góc Max phủ bạt)' : 'Đang Track Hybrid'
+        }
+      }));
+      alert(targetActive 
+        ? '🚨 ĐÃ KÍCH HOẠT DỪNG KHẨN CẤP: Hệ thống đang đưa về Home rồi hạ góc Max để phủ bạt an toàn!' 
+        : '✅ ĐÃ MỞ KHÓA HOẠT ĐỘNG: Hệ thống đang Home lại và tiếp tục chu trình Hybrid Track!');
+    } catch (err) {
+      alert(`❌ Lỗi gửi lệnh: ${err.message}`);
+    }
+  };
+
   // Compute adaptive weather theme for frosted glass panels
   const currentWeather = weatherData?.current || {};
   const effectiveWeatherType = customWeatherType || currentWeather?.condition?.type || 'partly_cloudy';
@@ -699,6 +724,7 @@ export default function App() {
         onLogout={handleLogout}
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onOpenSettingsModal={() => openSettingsTab('config')}
+        onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onResetEstop={handleResetEstop}
         weatherData={weatherData}
         isLoadingWeather={isLoadingWeather}
@@ -758,6 +784,14 @@ export default function App() {
         onTestDir={handleTestDir}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
+      />
+
+      {/* Modal Xác thực Dừng khẩn cấp / Phủ bạt an toàn & Mở khóa */}
+      <EmergencyModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
+        isCurrentlyActive={Boolean(telemetry?.system?.emergencyActive)}
+        onConfirm={handleConfirmEmergencyAction}
       />
 
       {/* Modal Cài Đặt Hệ Thống & Tọa Độ Lắp Đặt & Quản Lý Người Dùng & Mã Nguồn ESP32 */}
