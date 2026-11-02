@@ -1435,8 +1435,8 @@ bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun,
     return false;
   }
 
-  double lat = (double)ParamRegistry.get("PANEL_LATITUDE", 10.7626f);
-  double lon = (double)ParamRegistry.get("PANEL_LONGITUDE", 106.660f);
+  double lat = (double)ParamRegistry.get("PANEL_LATITUDE", 10.7831f);
+  double lon = (double)ParamRegistry.get("PANEL_LONGITUDE", 106.6721f);
   double tz  = (double)ParamRegistry.get("TIMEZONE_OFFSET", 7.0f);
 
   solar::SolarPosition pos = solar::SolarEphemeris::calculate(y, m, d, hh, mm, ss, tz, lat, lon);
@@ -2740,8 +2740,8 @@ void handleCliCommand(const String& cmdStr) {
     if (!readDS3231(y, m, d, hh, mm, ss, tC)) {
       Serial.println("\n>> [LOI] Khong the doc RTC DS3231 qua I2C de tinh vi tri mat troi!");
     } else {
-      double lat = (double)ParamRegistry.get("PANEL_LATITUDE", 10.7626f);
-      double lon = (double)ParamRegistry.get("PANEL_LONGITUDE", 106.660f);
+      double lat = (double)ParamRegistry.get("PANEL_LATITUDE", 10.7831f);
+      double lon = (double)ParamRegistry.get("PANEL_LONGITUDE", 106.6721f);
       double tz  = (double)ParamRegistry.get("TIMEZONE_OFFSET", 7.0f);
 
       solar::SolarPosition pos = solar::SolarEphemeris::calculate(y, m, d, hh, mm, ss, tz, lat, lon);
