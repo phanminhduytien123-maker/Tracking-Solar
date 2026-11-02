@@ -565,7 +565,7 @@ bool isHome1Triggered() {
   static bool debouncedState1 = false;
   static unsigned long lowStartTime1 = 0;
   static unsigned long highStartTime1 = 0;
-  const unsigned long DEBOUNCE_MS = 25;
+  const unsigned long DEBOUNCE_MS = 10; // 10ms chống dội & lọc sạch 100% xung nhiễu băm EMI DM556
 
   bool isRawLow = (digitalRead(M1_HOME_SW_PIN) == HOME_ACTIVE_LEVEL);
 
@@ -598,7 +598,7 @@ bool isHome2Triggered() {
   static bool debouncedState2 = false;
   static unsigned long lowStartTime2 = 0;
   static unsigned long highStartTime2 = 0;
-  const unsigned long DEBOUNCE_MS = 25;
+  const unsigned long DEBOUNCE_MS = 10; // 10ms chống dội & lọc sạch 100% xung nhiễu băm EMI DM556
 
   bool isRawLow = (digitalRead(M2_HOME_SW_PIN) == HOME_ACTIVE_LEVEL);
 
@@ -2498,7 +2498,7 @@ bool runDualHomingToSwitches() {
     // Xử lý trục 1
     switch (stage1) {
       case STAGE_FAST:
-        if (isHome1Triggered() || isHome1Raw()) {
+        if (isHome1Triggered()) {
           stepper1->forceStopAndNewPosition(0);
           Serial.println(">> [M1 FAST OK] Da cham switch 1 lan dau! Dang lui dong ra xa...");
           stepper1->setSpeedInHz(manualSpeedHz);
@@ -2535,7 +2535,7 @@ bool runDualHomingToSwitches() {
         break;
 
       case STAGE_CREEP:
-        if (isHome1Triggered() || isHome1Raw()) {
+        if (isHome1Triggered()) {
           stepper1->forceStopAndNewPosition(0);
           int32_t touchCnt1 = getEncoderCount1();
           int32_t diff1 = touchCnt1 - lastHomeTouchCount1;
@@ -2557,7 +2557,7 @@ bool runDualHomingToSwitches() {
     // Xử lý trục 2
     switch (stage2) {
       case STAGE_FAST:
-        if (isHome2Triggered() || isHome2Raw()) {
+        if (isHome2Triggered()) {
           stepper2->forceStopAndNewPosition(0);
           Serial.println(">> [M2 FAST OK] Da cham switch 2 lan dau! Dang lui dong ra xa...");
           stepper2->setSpeedInHz(manualSpeedHz);
@@ -2594,7 +2594,7 @@ bool runDualHomingToSwitches() {
         break;
 
       case STAGE_CREEP:
-        if (isHome2Triggered() || isHome2Raw()) {
+        if (isHome2Triggered()) {
           stepper2->forceStopAndNewPosition(0);
           int32_t touchCnt2 = getEncoderCount2();
           int32_t diff2 = touchCnt2 - lastHomeTouchCount2;
