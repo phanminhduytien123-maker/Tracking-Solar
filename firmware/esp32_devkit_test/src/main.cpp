@@ -2279,7 +2279,7 @@ bool homeAxisToSwitch(int axis) {
 
   uint32_t tStart = millis();
 
-  // BƯỚC 1: NẾU ĐANG CHẠM HOME TỪ TRƯỚC -> LÙI ĐỘNG RA XA (A9)
+  // BƯỚC 0: NẾU ĐANG CHẠM HOME TỪ TRƯỚC -> LÙI RA XA ĐỂ NHẢ SWITCH
   if (isTriggered()) {
     Serial.printf(">> [%s BUOC 0] Dang cham switch san -> Dang lui dong ra xa de nha switch...\n", axisName);
     s->setSpeedInHz(manualSpeedHz);
@@ -2299,13 +2299,18 @@ bool homeAxisToSwitch(int axis) {
     }
     s->stopMove();
     delay(50);
-    s->move(100);
+    s->move(200); // Lùi thêm 200 bước an toàn
     while (s->isRunning()) { if (checkCancel()) return false; delay(2); }
-    delay(100);
+    delay(200);
   }
 
-  // BƯỚC 2: TIẾP CẬN NHANH (FAST APPROACH)
-  Serial.printf(">> [%s BUOC 1] Dang chay nhanh tiep can Home (Fast Approach)...\n", axisName);
+  // =========================================================================
+  // QUY TRÌNH HOMING 3 LẦN CHẠM XÁC THỰC CÔNG NGHIỆP (TRIPLE-CONFIRMED HOMING)
+  // Mỗi lần chạm cách nhau ít nhất >= 0.5s và bắt buộc có chuyển động lùi cơ khí
+  // =========================================================================
+
+  // --- LẦN 1: TIẾP CẬN NHANH (Fast Approach 1200 Hz) ---
+  Serial.printf(">> [%s HOMING 1/3] Dang chay nhanh tiep can Home (1200 Hz)...\n", axisName);
   s->setSpeedInHz(HOME_FAST_SPEED_HZ);
   s->setAcceleration(stepperAccel);
   s->runBackward();
@@ -2315,65 +2320,115 @@ bool homeAxisToSwitch(int axis) {
     if (millis() - tStart > 35000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 35s! Da dung.\n", axisName);
+      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 35s o lan cham 1! Da dung.\n", axisName);
       requestTelemetryPrint();
       return false;
     }
     delay(1);
   }
-
   s->forceStopAndNewPosition(0);
-  Serial.printf(">> [%s BUOC 1 OK] Da cham switch lan 1! Dung ngay lap tuc.\n", axisName);
-  delay(150);
+  Serial.printf(">> [%s HOMING 1/3 OK] Da cham switch lan 1! Dung ngay lap tuc.\n", axisName);
+  delay(250); // Nghỉ 0.25s triệt tiêu quán tính
 
-  // BƯỚC 3: LÙI ĐỘNG RA XA ĐỂ NHẢ SWITCH (DYNAMIC RETRACT + 100 SAFETY STEPS) (A9)
-  Serial.printf(">> [%s BUOC 2] Dang lui dong ra xa cho den khi switch nha hoan toan + 100 buoc...\n", axisName);
+  // --- LÙI NHẢ SWITCH LẦN 1 (Bắt buộc lùi cơ khí kéo dài >= 0.5s chống nhiễu liên tiếp) ---
+  Serial.printf(">> [%s LUI NHA 1/2] Dang lui dong ra xa (bat buoc >= 0.5s nha switch + 200 buoc)...\n", axisName);
+  uint32_t tRetract1 = millis();
   s->setSpeedInHz(manualSpeedHz);
   s->setAcceleration(stepperAccel);
   s->runForward();
-  uint32_t tRetract = millis();
+
   while (isTriggered()) {
     if (checkCancel()) return false;
-    if (millis() - tRetract > 10000) {
+    if (millis() - tRetract1 > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.printf("\n>> [LOI AN TOAN %s] Switch bi ket dinh (Stuck LOW)! Timeout lui nha cong tac.\n", axisName);
-      requestTelemetryPrint();
+      Serial.printf("\n>> [LOI AN TOAN %s] Switch bi ket dinh! Timeout lui nha cong tac.\n", axisName);
       return false;
     }
     delay(2);
   }
   s->stopMove();
   delay(50);
-  s->move(100); // Biên an toàn 100 bước
-  while (s->isRunning()) {
-    if (checkCancel()) return false;
-    delay(2);
-  }
-  delay(150);
+  s->move(200); // Lùi thêm 200 bước an toàn
+  while (s->isRunning()) { if (checkCancel()) return false; delay(2); }
 
-  // BƯỚC 4: RÀ CHẬM TIẾP XÚC CHÍNH XÁC (SLOW CREEP, SAI SỐ <= 1 BƯỚC)
-  Serial.printf(">> [%s BUOC 3] Dang ra cham tiep xuc chinh xac (Slow Creep %d Hz)...\n", axisName, HOME_CREEP_SPEED_HZ);
-  s->setSpeedInHz(HOME_CREEP_SPEED_HZ);
+  // Đảm bảo khoảng cách thời gian giữa 2 lần chạm ít nhất 0.5 giây
+  while (millis() - tRetract1 < 500) {
+    if (checkCancel()) return false;
+    delay(10);
+  }
+  delay(200);
+
+  // --- LẦN 2: TIẾP CẬN TỐC ĐỘ VỪA XÁC THỰC (Medium Verification 500 Hz) ---
+  Serial.printf(">> [%s HOMING 2/3] Dang tiep can lan 2 toc do vua (500 Hz)...\n", axisName);
+  uint32_t tApproach2 = millis();
+  s->setSpeedInHz(500);
   s->setAcceleration(stepperAccel);
   s->runBackward();
 
+  while (!isTriggered()) {
+    if (checkCancel()) return false;
+    if (millis() - tApproach2 > 15000) {
+      s->stopMove();
+      stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
+      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 15s o lan cham 2! Da dung.\n", axisName);
+      return false;
+    }
+    delay(1);
+  }
+  s->forceStopAndNewPosition(0);
+  Serial.printf(">> [%s HOMING 2/3 OK] Da cham switch lan 2! Xac thuc thanh cong.\n", axisName);
+  delay(250);
+
+  // --- LÙI NHẢ SWITCH LẦN 2 (Bắt buộc lùi cơ khí kéo dài >= 0.5s) ---
+  Serial.printf(">> [%s LUI NHA 2/2] Dang lui dong ra xa (bat buoc >= 0.5s nha switch + 100 buoc)...\n", axisName);
+  uint32_t tRetract2 = millis();
+  s->setSpeedInHz(manualSpeedHz);
+  s->setAcceleration(stepperAccel);
+  s->runForward();
+
+  while (isTriggered()) {
+    if (checkCancel()) return false;
+    if (millis() - tRetract2 > 10000) {
+      s->stopMove();
+      stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
+      Serial.printf("\n>> [LOI AN TOAN %s] Switch bi ket dinh o lan lui 2! Da dung.\n", axisName);
+      return false;
+    }
+    delay(2);
+  }
+  s->stopMove();
+  delay(50);
+  s->move(100); // Lùi thêm 100 bước an toàn
+  while (s->isRunning()) { if (checkCancel()) return false; delay(2); }
+
+  // Đảm bảo khoảng cách thời gian giữa lần chạm 2 và 3 ít nhất 0.5 giây
+  while (millis() - tRetract2 < 500) {
+    if (checkCancel()) return false;
+    delay(10);
+  }
+  delay(200);
+
+  // --- LẦN 3: RÀ SIÊU CHẬM CHỐT MỐC GỐC TUYỆT ĐỐI (Ultra-Precision Creep 150 Hz) ---
+  Serial.printf(">> [%s HOMING 3/3] Dang ra sieu cham chot goc tuyet doi (150 Hz)...\n", axisName);
   uint32_t tCreepStart = millis();
+  s->setSpeedInHz(150);
+  s->setAcceleration(stepperAccel);
+  s->runBackward();
+
   while (!isTriggered()) {
     if (checkCancel()) return false;
     if (millis() - tCreepStart > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 10s o pha ra cham! Da dung.\n", axisName);
-      requestTelemetryPrint();
+      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 10s o lan cham 3! Da dung.\n", axisName);
       return false;
     }
     delay(1);
   }
-
   s->forceStopAndNewPosition(0);
 
-  // Đo độ lặp lại cơ học Homing (A9: repeatability metric)
+  // Đo độ lặp lại cơ học Homing (Repeatability Metric)
   int32_t touchCnt = (axis == 1) ? getEncoderCount1() : getEncoderCount2();
   int32_t prevTouch = (axis == 1) ? lastHomeTouchCount1 : lastHomeTouchCount2;
   int32_t diffRepeat = touchCnt - prevTouch;
@@ -2383,10 +2438,10 @@ bool homeAxisToSwitch(int axis) {
                 axisName, (long)touchCnt, (long)diffRepeat, (float)diffRepeat * getDegPerCount());
 
   if (axis == 1) resetEncoder1(0); else resetEncoder2(0);
-  Serial.printf(">> [BUOC 3 OK] %s DA CHOT MOC HOME 0.0° CHINH XAC TUYET DOI!\n", axisName);
+  Serial.printf(">> [HOMING HOAN TAT 100%%] %s DA XAC THUC DU 3 LAN CHAM -> CHOT MOC 0.0° CHINH XAC TUYET DOI!\n", axisName);
   stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
   requestTelemetryPrint();
-  delay(150);
+  delay(200);
   return true;
 }
 
