@@ -328,9 +328,6 @@ export class FirebaseSolarService {
     });
 
     const byDay = {};
-    const intradayProfile = generateIntradayProfile();
-    const intradaySlotMap = new Map();
-
     const now = new Date();
     const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
@@ -350,7 +347,8 @@ export class FirebaseSolarService {
           maxSta: 0,
           sumTrk: 0,
           sumSta: 0,
-          count: 0
+          count: 0,
+          slots: new Map()
         };
       }
       const trk = Number(rec.wh_trk || 0);
@@ -361,23 +359,22 @@ export class FirebaseSolarService {
       byDay[dayKey].sumTrk += trk;
       byDay[dayKey].sumSta += sta;
 
-      if (dayKey === todayStr) {
-        const hour = d.getHours();
-        const min = d.getMinutes();
-        if (hour >= 5 && hour <= 19) {
-          const slot = `${hour.toString().padStart(2, '0')}:${min < 30 ? '00' : '30'}`;
-          let pTrk = Number(rec.p_trk || 0);
-          let pSta = Number(rec.p_sta || 0);
-          if (pTrk > 50) pTrk = pTrk / 37.0;
-          if (pSta > 50) pSta = pSta / 37.0;
-          intradaySlotMap.set(slot, {
-            pTracking: parseFloat(pTrk.toFixed(1)),
-            pStatic: parseFloat(pSta.toFixed(1))
-          });
-        }
+      const hour = d.getHours();
+      const min = d.getMinutes();
+      if (hour >= 5 && hour <= 19) {
+        const slot = `${String(hour).padStart(2, '0')}:${min < 30 ? '00' : '30'}`;
+        let pTrk = Number(rec.p_trk || 0);
+        let pSta = Number(rec.p_sta || 0);
+        if (pTrk > 50) pTrk = pTrk / 37.0;
+        if (pSta > 50) pSta = pSta / 37.0;
+        byDay[dayKey].slots.set(slot, {
+          pTracking: parseFloat(pTrk.toFixed(1)),
+          pStatic: parseFloat(pSta.toFixed(1))
+        });
       }
     });
 
+    // 1. Cập nhật tích lũy 30 ngày (historyList)
     Object.values(byDay).forEach((dayInfo) => {
       const idx = dateIndexMap.get(dayInfo.date);
       if (idx !== undefined) {
@@ -409,18 +406,34 @@ export class FirebaseSolarService {
       }
     });
 
-    intradayProfile.forEach((pt) => {
-      if (intradaySlotMap.has(pt.time)) {
-        const slotData = intradaySlotMap.get(pt.time);
-        pt.pTracking = slotData.pTracking;
-        pt.pStatic = slotData.pStatic;
-        const exp = 1.018 * slotData.pStatic;
-        pt.gain = exp > 0 ? parseFloat((((slotData.pTracking / exp) - 1) * 100).toFixed(1)) : 0;
+    // 2. Tạo hồ sơ công suất trong ngày (intradayProfilesByDate) cho TẤT CẢ các ngày có dữ liệu
+    const allIntradayProfiles = {};
+    const availableDates = Object.keys(byDay).sort().reverse(); // Ngày mới nhất lên trước
+
+    // Đảm bảo luôn có ngày hôm nay trong danh sách
+    if (!availableDates.includes(todayStr)) {
+      availableDates.unshift(todayStr);
+    }
+
+    availableDates.forEach((dKey) => {
+      const profile = generateIntradayProfile();
+      const daySlots = byDay[dKey]?.slots;
+      if (daySlots) {
+        profile.forEach((pt) => {
+          if (daySlots.has(pt.time)) {
+            const slotData = daySlots.get(pt.time);
+            pt.pTracking = slotData.pTracking;
+            pt.pStatic = slotData.pStatic;
+            const exp = 1.018 * slotData.pStatic;
+            pt.gain = exp > 0 ? parseFloat((((slotData.pTracking / exp) - 1) * 100).toFixed(1)) : 0;
+          }
+        });
       }
+      allIntradayProfiles[dKey] = profile;
     });
 
     if (this.onHistory) {
-      this.onHistory(historyList, intradayProfile);
+      this.onHistory(historyList, allIntradayProfiles, availableDates);
     }
   }
 

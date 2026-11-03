@@ -34,7 +34,16 @@ const RANGE_OPTIONS = [
   { value: 30, label: '30 ngày' }
 ];
 
-export default function ChartsSection({ intradayData, history30Days, onClearCharts, isAdmin = false, themeMode = 'light' }) {
+export default function ChartsSection({
+  intradayData,
+  history30Days,
+  onClearCharts,
+  isAdmin = false,
+  themeMode = 'light',
+  availableDates = [],
+  selectedIntradayDate = '',
+  onSelectIntradayDate = null
+}) {
   const [historyRange, setHistoryRange] = useState(1);
   const [expandedChart, setExpandedChart] = useState(null);
   const [includeExcludedDays, setIncludeExcludedDays] = useState(false);
@@ -307,22 +316,50 @@ export default function ChartsSection({ intradayData, history30Days, onClearChar
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ĐỒ THỊ 1: CÔNG SUẤT TRONG NGÀY */}
         <div className="lab-card p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                Đồ thị công suất trong ngày
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <span>Đồ thị công suất trong ngày</span>
+                {selectedIntradayDate && (
+                  <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 rounded-sm">
+                    {selectedIntradayDate}
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
                 So sánh công suất tức thời (W) theo khung giờ đo 05:00 – 19:00
               </p>
             </div>
-            <button
-              onClick={() => setExpandedChart('intraday')}
-              className="p-1.5 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
-              title="Phóng to đồ thị"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
+            
+            <div className="flex items-center gap-2">
+              {availableDates && availableDates.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="select-intraday-date" className="text-xs text-zinc-500 dark:text-slate-400 font-medium hidden sm:inline">
+                    Xem ngày:
+                  </label>
+                  <select
+                    id="select-intraday-date"
+                    value={selectedIntradayDate}
+                    onChange={(e) => onSelectIntradayDate && onSelectIntradayDate(e.target.value)}
+                    className="text-xs border border-zinc-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 rounded-sm px-2.5 py-1 font-semibold cursor-pointer outline-none shadow-xs"
+                    title="Chọn ngày cụ thể để xem biểu đồ công suất 05:00 - 19:00"
+                  >
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={() => setExpandedChart('intraday')}
+                className="p-1.5 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
+                title="Phóng to đồ thị"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="h-[260px] sm:h-[300px] w-full">
