@@ -48,6 +48,18 @@ volatile bool     telemetryDirty      = false;
 volatile bool isEmergencyCoverActive = false;
 volatile bool remoteEmergencyTrigger  = false;
 volatile bool remoteUnlockTrigger     = false;
+volatile bool remoteHomeTrigger       = false;
+volatile bool remoteParkTrigger       = false;
+volatile bool remoteJogTrigger        = false;
+volatile int  remoteJogAxis           = 1;
+volatile float remoteJogDeltaDeg      = 0.0f;
+volatile bool remoteTestDirTrigger    = false;
+volatile int  remoteTestDirAxis       = 1;
+volatile int  remoteTestDirDir        = 1;
+volatile bool remoteResetFaultTrigger = false;
+volatile bool remotePsoTrigger        = false;
+String lastHandledCmdId = "";
+void parkPanels();
 
 void requestTelemetryPrint() {
   telemetryDirty = true;
@@ -2024,26 +2036,165 @@ void checkRemoteFirebaseCommands() {
     FirebaseJson &json = cmdFbdo.jsonObject();
     FirebaseJsonData jsonData;
 
-    // Kiểm tra cờ Dừng Khẩn Cấp (Phủ bạt)
+    // Kiểm tra ID lệnh và cờ ack để tránh thực thi lặp lại
+    String cmdId = "";
+    json.get(jsonData, "id");
+    if (jsonData.success) cmdId = jsonData.stringValue;
+
+    bool isAck = false;
+    json.get(jsonData, "ack");
+    if (jsonData.success) isAck = jsonData.boolValue;
+
+    if (cmdId.length() > 0 && cmdId == lastHandledCmdId && isAck) {
+      return; // Lệnh này đã được xử lý xong
+    }
+
+    bool shouldAck = false;
+
+    // 1. Kiểm tra cờ Dừng Khẩn Cấp (Phủ bạt)
     json.get(jsonData, "emergency");
     if (jsonData.success) {
       bool emgVal = jsonData.boolValue;
       if (emgVal && !isEmergencyCoverActive) {
         remoteEmergencyTrigger = true;
+        shouldAck = true;
       } else if (!emgVal && isEmergencyCoverActive) {
         remoteUnlockTrigger = true;
+        shouldAck = true;
       }
     }
 
     json.get(jsonData, "cmd");
     if (jsonData.success) {
       String cmd = jsonData.stringValue;
+
+      // 1. DỪNG KHẨN CẤP / PHỦ BẠT & MỞ KHÓA
       if (cmd.equalsIgnoreCase("emergency_cover") || cmd.equalsIgnoreCase("estop")) {
         json.get(jsonData, "state");
         bool st = jsonData.success ? jsonData.boolValue : true;
-        if (st && !isEmergencyCoverActive) remoteEmergencyTrigger = true;
-        else if (!st && isEmergencyCoverActive) remoteUnlockTrigger = true;
+        if (st && !isEmergencyCoverActive) {
+          remoteEmergencyTrigger = true;
+          shouldAck = true;
+        } else if (!st && isEmergencyCoverActive) {
+          remoteUnlockTrigger = true;
+          shouldAck = true;
+        }
       }
+      // 2. LỆNH HOME LẠI HỆ THỐNG
+      else if (cmd.equalsIgnoreCase("re_home") || cmd.equalsIgnoreCase("home")) {
+        if (!isEmergencyCoverActive) {
+          remoteHomeTrigger = true;
+          shouldAck = true;
+          Serial.println(">> [REMOTE] Nhan lenh HOME lai toan bo he thong!");
+        } else {
+          Serial.println(">> [REMOTE] Bo qua lenh Home vi he thong dang o the KHAN CAP!");
+        }
+      }
+      // 3. LỆNH ĐƯA VỀ VỊ TRÍ NGHỈ (PARK)
+      else if (cmd.equalsIgnoreCase("park")) {
+        if (!isEmergencyCoverActive) {
+          remoteParkTrigger = true;
+          shouldAck = true;
+          Serial.println(">> [REMOTE] Nhan lenh PARK dua gian pin ve the do an toan!");
+        }
+      }
+      // 4. LỆNH CHUYỂN CHẾ ĐỘ VẬN HÀNH (AUTO / MANUAL / PARK)
+      else if (cmd.equalsIgnoreCase("set_mode")) {
+        json.get(jsonData, "mode");
+        if (jsonData.success) {
+          String m = jsonData.stringValue;
+          if (m.equalsIgnoreCase("MANUAL")) {
+            currentTrackSource = TRACK_SRC_OFF;
+            autoOpticalTracking = false;
+            if (stepper1) stepper1->stopMove();
+            if (stepper2) stepper2->stopMove();
+            systemFsmState = FSM_STATE_IDLE;
+            Serial.println(">> [REMOTE] Da chuyen sang che do THU CONG (MANUAL). Cho phep Jog goc!");
+            shouldAck = true;
+          } else if (m.equalsIgnoreCase("AUTO")) {
+            if (!isEmergencyCoverActive) {
+              currentTrackSource = TRACK_SRC_HYBRID;
+              autoOpticalTracking = true;
+              trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+              isMaxAzimuthReached = false;
+              systemFsmState = FSM_STATE_TRACKING;
+              Serial.println(">> [REMOTE] Da chuyen sang che do TU DONG (AUTO HYBRID).");
+              shouldAck = true;
+            }
+          } else if (m.equalsIgnoreCase("PARK")) {
+            remoteParkTrigger = true;
+            shouldAck = true;
+          }
+        }
+      }
+      // 5. LỆNH ĐIỀU CHỈNH GÓC QUAY (JOG)
+      else if (cmd.equalsIgnoreCase("jog")) {
+        if (!isEmergencyCoverActive) {
+          int ax = 1;
+          json.get(jsonData, "axis");
+          if (jsonData.success) {
+            String axStr = jsonData.stringValue;
+            if (axStr.equalsIgnoreCase("elevation") || axStr == "2") ax = 2;
+            else ax = 1;
+          }
+
+          float stepDeg = 5.0f;
+          json.get(jsonData, "step");
+          if (jsonData.success) stepDeg = fabs((float)jsonData.doubleValue);
+          if (stepDeg <= 0.01f) stepDeg = 5.0f;
+
+          String dirStr = "CW";
+          json.get(jsonData, "direction");
+          if (jsonData.success) dirStr = jsonData.stringValue;
+
+          float delta = (dirStr.equalsIgnoreCase("CCW") || dirStr == "-1") ? -stepDeg : stepDeg;
+
+          remoteJogAxis = ax;
+          remoteJogDeltaDeg = delta;
+          remoteJogTrigger = true;
+          shouldAck = true;
+          Serial.printf(">> [REMOTE] Nhan lenh JOG Truc %d buoc %+.1f do\n", ax, delta);
+        } else {
+          Serial.println(">> [REMOTE] Bo qua lenh Jog vi he thong dang o the KHAN CAP!");
+        }
+      }
+      // 6. LỆNH TEST DIR (QUAY CHẬM)
+      else if (cmd.equalsIgnoreCase("test_dir")) {
+        if (!isEmergencyCoverActive) {
+          int ax = 1;
+          json.get(jsonData, "axis");
+          if (jsonData.success) {
+            String axStr = jsonData.stringValue;
+            if (axStr.equalsIgnoreCase("elevation") || axStr == "2") ax = 2;
+            else ax = 1;
+          }
+          int d = 1;
+          json.get(jsonData, "direction");
+          if (jsonData.success) d = (jsonData.intValue < 0) ? -1 : 1;
+
+          remoteTestDirAxis = ax;
+          remoteTestDirDir = d;
+          remoteTestDirTrigger = true;
+          shouldAck = true;
+          Serial.printf(">> [REMOTE] Nhan lenh Test DIR Truc %d, chieu %d\n", ax, d);
+        }
+      }
+      // 7. LỆNH RESET CỜ BÁO LỖI FAULT
+      else if (cmd.equalsIgnoreCase("reset_fault")) {
+        remoteResetFaultTrigger = true;
+        shouldAck = true;
+      }
+      // 8. LỆNH KÍCH HOẠT TỐI ƯU HÓA PSO
+      else if (cmd.equalsIgnoreCase("trigger_pso")) {
+        remotePsoTrigger = true;
+        shouldAck = true;
+      }
+    }
+
+    // Xử lý xác nhận lệnh (ack)
+    if (shouldAck && cmdId.length() > 0) {
+      lastHandledCmdId = cmdId;
+      Firebase.RTDB.setBool(&cmdFbdo, "/solar/control/ack", true);
     }
   }
 }
@@ -3722,6 +3873,62 @@ void loop() {
       systemFsmState = FSM_STATE_TRACKING;
       Serial.println(">> [UNLOCK COMPLETE] Da mo khoa thanh cong! Tiep tuc bam Hybrid tu dong.");
     }
+    requestTelemetryPrint();
+  }
+
+  // =========================================================================
+  // XỬ LÝ CÁC LỆNH TỪ XA TỪ WEB DASHBOARD TRÊN CORE 1 (CHUYỂN ĐỘNG AN TOÀN)
+  // =========================================================================
+  if (remoteHomeTrigger) {
+    remoteHomeTrigger = false;
+    Serial.println("\n>> [REMOTE HOMING] Dang thuc hien Homing ca 2 truc ve cong tac...");
+    runDualHomingToSwitches();
+    Serial.println(">> [REMOTE HOMING] Hoan thanh Homing!");
+    requestTelemetryPrint();
+  }
+
+  if (remoteParkTrigger) {
+    remoteParkTrigger = false;
+    Serial.println("\n>> [REMOTE PARK] Dang dua gian pin ve the do an toan (Park)...");
+    parkPanels();
+    requestTelemetryPrint();
+  }
+
+  if (remoteJogTrigger) {
+    remoteJogTrigger = false;
+    int ax = remoteJogAxis;
+    float delta = remoteJogDeltaDeg;
+    float startDeg = (ax == 1) ? getAngleDeg1() : getElevationEpsilon();
+    float targetDeg = startDeg + delta;
+    Serial.printf("\n>> [REMOTE JOG] Truc %d: Tu %+.2f do -> Muc tieu: %+.2f do (Nhay %+.1f do)\n",
+                  ax, startDeg, targetDeg, delta);
+    stepPositionControl(ax, targetDeg, manualSpeedHz);
+    requestTelemetryPrint();
+  }
+
+  if (remoteTestDirTrigger) {
+    remoteTestDirTrigger = false;
+    int ax = remoteTestDirAxis;
+    int d = remoteTestDirDir;
+    Serial.printf("\n>> [REMOTE TEST DIR] Truc %d, chieu %d (Phat 200 buoc toc do cham)...\n", ax, d);
+    moveMotorSteps(ax, (d > 0) ? DIR_AWAY_HOME : DIR_TOWARD_HOME, 200, 300);
+    requestTelemetryPrint();
+  }
+
+  if (remoteResetFaultTrigger) {
+    remoteResetFaultTrigger = false;
+    if (stepper1) stepper1->stopMove();
+    if (stepper2) stepper2->stopMove();
+    stateM1 = STATE_IDLE;
+    stateM2 = STATE_IDLE;
+    Serial.println("\n>> [REMOTE RESET FAULT] Da xoa toan bo co bao loi ket dong co!");
+    requestTelemetryPrint();
+  }
+
+  if (remotePsoTrigger) {
+    remotePsoTrigger = false;
+    Serial.println("\n>> [REMOTE PSO] Chay toi uu hoa bay dan PSO...");
+    runPsoOptimization();
     requestTelemetryPrint();
   }
 

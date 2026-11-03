@@ -46,6 +46,16 @@ export default function ManualControlModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
       <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-2xl max-h-[92vh] flex flex-col shadow-sm">
         
+        {/* Banner cảnh báo Khóa Dừng khẩn cấp / Phủ bạt */}
+        {system?.emergencyActive && (
+          <div className="bg-amber-500 text-slate-950 font-bold text-xs py-2 px-4 text-center shrink-0 border-b border-amber-600">
+            ⚠️ HỆ THỐNG ĐANG KHÓA AN TOÀN (DỪNG KHẨN CẤP / PHỦ BẠT)
+            <div className="font-normal text-[11px] mt-0.5 text-slate-900">
+              Mọi lệnh di chuyển sẽ bị chặn cho đến khi mở khóa. Hãy nhấn nút màu cam <b>[MỞ KHÓA HOẠT ĐỘNG]</b> trên thanh tiêu đề!
+            </div>
+          </div>
+        )}
+
         {/* Banner dữ liệu giả lập nếu có */}
         {isMockData && (
           <div className="bg-red-700 text-white text-xs font-semibold py-1.5 px-4 text-center shrink-0">

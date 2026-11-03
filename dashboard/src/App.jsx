@@ -316,6 +316,30 @@ export default function App() {
               });
             }
           },
+          onHistory: (historyList, intradayProfile) => {
+            if (historyList && historyList.length > 0) {
+              setHistory30Days((prev) => {
+                const merged = [...historyList];
+                const lastIdx = merged.length - 1;
+                // Bảo lưu số liệu hôm nay nếu live telemetry đang có giá trị lớn hơn
+                if (prev && prev.length > 0 && prev[prev.length - 1].trackingWh > merged[lastIdx].trackingWh) {
+                  merged[lastIdx] = { ...prev[prev.length - 1] };
+                }
+                return merged;
+              });
+            }
+            if (intradayProfile && intradayProfile.length > 0) {
+              setIntradayData((prev) => {
+                return intradayProfile.map((pt, i) => {
+                  const livePt = prev[i];
+                  if (livePt && livePt.pTracking > 0 && pt.pTracking === 0) {
+                    return livePt;
+                  }
+                  return pt;
+                });
+              });
+            }
+          },
           onStatusChange: (status) => {
             setFirebaseConnected(status.connected);
           },
