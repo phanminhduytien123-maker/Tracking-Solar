@@ -168,15 +168,15 @@ export default function DetailedTelemetryModal({
                     <td className="py-2 px-3 text-zinc-600">Độ ngửa hiện tại (ε)</td>
                     <td className="py-2 px-3 font-semibold text-zinc-900">
                       {el.epsilon !== null && el.epsilon !== undefined ? formatValueOrDash(el.epsilon, 1, '°') : '--'}
-                      <span className="text-[11px] text-zinc-500 font-normal ml-2">(Nằm ngang = 90°, dựng đứng = 0°)</span>
+                      <span className="text-[11px] text-zinc-500 font-normal ml-2">(CTHT = 90°, Zenith nằm ngang = 50°, Ngửa đón Tây = 10°)</span>
                     </td>
                   </tr>
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Góc mục tiêu thiên văn (φ_ref / ε_ref)</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {az.targetAngle !== null ? formatSignedNumber(az.targetAngle - 180, 1, '°') : '--'}
+                      {az.targetPhi !== null && az.targetPhi !== undefined ? formatSignedNumber(az.targetPhi, 1, '°') : (az.targetAngle !== null ? formatSignedNumber(az.targetAngle <= 180 ? 180 - az.targetAngle : (360 - az.targetAngle), 1, '°') : '--')}
                       <span className="mx-2 text-zinc-400">/</span>
-                      {el.targetAngle !== null ? formatValueOrDash(el.targetAngle, 1, '°') : '--'}
+                      {el.targetEpsilon !== null && el.targetEpsilon !== undefined ? formatValueOrDash(el.targetEpsilon, 1, '°') : (el.targetAngle !== null ? formatValueOrDash(el.targetAngle, 1, '°') : '--')}
                     </td>
                   </tr>
                   <tr>
@@ -226,21 +226,33 @@ export default function DetailedTelemetryModal({
                     </td>
                   </tr>
                   <tr>
-                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình phương vị (AZ_MIN / AZ_MAX)</td>
+                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình phương vị (Home SW1)</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.limit_az_min ? 'Đang chạm' : 'Hở'} / {motors.limit_az_max ? 'Đang chạm' : 'Hở'}
+                      {(motors.limit_az_min ?? motors.azimuth?.limitHome) ? (
+                        <span className="text-amber-600 font-bold">Đang chạm (Home 0.0°)</span>
+                      ) : (
+                        <span className="text-emerald-600">Hở (Bình thường)</span>
+                      )}
                     </td>
                   </tr>
                   <tr>
-                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình độ ngửa (EL_MIN / EL_MAX)</td>
+                    <td className="py-2 px-3 text-zinc-600">Công tắc hành trình độ ngửa (Home SW2)</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.limit_el_min ? 'Đang chạm' : 'Hở'} / {motors.limit_el_max ? 'Đang chạm' : 'Hở'}
+                      {(motors.limit_el_min ?? motors.elevation?.limitSwitch90) ? (
+                        <span className="text-amber-600 font-bold">Đang chạm (Home 90.0°)</span>
+                      ) : (
+                        <span className="text-emerald-600">Hở (Bình thường)</span>
+                      )}
                     </td>
                   </tr>
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Trạng thái gốc tọa độ (Homing)</td>
-                    <td className="py-2 px-3 text-zinc-800">
-                      {motors.isHomed ? 'Đã hoàn thành xác lập gốc' : 'Chưa Homing'}
+                    <td className="py-2 px-3 text-zinc-800 font-medium">
+                      {(motors.isHomed ?? (motors.azimuth?.isHomed || motors.elevation?.isHomed)) ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">✓ Đã hoàn thành xác lập gốc</span>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">Chưa Homing</span>
+                      )}
                     </td>
                   </tr>
                 </tbody>

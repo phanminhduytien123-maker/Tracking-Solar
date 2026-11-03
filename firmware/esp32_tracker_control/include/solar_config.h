@@ -114,7 +114,7 @@ extern "C" {
 /** [G] az_home_sw: Phương vị thực tế của công tắc hành trình Azimuth (Độ, tính từ Bắc = 0° theo chiều KĐH).
  *  Công tắc HOME đặt chéo về phía Bắc của hướng mọc xa nhất.
  *  Placeholder: 45.0° (Đông Bắc). CẦN ĐO THỰC TẾ TRÊN KHUNG BẰNG LA BÀN/KINH VĨ. */
-#define CFG_G_AZ_HOME_SW_DEG                (45.0f)
+#define CFG_G_AZ_HOME_SW_DEG                (180.0f)
 
 /** [H] az_offset: Độ lệch lắp đặt của khung so với trục chuẩn địa lý (Độ).
  *  Hiệu chuẩn bằng bóng nắng trưa (khi solar noon: Az_sun = 180°).

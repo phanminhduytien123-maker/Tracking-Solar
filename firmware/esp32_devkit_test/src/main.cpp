@@ -55,8 +55,10 @@ void requestTelemetryPrint() {
 
 // Khai báo trước hàm điều khiển vị trí góc & Homing cả 2 trục
 bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz = 0);
+bool homeAxisToSwitch(int axis);
 bool runDualHomingToSwitches();
 void runDualAutoHoming();
+void runPsoOptimization();
 bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun, float &elSun, float &zenithSun, float &ws, bool &isDaylight);
 void checkRemoteFirebaseCommands();
 
@@ -188,9 +190,24 @@ inline float getElMinSoftLimitDeg();
 inline float getElMaxSoftLimitDeg();
 
 // Hằng số hình học lắp đặt & La bàn địa lý (Đọc động từ ParamRegistry, UNVERIFIED)
-inline float getGHomeAzDeg()        { return ParamRegistry.get("G_AZ_HOME", 45.0f); }
+inline float getGHomeAzDeg()        { return ParamRegistry.get("G_AZ_HOME", 180.0f); }
 inline float getHOffsetAzDeg()      { return ParamRegistry.get("H_AZ_OFFSET", 0.0f); }
 inline float getJHomeElDeg()        { return ParamRegistry.get("J_EL_HOME", 90.0f); }
+
+// Góc ngửa epsilon khi giàn pin nằm ngang hướng thẳng thiên đỉnh (Zenith)
+// Bằng góc mặc định trục 2 mà người dùng đã cài (hoặc đọc động từ ParamRegistry J_EL_ZENITH)
+extern float defaultDeg2;
+inline float getElevationZenith() {
+  float zenParam = ParamRegistry.get("J_EL_ZENITH", 0.0f);
+  if (zenParam >= 15.0f && zenParam <= 75.0f) {
+    return zenParam;
+  }
+  float defAway = fabs(defaultDeg2);
+  if (defAway >= 15.0f && defAway <= 75.0f) {
+    return getJHomeElDeg() - defAway;
+  }
+  return 50.0f; // Mặc định ở giữa hành trình [10°, 90°]
+}
 #ifdef CFG_G_AZ_HOME_SW_DEG
 #undef CFG_G_AZ_HOME_SW_DEG
 #endif
@@ -402,6 +419,12 @@ TrackCyclePhase trackCyclePhase = TRACK_CYCLE_ADJUSTING;
 unsigned long   trackHoldStartTimeMs = 0;
 bool            isMaxAzimuthReached = false;
 
+// Lưu mục tiêu bám thời gian thực để gửi Telemetry lên Dashboard
+float           liveSunAzimuth       = 180.0f;
+float           liveSunElevation     = 0.0f;
+float           liveTargetPhi        = 0.0f;
+float           liveTargetEpsilon    = 90.0f;
+
 // Trạng thái Bám quang tự động (Optical Tracking) & Lọc tín hiệu
 bool autoOpticalTracking = false;
 unsigned long lastOpticalTrackTime = 0;
@@ -542,10 +565,14 @@ float getMotorAngleDeg2() {
 }
 
 // Góc La bàn địa lý Azimuth (tính từ Bắc = 0° theo chiều KĐH: Bắc 0°, Đông 90°, Nam 180°, Tây 270°)
+// Switch Home 1 đặt tại Chính Nam (180.0°). Quay ra xa Home theo chiều ngược KĐH về phía Đông (90.0°).
+// - Sáng (Sun Az <= 180°): Mặt trước pin đón nắng Đông -> Nam: Heading = 180.0° - phi.
+// - Chiều (Sun Az > 180°): Trục 1 quay Đông Bắc, Trục 2 ngửa sau đón Tây: Heading = 360.0° - phi.
 float getCompassAzimuth() {
-  float az = CFG_G_AZ_HOME_SW_DEG + CFG_H_AZ_OFFSET_DEG + getAngleDeg1();
-  while (az >= 360.0f) az -= 360.0f;
+  float phi = getAngleDeg1();
+  float az = (liveSunAzimuth > 180.0f) ? (360.0f - phi) : (CFG_G_AZ_HOME_SW_DEG + CFG_H_AZ_OFFSET_DEG - phi);
   while (az < 0.0f)    az += 360.0f;
+  while (az >= 360.0f) az -= 360.0f;
   return az;
 }
 
@@ -561,69 +588,23 @@ float getElevationEpsilon() {
 static portMUX_TYPE homeMux = portMUX_INITIALIZER_UNLOCKED;
 
 bool isHome1Triggered() {
-  portENTER_CRITICAL(&homeMux);
-  static bool debouncedState1 = false;
-  static unsigned long lowStartTime1 = 0;
-  static unsigned long highStartTime1 = 0;
-  const unsigned long DEBOUNCE_MS = 10; // 10ms chống dội & lọc sạch 100% xung nhiễu băm EMI DM556
-
-  bool isRawLow = (digitalRead(M1_HOME_SW_PIN) == HOME_ACTIVE_LEVEL);
-
-  if (isRawLow) {
-    highStartTime1 = 0;
-    if (!debouncedState1) {
-      if (lowStartTime1 == 0) {
-        lowStartTime1 = millis();
-      } else if (millis() - lowStartTime1 >= DEBOUNCE_MS) {
-        debouncedState1 = true;
-      }
-    }
-  } else {
-    lowStartTime1 = 0;
-    if (debouncedState1) {
-      if (highStartTime1 == 0) {
-        highStartTime1 = millis();
-      } else if (millis() - highStartTime1 >= DEBOUNCE_MS) {
-        debouncedState1 = false;
-      }
-    }
+  // Bộ lọc xung băm EMI công nghiệp: Đọc nhanh 15 mẫu liên tiếp cách nhau 200us (3ms)
+  // Xung nhiễu từ mạch Buck / Driver DM556 chỉ tồn tại vài micro-giây sẽ bị loại bỏ 100%
+  if (digitalRead(M1_HOME_SW_PIN) != HOME_ACTIVE_LEVEL) return false;
+  for (int i = 0; i < 15; i++) {
+    esp_rom_delay_us(200);
+    if (digitalRead(M1_HOME_SW_PIN) != HOME_ACTIVE_LEVEL) return false;
   }
-  bool res = debouncedState1;
-  portEXIT_CRITICAL(&homeMux);
-  return res;
+  return true;
 }
 
 bool isHome2Triggered() {
-  portENTER_CRITICAL(&homeMux);
-  static bool debouncedState2 = false;
-  static unsigned long lowStartTime2 = 0;
-  static unsigned long highStartTime2 = 0;
-  const unsigned long DEBOUNCE_MS = 10; // 10ms chống dội & lọc sạch 100% xung nhiễu băm EMI DM556
-
-  bool isRawLow = (digitalRead(M2_HOME_SW_PIN) == HOME_ACTIVE_LEVEL);
-
-  if (isRawLow) {
-    highStartTime2 = 0;
-    if (!debouncedState2) {
-      if (lowStartTime2 == 0) {
-        lowStartTime2 = millis();
-      } else if (millis() - lowStartTime2 >= DEBOUNCE_MS) {
-        debouncedState2 = true;
-      }
-    }
-  } else {
-    lowStartTime2 = 0;
-    if (debouncedState2) {
-      if (highStartTime2 == 0) {
-        highStartTime2 = millis();
-      } else if (millis() - highStartTime2 >= DEBOUNCE_MS) {
-        debouncedState2 = false;
-      }
-    }
+  if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL) return false;
+  for (int i = 0; i < 15; i++) {
+    esp_rom_delay_us(200);
+    if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL) return false;
   }
-  bool res = debouncedState2;
-  portEXIT_CRITICAL(&homeMux);
-  return res;
+  return true;
 }
 
 // Đọc trực tiếp không trễ (phục vụ ngắt khẩn cấp hoặc rà chính xác)
@@ -710,6 +691,12 @@ uint32_t getRtcEpochUTC7() {
   t.tm_sec  = ss;
   t.tm_isdst = 0;
   time_t epoch = mktime(&t);
+  // DS3231 lưu theo giờ địa phương Việt Nam (UTC+7).
+  // Để Unix Epoch khớp chuẩn quốc tế (UTC) với Firebase Server Timestamp và Web Dashboard,
+  // cần trừ đi 7 giờ (7 * 3600 = 25200 giây).
+  if (epoch > 25200) {
+    epoch -= (7 * 3600);
+  }
   return (uint32_t)epoch;
 }
 
@@ -956,6 +943,11 @@ void enterNightSleepUntil4AM() {
 
   systemFsmState = FSM_STATE_LIGHT_SLEEP;
 
+  // Tạm dừng TelemetryTask trên Core 0 để tránh đụng độ WiFi/Flash khi ngủ
+  if (telemetryTaskHandle != NULL) {
+    vTaskSuspend(telemetryTaskHandle);
+  }
+
   // 7. BẮT ĐẦU LIGHT SLEEP (RAM VÀ TRẠNG THÁI CPU NGUYÊN VẸN 100%)
   esp_light_sleep_start();
 
@@ -985,15 +977,26 @@ void enterNightSleepUntil4AM() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // 10. Homing lại cả 2 trục: Trục 2 quay từ góc Max về Home 2 (Epsilon=90° chạm switch), Trục 1 về Home 1 (0°)
-  Serial.println(">> [DAWN HOMING] Tu dong Homing lai ca 2 truc sau khi thuc day...");
-  runDualHomingToSwitches();
+  // Xóa cờ ngủ đông trên Firebase ngay khi thức dậy
+  if (telemetryTaskHandle != NULL) {
+    vTaskResume(telemetryTaskHandle);
+  }
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    FirebaseJson wakeJson;
+    wakeJson.set("isSleeping", false);
+    wakeJson.set("wake_at", "DAWN");
+    wakeJson.set("state", "HOMING");
+    wakeJson.set("status", "WAKEUP_DAWN");
+    wakeJson.set("displayState", "Thuc day don binh minh");
+    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &wakeJson);
+  }
 
-  // Trục 2 giữ nguyên ở Home 2 (Epsilon = 90.0°, chạm công tắc hành trình 2 đón bình minh)
-  Serial.println(">> [TRUC 2 DAWN] Truc 2 giu nguyen tai Home 2 (Epsilon=90.0° - cham CTHT 2 cho mat troi moc).");
+  // 10. Homing lại cả 2 trục và đưa về vị trí mặc định (Seek Default) đón ngày mới
+  Serial.println(">> [DAWN HOMING] Tu dong Dual Auto Homing ca 2 truc sau khi thuc day...");
+  runDualAutoHoming();
 
   // Trục 1: Tính toán góc phương vị mặt trời mọc hôm nay theo NOAA và quay đón sẵn
-  float dawnAzTarget = defaultDeg1; // Mặc định hướng đón
+  float dawnAzTarget = defaultDeg1;
   float tAz = 0.0f, tEl = 0.0f, azS = 0.0f, elS = 0.0f, zenS = 0.0f, ws = 0.0f;
   bool isDay = false;
   if (computeSolarTrackingTargets(tAz, tEl, azS, elS, zenS, ws, isDay)) {
@@ -1016,10 +1019,13 @@ void enterNightSleepUntil4AM() {
   Serial.println(">> [DAWN READY] Gian pin da vao vi tri don binh minh san sang cho ngay moi!");
   Serial.println(">> =======================================================\n");
 
-  // 11. Đặt lại các biến trạng thái ngày mới
-  isMaxAzimuthReached = false;
+  // 11. Bật ngay chế độ tự động Hybrid Tracking ban ngày
+  runPsoOptimization();
+  currentTrackSource = TRACK_SRC_HYBRID;
+  autoOpticalTracking = true;
   trackCyclePhase = TRACK_CYCLE_ADJUSTING;
-  systemFsmState = FSM_STATE_IDLE;
+  isMaxAzimuthReached = false;
+  systemFsmState = FSM_STATE_TRACKING;
 }
 
 // Giám sát phát hiện kẹt động cơ (Stall Detection) & mất nguồn 24V (Mục 8)
@@ -1091,19 +1097,32 @@ void checkStallProtection() {
 void updateEnergyAndPower() {
   // 1. Đọc 2 cảm biến INA226 qua I2C Mutex
   if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    float inaScale = ParamRegistry.get("INA_SCALE_FACTOR", 10.0f);
+    if (inaScale <= 0.0f) inaScale = 1.0f;
+
     if (inaTrackerFound) {
       voltTrkLive = inaTracker.getBusVoltage();
-      currTrkLive = inaTracker.getCurrent_mA() / 1000.0f;
+      currTrkLive = (inaTracker.getCurrent_mA() / 1000.0f) / inaScale;
       if (currTrkLive < 0) currTrkLive = 0.0f;
       pwrTrkLive = voltTrkLive * currTrkLive;
     }
     if (inaStaticFound) {
       voltStaLive = inaStatic.getBusVoltage();
-      currStaLive = inaStatic.getCurrent_mA() / 1000.0f;
+      currStaLive = (inaStatic.getCurrent_mA() / 1000.0f) / inaScale;
       if (currStaLive < 0) currStaLive = 0.0f;
       pwrStaLive = voltStaLive * currStaLive;
     }
     xSemaphoreGive(i2cMutex);
+
+    // Tự động thu nhỏ Wh bị phóng đại 10x trong đợt chạy trước
+    static bool energyScaledOnce = false;
+    if (!energyScaledOnce) {
+      energyScaledOnce = true;
+      if (inaScale > 1.0f) {
+        if (energyWhTracker > 100.0) energyWhTracker /= inaScale;
+        if (energyWhStatic > 100.0)  energyWhStatic /= inaScale;
+      }
+    }
   }
 
   // Tích lũy mẫu thống kê cho cửa sổ 1 phút (Mục 9)
@@ -1581,7 +1600,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         if (s->isRunning()) s->stopMove();
         return true; // Đã chạm giới hạn mềm max, không quay tiếp và coi như cân bằng
       }
-      int32_t steps = (int32_t)((errDeg / degPerCount) * pulsesPerCount);
+      int32_t steps = (int32_t)((errDeg / degPerCount) * getPulsesPerCount());
       if (steps > 0) {
         s->setSpeedInHz(speedHz);
         s->setAcceleration(stepperAccel);
@@ -1593,7 +1612,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         if (s->isRunning()) s->stopMove();
         return false;
       }
-      int32_t steps = (int32_t)((-errDeg / degPerCount) * pulsesPerCount);
+      int32_t steps = (int32_t)((-errDeg / degPerCount) * getPulsesPerCount());
       if (steps > 0) {
         s->setSpeedInHz(speedHz);
         s->setAcceleration(stepperAccel);
@@ -1631,7 +1650,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         if (s->isRunning()) s->stopMove();
         return true; // Đã chạm giới hạn ngửa tối đa
       }
-      int32_t steps = (int32_t)((errDeg / degPerCount) * pulsesPerCount);
+      int32_t steps = (int32_t)((errDeg / degPerCount) * getPulsesPerCount());
       if (steps > 0) {
         s->setSpeedInHz(speedHz);
         s->setAcceleration(stepperAccel);
@@ -1643,7 +1662,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         if (s->isRunning()) s->stopMove();
         return true; // Đã chạm giới hạn hạ thấp tối đa
       }
-      int32_t steps = (int32_t)((-errDeg / degPerCount) * pulsesPerCount);
+      int32_t steps = (int32_t)((-errDeg / degPerCount) * getPulsesPerCount());
       if (steps > 0) {
         s->setSpeedInHz(speedHz);
         s->setAcceleration(stepperAccel);
@@ -1673,7 +1692,7 @@ bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun,
   isDaylight = pos.is_daylight;
 
   solar::AxisTarget outAz, outEl;
-  solar::SolarGeometry::computeAxisTargets(pos, outAz, outEl, defaultDeg1);
+  solar::SolarGeometry::computeAxisTargets(pos, outAz, outEl, CFG_G_AZ_HOME_SW_DEG, getElevationZenith());
 
   OpticalData opt = readOpticalSensors();
   // Tính trọng số quang ws: mây mù/tối ngắt quang ws=0; trời nắng ws=1
@@ -1701,6 +1720,12 @@ bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun,
     targetAz = outAz.final_ref_deg;
     targetEl = outEl.final_ref_deg;
   }
+
+  liveSunAzimuth = azSun;
+  liveSunElevation = elSun;
+  liveTargetPhi = targetAz;
+  liveTargetEpsilon = targetEl;
+
   return true;
 }
 
@@ -1823,6 +1848,12 @@ void pushTelemetryToFirebase() {
   trk.set("epsilon", curEpsilon);
   trk.set("azimuthAngle", compassAz);
   trk.set("elevationAngle", curEpsilon);
+  trk.set("targetAzimuth", liveSunAzimuth);
+  trk.set("targetElevation", liveSunElevation);
+  trk.set("targetPhi", liveTargetPhi);
+  trk.set("targetEpsilon", liveTargetEpsilon);
+  trk.set("error_az_deg", liveTargetPhi - curPhi);
+  trk.set("error_el_deg", liveTargetEpsilon - curEpsilon);
   trk.set("azEncoder", encoderCount1);
   trk.set("elEncoder", encoderCount2);
   trk.set("encoderPulses", encoderCount1);
@@ -1833,11 +1864,14 @@ void pushTelemetryToFirebase() {
   trk.set("ldrRight", opt.rgt);
   trk.set("normDiffAz", opt.normDiffAz);
   trk.set("normDiffEl", opt.normDiffEl);
+  trk.set("zenith_eps", getElevationZenith());
+  trk.set("def_deg2", defaultDeg2);
 
   bool h1 = isHome1Triggered();
   bool h2 = isHome2Triggered();
   trk.set("limitHome", h1);
   trk.set("limitHome2", h2);
+  trk.set("isHomed", systemHomed);
 
   // Trạng thái vận hành thực tế (A6, Mục 8: Chỉ hiện MOVE khi Encoder xác nhận có chuyển động)
   bool m1MotorRunning = (stepper1 && stepper1->isRunning());
@@ -1869,8 +1903,21 @@ void pushTelemetryToFirebase() {
   trk.set("state", stStr);
   trk.set("status", isEmergencyCoverActive ? "EMERGENCY_STOP" : (isMoving ? "MOVE" : ((currentTrackSource != TRACK_SRC_OFF) ? "TRACKING_ACTIVE" : "STABLE")));
   trk.set("emergencyActive", (bool)isEmergencyCoverActive);
+  bool isDeviceSleeping = (systemFsmState == FSM_STATE_PREP_SLEEP || systemFsmState == FSM_STATE_LIGHT_SLEEP);
+  trk.set("isSleeping", isDeviceSleeping);
+  if (isDeviceSleeping) {
+    trk.set("wake_at", "04:00");
+  } else {
+    trk.set("wake_at", "AWAKE");
+  }
   if (isEmergencyCoverActive) {
     trk.set("displayState", "KHAN CAP (Goc Max phu bat)");
+  } else if (isDeviceSleeping) {
+    trk.set("displayState", "NGỦ ĐÔNG (04:00)");
+  } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
+    trk.set("displayState", "GIỮ BƯỚC (CHỜ 15P)");
+  } else {
+    trk.set("displayState", stStr);
   }
   
   // Nguồn thuật toán bám (Mục 4 & 5): EPHEMERIS_ONLY, SENSOR_ONLY, HYBRID, NONE
@@ -2200,23 +2247,13 @@ bool moveMotorSteps(int axis, bool direction, int32_t steps, uint32_t speedHz = 
 }
 
 // -------------------------------------------------------------------------
-// 9. SINGLE AUTO HOMING CHO 1 TRỤC [G] (2 TỐC ĐỘ: NHANH + RÀ CHẬM + LÙI ĐỘNG A9)
+// 9. HÀM HOMING CHUẨN XÁC TỪNG TRỤC VỀ CÔNG TẮC HÀNH TRÌNH (2 TỐC ĐỘ + LÙI AN TOÀN A9)
 // -------------------------------------------------------------------------
-void runSingleAutoHoming(int axis) {
+bool homeAxisToSwitch(int axis) {
   FastAccelStepper* s = (axis == 1) ? stepper1 : stepper2;
-  if (!s) return;
+  if (!s) return false;
 
   const char* axisName = (axis == 1) ? "Truc 1 (Azimuth)" : "Truc 2 (Elevation)";
-  float targetDeg = (axis == 1) ? defaultDeg1 : defaultDeg2;
-  int32_t targetCount = (axis == 1) ? defaultCount1 : defaultCount2;
-
-  Serial.println("\n=======================================================");
-  Serial.printf(">> [KICH HOAT SINGLE AUTO HOMING (G)] - %s\n", axisName);
-  Serial.printf("   Muc tieu ve default: %+.2f do giang pin (%ld counts)\n", targetDeg, (long)targetCount);
-  Serial.println("   Chu trinh Homing 2 toc do: [1] Chay nhanh -> [2] Lui dong nha switch (+100 buoc) -> [3] Ra cham -> [4] Ve Default");
-  Serial.println("   (Bam [Space] hoac [X] de dung khan cap)");
-  Serial.println("=======================================================");
-
   if (axis == 1) stateM1 = STATE_AUTO_HOMING;
   else           stateM2 = STATE_AUTO_HOMING;
 
@@ -2228,7 +2265,7 @@ void runSingleAutoHoming(int axis) {
       if (c == ' ' || c == 'x' || c == 'X') {
         s->stopMove();
         stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-        Serial.println("\n>> [STOP] Da dung khan cap Single Homing!");
+        Serial.printf("\n>> [STOP] Da dung khan cap Homing %s!\n", axisName);
         requestTelemetryPrint();
         return true;
       }
@@ -2244,65 +2281,65 @@ void runSingleAutoHoming(int axis) {
 
   // BƯỚC 1: NẾU ĐANG CHẠM HOME TỪ TRƯỚC -> LÙI ĐỘNG RA XA (A9)
   if (isTriggered()) {
-    Serial.println(">> [BUOC 0] Dang cham switch san -> Dang lui dong ra xa de nha switch...");
+    Serial.printf(">> [%s BUOC 0] Dang cham switch san -> Dang lui dong ra xa de nha switch...\n", axisName);
     s->setSpeedInHz(manualSpeedHz);
     s->setAcceleration(stepperAccel);
     s->runForward();
     uint32_t tRetract0 = millis();
     while (isTriggered()) {
-      if (checkCancel()) return;
+      if (checkCancel()) return false;
       if (millis() - tRetract0 > 10000) {
         s->stopMove();
         stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-        Serial.println("\n>> [LOI AN TOAN] Switch bi ket dinh (Stuck LOW)! Timeout lui nha cong tac.");
+        Serial.printf("\n>> [LOI AN TOAN %s] Switch bi ket dinh (Stuck LOW)! Timeout lui nha cong tac.\n", axisName);
         requestTelemetryPrint();
-        return;
+        return false;
       }
       delay(2);
     }
     s->stopMove();
     delay(50);
     s->move(100);
-    while (s->isRunning()) { if (checkCancel()) return; delay(2); }
+    while (s->isRunning()) { if (checkCancel()) return false; delay(2); }
     delay(100);
   }
 
   // BƯỚC 2: TIẾP CẬN NHANH (FAST APPROACH)
-  Serial.println(">> [BUOC 1] Dang chay nhanh tiep can Home (Fast Approach)...");
+  Serial.printf(">> [%s BUOC 1] Dang chay nhanh tiep can Home (Fast Approach)...\n", axisName);
   s->setSpeedInHz(HOME_FAST_SPEED_HZ);
   s->setAcceleration(stepperAccel);
   s->runBackward();
 
   while (!isTriggered()) {
-    if (checkCancel()) return;
+    if (checkCancel()) return false;
     if (millis() - tStart > 35000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.println("\n>> [CANH BAO AN TOAN] Timeout 35s! Da dung.");
+      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 35s! Da dung.\n", axisName);
       requestTelemetryPrint();
-      return;
+      return false;
     }
     delay(1);
   }
 
   s->forceStopAndNewPosition(0);
-  Serial.println(">> [BUOC 1 OK] Da cham switch lan 1! Dung ngay lap tuc.");
+  Serial.printf(">> [%s BUOC 1 OK] Da cham switch lan 1! Dung ngay lap tuc.\n", axisName);
   delay(150);
 
   // BƯỚC 3: LÙI ĐỘNG RA XA ĐỂ NHẢ SWITCH (DYNAMIC RETRACT + 100 SAFETY STEPS) (A9)
-  Serial.println(">> [BUOC 2] Dang lui dong ra xa cho den khi switch nha hoan toan + 100 buoc...");
+  Serial.printf(">> [%s BUOC 2] Dang lui dong ra xa cho den khi switch nha hoan toan + 100 buoc...\n", axisName);
   s->setSpeedInHz(manualSpeedHz);
   s->setAcceleration(stepperAccel);
   s->runForward();
   uint32_t tRetract = millis();
   while (isTriggered()) {
-    if (checkCancel()) return;
+    if (checkCancel()) return false;
     if (millis() - tRetract > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.println("\n>> [LOI AN TOAN] Switch bi ket dinh (Stuck LOW)! Timeout lui nha cong tac.");
+      Serial.printf("\n>> [LOI AN TOAN %s] Switch bi ket dinh (Stuck LOW)! Timeout lui nha cong tac.\n", axisName);
       requestTelemetryPrint();
-      return;
+      return false;
     }
     delay(2);
   }
@@ -2310,26 +2347,26 @@ void runSingleAutoHoming(int axis) {
   delay(50);
   s->move(100); // Biên an toàn 100 bước
   while (s->isRunning()) {
-    if (checkCancel()) return;
+    if (checkCancel()) return false;
     delay(2);
   }
   delay(150);
 
   // BƯỚC 4: RÀ CHẬM TIẾP XÚC CHÍNH XÁC (SLOW CREEP, SAI SỐ <= 1 BƯỚC)
-  Serial.println(">> [BUOC 3] Dang ra cham tiep xuc chinh xac (Slow Creep 200 Hz)...");
+  Serial.printf(">> [%s BUOC 3] Dang ra cham tiep xuc chinh xac (Slow Creep %d Hz)...\n", axisName, HOME_CREEP_SPEED_HZ);
   s->setSpeedInHz(HOME_CREEP_SPEED_HZ);
   s->setAcceleration(stepperAccel);
   s->runBackward();
 
   uint32_t tCreepStart = millis();
   while (!isTriggered()) {
-    if (checkCancel()) return;
+    if (checkCancel()) return false;
     if (millis() - tCreepStart > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.println("\n>> [CANH BAO AN TOAN] Timeout 10s o pha ra cham! Da dung.");
+      Serial.printf("\n>> [CANH BAO AN TOAN %s] Timeout 10s o pha ra cham! Da dung.\n", axisName);
       requestTelemetryPrint();
-      return;
+      return false;
     }
     delay(1);
   }
@@ -2346,39 +2383,51 @@ void runSingleAutoHoming(int axis) {
                 axisName, (long)touchCnt, (long)diffRepeat, (float)diffRepeat * getDegPerCount());
 
   if (axis == 1) resetEncoder1(0); else resetEncoder2(0);
-  systemHomed = true;
   Serial.printf(">> [BUOC 3 OK] %s DA CHOT MOC HOME 0.0° CHINH XAC TUYET DOI!\n", axisName);
+  stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
   requestTelemetryPrint();
-  delay(250);
+  delay(150);
+  return true;
+}
 
-  // BƯỚC 5: QUAY VỀ MỐC MẶC ĐỊNH (SEEK DEFAULT)
-  Serial.println(">> [BUOC 4] Dang quay ve vi tri mac dinh da luu...");
+// -------------------------------------------------------------------------
+// 9B. SINGLE AUTO HOMING CHO 1 TRỤC [G]: TÌM GỐC 2 TỐC ĐỘ + VỀ DEFAULT
+// -------------------------------------------------------------------------
+void runSingleAutoHoming(int axis) {
+  if (!homeAxisToSwitch(axis)) return;
+
+  FastAccelStepper* s = (axis == 1) ? stepper1 : stepper2;
+  const char* axisName = (axis == 1) ? "Truc 1 (Azimuth)" : "Truc 2 (Elevation)";
+  float targetDeg = (axis == 1) ? defaultDeg1 : defaultDeg2;
+  int32_t targetCount = (axis == 1) ? defaultCount1 : defaultCount2;
+
+  Serial.println(">> [BUOC 4] Dang quay ve vi tri mac dinh da luu (Target-Step Control)...");
   if (axis == 1) stateM1 = STATE_AUTO_SEEK_DEFAULT;
   else           stateM2 = STATE_AUTO_SEEK_DEFAULT;
 
+  int32_t targetSteps = (int32_t)((float)targetCount * getPulsesPerCount());
   s->setSpeedInHz(autoSpeedHz);
   s->setAcceleration(stepperAccel);
-  s->runForward();
+  s->moveTo(targetSteps);
 
-  bool reached = false;
   uint32_t p2Start = millis();
 
-  while (!reached) {
-    if (checkCancel()) return;
-
-    int32_t curCnt = (axis == 1) ? getEncoderCount1() : getEncoderCount2();
-    reached = (targetCount >= 0) ? (curCnt >= targetCount) : (curCnt <= targetCount);
-
-    if (reached) {
-      s->stopMove();
-      Serial.printf(">> [%s VE DICH] Dat: %+.2f do gian pin (%ld counts)\n", axisName, (axis == 1) ? getAngleDeg1() : getAngleDeg2(), (long)curCnt);
-      break;
+  while (s->isRunning()) {
+    esp_task_wdt_reset();
+    updateHardwareEncoders();
+    if (Serial.available() > 0) {
+      char c = Serial.read();
+      if (c == ' ' || c == 'x' || c == 'X') {
+        s->stopMove();
+        stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
+        return;
+      }
     }
 
-    // Khi cách đích < 50 counts, giảm tốc mượt mà
-    if (abs(targetCount - curCnt) < 50) {
-      s->setSpeedInHz(autoSpeedHz / 2);
-      s->applySpeedAcceleration();
+    if (axis == 1 && getAngleDeg1() >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG) {
+      s->stopMove();
+      Serial.println("\n>> [GIOI HAN MEM] Truc 1 da cham gioi han mem max 270°!");
+      break;
     }
 
     if (millis() - p2Start > 35000) {
@@ -2390,6 +2439,7 @@ void runSingleAutoHoming(int axis) {
     }
     delay(2);
   }
+  Serial.printf(">> [%s VE DICH] Dat: %+.2f do gian pin (%ld counts)\n", axisName, (axis == 1) ? getAngleDeg1() : getAngleDeg2(), (long)((axis == 1) ? getEncoderCount1() : getEncoderCount2()));
 
   while (s->isRunning()) {
     esp_task_wdt_reset();
@@ -2398,228 +2448,42 @@ void runSingleAutoHoming(int axis) {
   }
 
   stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
+  systemHomed = true;
   Serial.printf("\n>> [HOAN TAT] %s da hoan tat Homing 2 toc do va ve vi tri mac dinh!\n\n", axisName);
   requestTelemetryPrint();
 }
 
 // -------------------------------------------------------------------------
-// 10. DUAL HOMING VỀ SWITCH: CẢ 2 TRỤC TÌM GỐC 2 TỐC ĐỘ (NHANH -> LÙI -> RÀ CHẬM -> RESET 0)
+// 10. DUAL HOMING VỀ SWITCH: TUẦN TỰ AN TOÀN (EL TRƯỚC -> AZ SAU)
 // -------------------------------------------------------------------------
 bool runDualHomingToSwitches() {
   if (!stepper1 || !stepper2) return false;
 
   Serial.println("\n=======================================================");
-  Serial.println(">> [KICH HOAT DUAL AUTO HOMING CUNG LUC CHO CA 2 TRUC (H)]");
-  Serial.printf("   Truc 1 (Azimuth)  : Home -> Muc tieu: %+.2f do (%ld counts)\n", defaultDeg1, (long)defaultCount1);
-  Serial.printf("   Truc 2 (Elevation): Home -> Muc tieu: %+.2f do (%ld counts)\n", defaultDeg2, (long)defaultCount2);
-  Serial.println("   Chu trinh Homing 2 toc do DONG THOI: [1] Chay nhanh -> [2] Lui dong nha switch (+100 buoc) -> [3] Ra cham -> [4] Ve Default");
-  Serial.println("   (Bam [Space] hoac [X] de dung khan cap)");
+  Serial.println(">> [DUAL AUTO HOMING CHUAN: ELEVATION TRUOC -> AZIMUTH SAU]");
+  Serial.println("   Giai doan 1: Truc 2 (Elevation) ngua len switch Home chot moc 90.0°");
+  Serial.println("   Giai doan 2: Truc 1 (Azimuth) quay ngang ve switch Home chot moc 0.0°");
+  Serial.println("   (Tranh hoan toan sut ap inrush nguon 24V & triet tieu nhiễu cheo switch)");
   Serial.println("=======================================================");
 
-  stateM1 = STATE_AUTO_HOMING;
-  stateM2 = STATE_AUTO_HOMING;
-
-  enum AxisHomeStage {
-    STAGE_FAST,
-    STAGE_RETRACT_SEEK_RELEASE,
-    STAGE_RETRACT_SAFETY,
-    STAGE_CREEP,
-    STAGE_DONE
-  };
-
-  AxisHomeStage stage1 = STAGE_FAST;
-  AxisHomeStage stage2 = STAGE_FAST;
-  uint32_t tRetract1 = 0;
-  uint32_t tRetract2 = 0;
-
-  auto checkCancel = [&]() -> bool {
-    esp_task_wdt_reset();
-    updateHardwareEncoders();
-    if (Serial.available() > 0) {
-      char c = Serial.read();
-      if (c == ' ' || c == 'x' || c == 'X') {
-        stepper1->stopMove();
-        stepper2->stopMove();
-        stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-        Serial.println("\n>> [STOP] Da dung khan cap Dual Homing!");
-        requestTelemetryPrint();
-        return true;
-      }
-    }
+  // 1. Trục 2 (Elevation) Home trước để nâng giàn pin an toàn, chống cấn khung
+  Serial.println(">> [GIAI DOAN 1/2] BAT DAU HOMING TRUC 2 (ELEVATION)...");
+  if (!homeAxisToSwitch(2)) {
+    Serial.println(">> [THAT BAI] Homing Truc 2 khong thanh cong!");
     return false;
-  };
-
-  // Khởi động giai đoạn cho từng trục (A9)
-  if (isHome1Triggered()) {
-    stepper1->setSpeedInHz(manualSpeedHz);
-    stepper1->setAcceleration(stepperAccel);
-    stepper1->runForward();
-    tRetract1 = millis();
-    stage1 = STAGE_RETRACT_SEEK_RELEASE;
-    Serial.println(">> [M1] Dang cham switch san -> Dang lui dong ra xa de nha...");
-  } else {
-    stepper1->setSpeedInHz(HOME_FAST_SPEED_HZ);
-    stepper1->setAcceleration(stepperAccel);
-    stepper1->runBackward();
-    stage1 = STAGE_FAST;
   }
 
-  delay(50); // Giãn cách 50ms chống sụt áp nguồn inrush khi khởi động 2 động cơ cùng lúc
+  delay(250); // Nghỉ 0.25s triệt tiêu quán tính cơ khí
 
-  if (isHome2Triggered()) {
-    stepper2->setSpeedInHz(manualSpeedHz);
-    stepper2->setAcceleration(stepperAccel);
-    stepper2->runForward();
-    tRetract2 = millis();
-    stage2 = STAGE_RETRACT_SEEK_RELEASE;
-    Serial.println(">> [M2] Dang cham switch san -> Dang lui dong ra xa de nha...");
-  } else {
-    stepper2->setSpeedInHz(HOME_FAST_SPEED_HZ);
-    stepper2->setAcceleration(stepperAccel);
-    stepper2->runBackward();
-    stage2 = STAGE_FAST;
+  // 2. Trục 1 (Azimuth) Home sau khi Trục 2 đã an toàn
+  Serial.println(">> [GIAI DOAN 2/2] BAT DAU HOMING TRUC 1 (AZIMUTH)...");
+  if (!homeAxisToSwitch(1)) {
+    Serial.println(">> [THAT BAI] Homing Truc 1 khong thanh cong!");
+    return false;
   }
 
-  uint32_t p1Start = millis();
-
-  // VÒNG LẶP HOMING 2 TỐC ĐỘ ĐỒNG THỜI CHO CẢ 2 TRỤC
-  while (stage1 != STAGE_DONE || stage2 != STAGE_DONE) {
-    if (checkCancel()) return false;
-
-    if (millis() - p1Start > 45000) {
-      stepper1->stopMove();
-      stepper2->stopMove();
-      stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-      Serial.println("\n>> [CANH BAO AN TOAN] Timeout 45s Dual Homing! Da dung.");
-      requestTelemetryPrint();
-      return false;
-    }
-
-    // Xử lý trục 1
-    switch (stage1) {
-      case STAGE_FAST:
-        if (isHome1Triggered()) {
-          stepper1->forceStopAndNewPosition(0);
-          Serial.println(">> [M1 FAST OK] Da cham switch 1 lan dau! Dang lui dong ra xa...");
-          stepper1->setSpeedInHz(manualSpeedHz);
-          stepper1->setAcceleration(stepperAccel);
-          stepper1->runForward();
-          tRetract1 = millis();
-          stage1 = STAGE_RETRACT_SEEK_RELEASE;
-        }
-        break;
-
-      case STAGE_RETRACT_SEEK_RELEASE:
-        if (!isHome1Triggered()) {
-          // Switch đã nhả -> Dừng và phát thêm 100 bước an toàn
-          stepper1->stopMove();
-          stepper1->move(100);
-          stage1 = STAGE_RETRACT_SAFETY;
-        } else if (millis() - tRetract1 > 10000) {
-          stepper1->stopMove(); stepper2->stopMove();
-          stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-          Serial.println("\n>> [LOI AN TOAN M1] Switch 1 bi ket dinh (Stuck LOW)! Da dung.");
-          requestTelemetryPrint();
-          return false;
-        }
-        break;
-
-      case STAGE_RETRACT_SAFETY:
-        if (!stepper1->isRunning()) {
-          Serial.println(">> [M1 CREEP] Dang ra cham switch 1 voi toc do 200 Hz...");
-          stepper1->setSpeedInHz(HOME_CREEP_SPEED_HZ);
-          stepper1->setAcceleration(stepperAccel);
-          stepper1->runBackward();
-          stage1 = STAGE_CREEP;
-        }
-        break;
-
-      case STAGE_CREEP:
-        if (isHome1Triggered()) {
-          stepper1->forceStopAndNewPosition(0);
-          int32_t touchCnt1 = getEncoderCount1();
-          int32_t diff1 = touchCnt1 - lastHomeTouchCount1;
-          lastHomeTouchCount1 = touchCnt1;
-          Serial.printf(">> [DO LAP LAI CO HOC M1] Touch Cnt: %ld (Delta: %+ld counts | %+.3f°)\n",
-                        (long)touchCnt1, (long)diff1, (float)diff1 * getDegPerCount());
-          resetEncoder1(0);
-          stage1 = STAGE_DONE;
-          Serial.println(">> [M1 DUAL 2-STAGE OK] Truc 1 da chot Home 0.0° chinh xac!");
-          requestTelemetryPrint();
-        }
-        break;
-
-      case STAGE_DONE:
-      default:
-        break;
-    }
-
-    // Xử lý trục 2
-    switch (stage2) {
-      case STAGE_FAST:
-        if (isHome2Triggered()) {
-          stepper2->forceStopAndNewPosition(0);
-          Serial.println(">> [M2 FAST OK] Da cham switch 2 lan dau! Dang lui dong ra xa...");
-          stepper2->setSpeedInHz(manualSpeedHz);
-          stepper2->setAcceleration(stepperAccel);
-          stepper2->runForward();
-          tRetract2 = millis();
-          stage2 = STAGE_RETRACT_SEEK_RELEASE;
-        }
-        break;
-
-      case STAGE_RETRACT_SEEK_RELEASE:
-        if (!isHome2Triggered()) {
-          // Switch đã nhả -> Dừng và phát thêm 100 bước an toàn
-          stepper2->stopMove();
-          stepper2->move(100);
-          stage2 = STAGE_RETRACT_SAFETY;
-        } else if (millis() - tRetract2 > 10000) {
-          stepper1->stopMove(); stepper2->stopMove();
-          stateM1 = STATE_IDLE; stateM2 = STATE_IDLE;
-          Serial.println("\n>> [LOI AN TOAN M2] Switch 2 bi ket dinh (Stuck LOW)! Da dung.");
-          requestTelemetryPrint();
-          return false;
-        }
-        break;
-
-      case STAGE_RETRACT_SAFETY:
-        if (!stepper2->isRunning()) {
-          Serial.println(">> [M2 CREEP] Dang ra cham switch 2 voi toc do 200 Hz...");
-          stepper2->setSpeedInHz(HOME_CREEP_SPEED_HZ);
-          stepper2->setAcceleration(stepperAccel);
-          stepper2->runBackward();
-          stage2 = STAGE_CREEP;
-        }
-        break;
-
-      case STAGE_CREEP:
-        if (isHome2Triggered()) {
-          stepper2->forceStopAndNewPosition(0);
-          int32_t touchCnt2 = getEncoderCount2();
-          int32_t diff2 = touchCnt2 - lastHomeTouchCount2;
-          lastHomeTouchCount2 = touchCnt2;
-          Serial.printf(">> [DO LAP LAI CO HOC M2] Touch Cnt: %ld (Delta: %+ld counts | %+.3f°)\n",
-                        (long)touchCnt2, (long)diff2, (float)diff2 * getDegPerCount());
-          resetEncoder2(0);
-          stage2 = STAGE_DONE;
-          Serial.println(">> [M2 DUAL 2-STAGE OK] Truc 2 da chot Home 0.0° chinh xac!");
-          requestTelemetryPrint();
-        }
-        break;
-
-      case STAGE_DONE:
-      default:
-        break;
-    }
-
-    delay(1);
-  }
-
-  stateM1 = STATE_IDLE;
-  stateM2 = STATE_IDLE;
   systemHomed = true;
-  Serial.println("\n>> [PHA 1 HOAN TAT 100%] Ca 2 truc da chot diem Home 0.0° voi do chinh xac tuyet doi!");
+  Serial.println("\n>> [HOMING CHOT MOC HOAN TAT 100%] Ca 2 truc da chot switch 0.0° tuyet doi!");
   requestTelemetryPrint();
   return true;
 }
@@ -2650,52 +2514,35 @@ void runDualAutoHoming() {
     return false;
   };
 
-  // PHA 2: CHẠY ĐỒNG THỜI VỀ VỊ TRÍ MẶC ĐỊNH M1 VÀ M2
-  Serial.println(">> Pha 2: Ca 2 truc dang DONG THOI quay ve vi tri mac dinh (FastAccelStepper)...");
+  // PHA 2: CHẠY ĐỒNG THỜI VỀ VỊ TRÍ MẶC ĐỊNH M1 VÀ M2 (TARGET-STEP MOTION AN TOÀN TUYỆT ĐỐI)
+  Serial.println(">> Pha 2: Ca 2 truc dang DONG THOI quay ve vi tri mac dinh (Target-Step Control)...");
   stateM1 = STATE_AUTO_SEEK_DEFAULT;
   stateM2 = STATE_AUTO_SEEK_DEFAULT;
 
+  int32_t targetSteps1 = (int32_t)((float)defaultCount1 * getPulsesPerCount());
+  int32_t targetSteps2 = (int32_t)((float)defaultCount2 * getPulsesPerCount());
+
   stepper1->setSpeedInHz(autoSpeedHz);
   stepper1->setAcceleration(stepperAccel);
-  stepper1->runForward();
+  stepper1->moveTo(targetSteps1);
 
   delay(50); // Giãn cách 50ms chống sụt áp nguồn inrush
 
   stepper2->setSpeedInHz(autoSpeedHz);
   stepper2->setAcceleration(stepperAccel);
-  stepper2->runForward();
+  stepper2->moveTo(targetSteps2);
 
-  bool m1Reached = false;
-  bool m2Reached = false;
   uint32_t p2Start = millis();
 
-  while (!m1Reached || !m2Reached) {
+  while (stepper1->isRunning() || stepper2->isRunning()) {
     if (checkCancel()) return;
+    esp_task_wdt_reset();
+    updateHardwareEncoders();
 
-    if (!m1Reached) {
-      bool reached1 = (defaultCount1 >= 0) ? (getEncoderCount1() >= defaultCount1) : (getEncoderCount1() <= defaultCount1);
-      if (reached1) {
-        stepper1->stopMove();
-        m1Reached = true;
-        Serial.printf(">> [M1 VE DICH] Truc 1 dat: %+.2f do (%ld counts)\n", getAngleDeg1(), (long)getEncoderCount1());
-        requestTelemetryPrint();
-      } else if (abs(defaultCount1 - getEncoderCount1()) < 50) {
-        stepper1->setSpeedInHz(autoSpeedHz / 2);
-        stepper1->applySpeedAcceleration();
-      }
-    }
-
-    if (!m2Reached) {
-      bool reached2 = (defaultCount2 >= 0) ? (getEncoderCount2() >= defaultCount2) : (getEncoderCount2() <= defaultCount2);
-      if (reached2) {
-        stepper2->stopMove();
-        m2Reached = true;
-        Serial.printf(">> [M2 VE DICH] Truc 2 dat: %+.2f do (%ld counts)\n", getAngleDeg2(), (long)getEncoderCount2());
-        requestTelemetryPrint();
-      } else if (abs(defaultCount2 - getEncoderCount2()) < 50) {
-        stepper2->setSpeedInHz(autoSpeedHz / 2);
-        stepper2->applySpeedAcceleration();
-      }
+    // Giám sát an toàn giới hạn mềm Trục 1 (chống xoắn cáp)
+    if (stepper1->isRunning() && getAngleDeg1() >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG) {
+      stepper1->stopMove();
+      Serial.println("\n>> [GIOI HAN MEM] Truc 1 da cham gioi han mem max 270°!");
     }
 
     if (millis() - p2Start > 35000) {
@@ -2708,6 +2555,8 @@ void runDualAutoHoming() {
     }
     delay(2);
   }
+  Serial.printf(">> [M1 VE DICH] Truc 1 dat: %+.2f do (%ld counts)\n", getAngleDeg1(), (long)getEncoderCount1());
+  Serial.printf(">> [M2 VE DICH] Truc 2 dat: %+.2f do (%ld counts)\n", getAngleDeg2(), (long)getEncoderCount2());
 
   while (stepper1->isRunning() || stepper2->isRunning()) {
     esp_task_wdt_reset();
@@ -2971,11 +2820,11 @@ void setup() {
   ArduinoOTA.begin();
   Serial.println(">> [OTA OK] San sang nhan nap firmware qua WiFi (Port 3232, Host: esp32-solar-tracker.local)!");
 
-  // 10. TỰ ĐỘNG HOMING 1 LẦN KHI ĐƯỢC CẤP ĐIỆN VÀ VẬN HÀNH THEO GIỜ RTC (HANDS-FREE 30 NGÀY)
+  // 10. TỰ ĐỘNG DUAL AUTO HOMING KHI CẤP ĐIỆN (CHỐT SWITCH -> VỀ VỊ TRÍ MẶC ĐỊNH -> HANDS-FREE 30 NGÀY)
   Serial.println("\n=======================================================");
-  Serial.println(">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU HOMING CHOT MOC GOC...");
+  Serial.println(">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU DUAL AUTO HOMING...");
   Serial.println("=======================================================");
-  runDualHomingToSwitches();
+  runDualAutoHoming();
 
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
@@ -3148,7 +2997,7 @@ void handleCliCommand(const String& cmdStr) {
 
       solar::SolarPosition pos = solar::SolarEphemeris::calculate(y, m, d, hh, mm, ss, tz, lat, lon);
       solar::AxisTarget outAz, outEl;
-      solar::SolarGeometry::computeAxisTargets(pos, outAz, outEl, defaultDeg1);
+      solar::SolarGeometry::computeAxisTargets(pos, outAz, outEl, CFG_G_AZ_HOME_SW_DEG, getElevationZenith());
 
       Serial.println("\n=======================================================");
       Serial.println("  [NOAA SOLAR EPHEMERIS] THONG SO THIEN VAN MAT TROI");
@@ -4105,18 +3954,36 @@ void loop() {
 
         if (computeSolarTrackingTargets(targetAz, targetEl, azSun, elSun, zenSun, ws, isDaylight)) {
           if (!isDaylight || elSun < 0.0f) {
-            // Khi mặt trời lặn (sau ~17:30 chiều):
-            // Tuyệt đối KHÔNG tự ý Park về 90°/0°, mà GIỮ NGUYÊN VỊ TRÍ CUỐI NGÀY ĐỨNG IM GIỮ BƯỚC ĐẾN 22:00:00!
+            // Khi mặt trời dưới chân trời / ban đêm:
             if (stepper1 && stepper1->isRunning()) stepper1->stopMove();
             if (stepper2 && stepper2->isRunning()) stepper2->stopMove();
-            isMaxAzimuthReached = true;
 
-            static unsigned long lastSunsetLogMs = 0;
-            if (millis() - lastSunsetLogMs >= 30000) {
-              lastSunsetLogMs = millis();
-              Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° < 0°). Gian pin DUNG IM GIU BUOC tai vi tri chieu den 22:00 toi!\n", elSun);
+            int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+            float curT = 0.0f;
+            readDS3231(curY, curM, curD, curH, curMin, curS, curT);
+
+            if (curH >= 16) {
+              // Chiều tối sau hoàng hôn (~17:30): GIỮ NGUYÊN VỊ TRÍ CUỐI NGÀY ĐỨNG IM GIỮ BƯỚC ĐẾN 22:00:00!
+              isMaxAzimuthReached = true;
+              static unsigned long lastSunsetLogMs = 0;
+              if (millis() - lastSunsetLogMs >= 30000) {
+                lastSunsetLogMs = millis();
+                Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° < 0°). Gian pin DUNG IM GIU BUOC tai vi tri chieu den 22:00 toi!\n", elSun);
+              }
+            } else {
+              // Buổi sáng sớm trước bình minh (04:00 - 05:45): ĐỨNG Ở TƯ THẾ ĐÓN BÌNH MINH, CHỜ MẶT TRỜI MỌC
+              isMaxAzimuthReached = false;
+              systemFsmState = FSM_STATE_DAWN_POLL;
+              static unsigned long lastDawnLogMs = 0;
+              if (millis() - lastDawnLogMs >= 30000) {
+                lastDawnLogMs = millis();
+                Serial.printf("\n>> [DAWN WAIT] Sang som truoc binh minh (Gio: %02d:%02d, El=%+.1f°). Gian pin dung don binh minh san sang!\n",
+                              curH, curMin, elSun);
+              }
             }
           } else {
+            // Ban ngày (elSun >= 0.0f): Xóa cờ max hold và tiến hành bám
+            isMaxAzimuthReached = false;
             systemFsmState = FSM_STATE_TRACKING;
 
             // Kiểm tra giới hạn mềm cận trên Azimuth

@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge } from '../utils/formatters';
+import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge, getCompassDirectionName } from '../utils/formatters';
 
 /**
  * BẢNG SO SÁNH ĐO ĐẠC PHÒNG THÍ NGHIỆM
@@ -23,20 +23,20 @@ export default function VisualPanelsComparison({
   const epsAngle = el.epsilon !== undefined ? el.epsilon : (el.currentAngle !== null ? el.currentAngle : null);
 
   // Tính phương vị địa lý thực tế (Compass Azimuth) của giàn pin tracker từ cơ cấu (φ, ε):
-  // - Trục 2 lật từ Đông sang Tây theo nhật động (Sáng hướng Đông, Chiều hướng Tây).
-  // - Trục 1 bù lệch xích vĩ Bắc - Nam (tháng 11 lệch Nam ~+18.4°).
+  // - Switch Home 1 đặt tại Nam (180.0°). Quay ra xa Home ngược KĐH về phía Đông (90.0°).
+  // - Sáng (Trước 12h): Heading = 180.0° - φ (Đón nắng Đông -> Nam).
+  // - Chiều (Sau 12h): Heading = 360.0° - φ (Trục 1 quay Đông Bắc ~100°, Trục 2 ngửa sau đón nắng Tây).
   const compassAzimuth = (() => {
+    if (az.currentAngle !== null && az.currentAngle !== undefined && !isNaN(az.currentAngle)) {
+      return Number(az.currentAngle);
+    }
     if (phiAngle === null || phiAngle === undefined) return null;
-    const eps = epsAngle !== null && epsAngle !== undefined ? epsAngle : 45.0;
     const hour = new Date().getHours();
     const isAfternoon = hour >= 12;
-    const deltaPhiRad = ((phiAngle - 91.4) * Math.PI) / 180.0;
-    const epsRad = (eps * Math.PI) / 180.0;
-    const nEW = Math.cos(epsRad);
-    const nS = Math.sin(deltaPhiRad);
-    const angleFromSouth = Math.atan2(nEW, Math.max(0.01, nS)) * (180.0 / Math.PI);
-    const az = isAfternoon ? (180.0 + angleFromSouth) : (180.0 - angleFromSouth);
-    return Math.round(az * 10) / 10;
+    let azVal = isAfternoon ? (360.0 - phiAngle) : (180.0 - phiAngle);
+    while (azVal < 0) azVal += 360.0;
+    while (azVal >= 360.0) azVal -= 360.0;
+    return Math.round(azVal * 10) / 10;
   })();
 
   // Chỉ báo kết nối 2 tấm
@@ -160,7 +160,7 @@ export default function VisualPanelsComparison({
                   </div>
                   <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
                     {compassAzimuth !== null 
-                      ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${compassAzimuth >= 180 && compassAzimuth <= 270 ? 'Tây Nam' : 'Đông Nam'})` 
+                      ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})` 
                       : '(Nằm ngang = 90°, dựng đứng = 0°)'}
                   </span>
                 </td>
@@ -246,7 +246,7 @@ export default function VisualPanelsComparison({
             <div className="flex justify-between items-center">
               <span className="text-blue-700 dark:text-sky-300 font-semibold">── Tracker:</span>
               <span className="font-bold text-zinc-900 dark:text-white">
-                {compassAzimuth !== null ? `${formatSignedNumber(compassAzimuth, 1, '°')} (${compassAzimuth >= 180 && compassAzimuth <= 270 ? 'Tây Nam' : 'Đông Nam'})` : (phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : '--')}
+                {compassAzimuth !== null ? `${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})` : (phiAngle !== null ? `φ: ${formatSignedNumber(phiAngle, 1, '°')}` : '--')}
               </span>
             </div>
             <div className="flex justify-between items-center text-[10px] text-zinc-500 dark:text-slate-400 pl-2">

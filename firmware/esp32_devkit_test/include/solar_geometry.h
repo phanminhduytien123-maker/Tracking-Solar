@@ -33,7 +33,8 @@ public:
     static bool computeAxisTargets(const SolarPosition& sun_pos,
                                   AxisTarget& out_target_az,
                                   AxisTarget& out_target_el,
-                                  float base_az_deg = 90.0f);
+                                  float base_az_deg = 180.0f,
+                                  float zenith_el_deg = 50.0f);
 
     /**
      * @brief Tính giờ báo thức thức dậy buổi sáng theo giờ bắt đầu bám thực tế (khi el_sun >= ngưỡng bám)

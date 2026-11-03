@@ -407,7 +407,7 @@ export class FirebaseSolarService {
     const isSystemOnline = (trkConnStatus !== 'DISCONNECTED' || staConnStatus !== 'DISCONNECTED');
 
     // 3. THỐNG NHẤT TRẠNG THÁI HỆ THỐNG GIỮA THẺ NGOÀI VÀ MODAL
-    const isSleeping = tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true;
+    const isSleeping = (tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true) && tracking.state !== 'TRACKING' && tracking.state !== 'HOLD_15M' && tracking.state !== 'MOVE' && tracking.status !== 'TRACKING_ACTIVE';
     const wakeAt = tracking.wake_at || tracking.wakeAt || null;
 
     let displayState = 'MẤT KẾT NỐI';
@@ -660,6 +660,11 @@ export class FirebaseSolarService {
         }
       },
       motors: {
+        isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
+        limit_az_min: Boolean(tracking.limitHome),
+        limit_az_max: false,
+        limit_el_min: Boolean(tracking.limitHome2 || tracking.limitSwitch90),
+        limit_el_max: false,
         azimuth: {
           phi: curPhi,
           targetPhi: tgtPhi,
@@ -678,7 +683,7 @@ export class FirebaseSolarService {
           soft_limit_status: softLimitStatus,
           softLimitViolated: Boolean(tracking.softLimitViolatedAz),
           moving: Boolean(tracking.movingAz || (errorAzDeg !== null && Math.abs(errorAzDeg) > 0.3)),
-          isHomed: tracking.isHomed !== false,
+          isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
           flag_stall: Boolean(tracking.flag_stall_az),
           compass_calibrated: compassCalibrated
         },
@@ -700,7 +705,7 @@ export class FirebaseSolarService {
           soft_limit_status: softLimitStatus,
           softLimitViolated: Boolean(tracking.softLimitViolatedEl),
           moving: Boolean(tracking.movingEl || (errorElDeg !== null && Math.abs(errorElDeg) > 0.3)),
-          isHomed: tracking.isHomed !== false,
+          isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
           flag_stall: Boolean(tracking.flag_stall_el)
         }
       },
