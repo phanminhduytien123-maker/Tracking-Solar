@@ -144,6 +144,15 @@ export default function App() {
   });
   const [intradayData, setIntradayData] = useState(() => generateIntradayProfile());
   const [history30Days, setHistory30Days] = useState(() => generate30DaysHistory());
+  const [allIntradayProfiles, setAllIntradayProfiles] = useState({});
+  const [availableHistoryDates, setAvailableHistoryDates] = useState(() => {
+    const now = new Date();
+    return [`${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`];
+  });
+  const [selectedIntradayDate, setSelectedIntradayDate] = useState(() => {
+    const now = new Date();
+    return `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
 
   // Save settings to localStorage
   useEffect(() => {
@@ -314,6 +323,31 @@ export default function App() {
                   return item;
                 });
               });
+            }
+          },
+          onHistory: (historyList, allProfiles, dates) => {
+            if (historyList && historyList.length > 0) {
+              setHistory30Days((prev) => {
+                const merged = [...historyList];
+                const lastIdx = merged.length - 1;
+                if (prev && prev.length > 0 && prev[prev.length - 1].trackingWh > merged[lastIdx].trackingWh) {
+                  merged[lastIdx] = { ...prev[prev.length - 1] };
+                }
+                return merged;
+              });
+            }
+            if (allProfiles && typeof allProfiles === 'object') {
+              setAllIntradayProfiles(allProfiles);
+              if (dates && dates.length > 0) {
+                setAvailableHistoryDates(dates);
+              }
+              // Chọn ngày hiển thị: ngày đang chọn hoặc ngày đầu tiên có sẵn
+              const now = new Date();
+              const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+              const activeDate = selectedIntradayDate || todayStr;
+              if (allProfiles[activeDate]) {
+                setIntradayData(allProfiles[activeDate]);
+              }
             }
           },
           onStatusChange: (status) => {
@@ -752,6 +786,14 @@ export default function App() {
             onClearCharts={handleClearCharts}
             isAdmin={authSession?.role === 'admin'}
             themeMode={themeMode}
+            availableDates={availableHistoryDates}
+            selectedIntradayDate={selectedIntradayDate}
+            onSelectIntradayDate={(dateStr) => {
+              setSelectedIntradayDate(dateStr);
+              if (allIntradayProfiles[dateStr]) {
+                setIntradayData(allIntradayProfiles[dateStr]);
+              }
+            }}
           />
         </section>
 

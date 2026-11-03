@@ -19,7 +19,8 @@ bool SolarGeometry::isZenithSingularity(float el_sun) {
 bool SolarGeometry::computeAxisTargets(const SolarPosition& sun_pos,
                                       AxisTarget& out_target_az,
                                       AxisTarget& out_target_el,
-                                      float base_az_deg) {
+                                      float base_az_deg,
+                                      float zenith_el_deg) {
     // Khởi tạo struct mặc định
     out_target_az.sensor_corr_deg = 0.0f;
     out_target_el.sensor_corr_deg = 0.0f;
@@ -28,38 +29,52 @@ bool SolarGeometry::computeAxisTargets(const SolarPosition& sun_pos,
     out_target_az.clamp_reason = "NONE";
     out_target_el.clamp_reason = "NONE";
 
-    // 1. ĐỘNG HỌC HỆ CƠ CẤU GIÀN PIN THỰC TẾ:
-    // Trục 1 (Azimuth / Bắc - Nam): Hướng mặc định quay thẳng hướng Đông (~90° hoặc defaultDeg1).
-    // Chỉ dao động trong khoảng [base_az - 45°, base_az + 45°] bù góc lệch mùa theo trục Bắc - Nam.
-    // Thành phần vector mặt trời hướng Bắc (+)/Nam (-): Sy = cos(El) * cos(Az)
-    double el_rad = sun_pos.elevation_deg * (M_PI / 180.0);
-    double az_rad = sun_pos.azimuth_deg * (M_PI / 180.0);
-    double sy = std::cos(el_rad) * std::cos(az_rad);
-    if (sy > 1.0) sy = 1.0;
-    if (sy < -1.0) sy = -1.0;
-    float delta_phi = static_cast<float>(std::asin(sy) * (180.0 / M_PI)); // Lệch mùa: tối đa ±23.45°
+    // 1. ĐỘNG HỌC HỆ CƠ CẤU GIÀN PIN THỰC TẾ (HỆ TỌA ĐỘ 2 TRỤC XOAY NGANG & NGỬA DỌC):
+    // Trục 1 (Azimuth / Xoay Ngang):
+    // Switch Home 1 đặt tại góc la bàn Chính Nam (base_az_deg = 180.0°).
+    // Chiều quay phi tăng từ Home (0.0°) quay ngược chiều kim đồng hồ ra xa về phía Đông (90.0°).
+    // - Buổi sáng (az_sun <= base_az_deg): Mặt pin hướng thẳng đón nắng Đông -> Nam:
+    //     phi_target = base_az_deg - az_sun
+    // - Buổi chiều (az_sun > base_az_deg): Trục 1 quay sang hướng đối diện (Đông Bắc), Trục 2 ngửa lật ra sau đón nắng Tây:
+    //     phi_target = 360.0f - az_sun (Ví dụ: az_sun = 260° Tây Nam -> phi_target = 100° Đông Bắc)
+    float az_s = static_cast<float>(sun_pos.azimuth_deg);
+    float el_s = static_cast<float>(sun_pos.elevation_deg);
+    float phi_raw = 0.0f;
+    float eps_raw = zenith_el_deg;
 
-    float phi_raw = base_az_deg - delta_phi;
+    // Khoảng cách góc so với thiên đỉnh (Zenith distance: 0° tại đỉnh trời, 90° tại chân trời)
+    float delta_zenith = 90.0f - el_s;
+    if (delta_zenith < 0.0f) delta_zenith = 0.0f;
+
+    // Kẹp biên an toàn cho zenith_el_deg trong dải [20.0°, 70.0°]
+    if (zenith_el_deg < 20.0f) zenith_el_deg = 20.0f;
+    if (zenith_el_deg > 70.0f) zenith_el_deg = 70.0f;
+
+    if (az_s <= base_az_deg) {
+        // Buổi sáng: Trục 1 đón nắng Đông -> Nam, Trục 2 nghiêng sườn trước đón Đông (tiến về phía switch 90°)
+        phi_raw = base_az_deg - az_s;
+        eps_raw = zenith_el_deg + delta_zenith * ((CFG_J_EL_HOME_SW_DEG - zenith_el_deg) / 90.0f);
+    } else {
+        // Buổi chiều: Trục 1 quay sang Đông Bắc, Trục 2 NGỬA LẬT RA SAU đón nắng Tây (tiến về phía 10°)
+        phi_raw = 360.0f - az_s;
+        eps_raw = zenith_el_deg - delta_zenith * ((zenith_el_deg - CFG_L_EL_MIN_SOFT_LIMIT_DEG) / 90.0f);
+    }
     out_target_az.feedforward_deg = phi_raw;
-
-    // Trục 2 (Elevation / Đông - Tây): Đảm nhiệm bám nhật động Đông -> Tây theo góc nâng mặt trời.
-    // Hạ dần từ 90° (đỉnh trời) xuống 10° (chân trời)
-    float eps_raw = static_cast<float>(sun_pos.elevation_deg);
     out_target_el.feedforward_deg = eps_raw;
 
-    // 2. Kẹp góc mềm trục Azimuth (Trục 1):
-    // Giới hạn biên độ [base_az - 45.0°, base_az + 45.0°] và [0.0°, CFG_I_AZ_MAX_SOFT_LIMIT_DEG]
-    float min_az_allowed = std::max(0.0f, base_az_deg - 45.0f);
-    float max_az_allowed = std::min(CFG_I_AZ_MAX_SOFT_LIMIT_DEG, base_az_deg + 45.0f);
+    // 2. Kẹp góc mềm trục Azimuth (Trục 1): [0.0°, CFG_I_AZ_MAX_SOFT_LIMIT_DEG]
+    // Nếu góc nằm ngoài phạm vi hành trình trục, kẹp lại an toàn chống xoắn cáp
+    float min_az_allowed = 0.0f;
+    float max_az_allowed = CFG_I_AZ_MAX_SOFT_LIMIT_DEG;
     float phi_clamped = phi_raw;
     if (phi_raw < min_az_allowed) {
         phi_clamped = min_az_allowed;
         out_target_az.is_clamped = true;
-        out_target_az.clamp_reason = "SEASONAL_MIN_45";
+        out_target_az.clamp_reason = "AZ_MIN_LIMIT";
     } else if (phi_raw > max_az_allowed) {
         phi_clamped = max_az_allowed;
         out_target_az.is_clamped = true;
-        out_target_az.clamp_reason = "SEASONAL_MAX_45";
+        out_target_az.clamp_reason = "AZ_MAX_LIMIT";
     }
     out_target_az.final_ref_deg = phi_clamped;
 

@@ -82,3 +82,21 @@ export function getConnectionStatusBadge(connStatus, staleDurationMs = 0) {
     isLive: false
   };
 }
+
+/**
+ * Chuyển đổi góc phương vị (0° - 360°) sang tên 8 hướng la bàn chuẩn
+ */
+export function getCompassDirectionName(deg) {
+  if (deg === null || deg === undefined || isNaN(deg) || deg === '') {
+    return '--';
+  }
+  const norm = ((Number(deg) % 360) + 360) % 360;
+  if (norm >= 337.5 || norm < 22.5) return 'Bắc';
+  if (norm >= 22.5 && norm < 67.5) return 'Đông Bắc';
+  if (norm >= 67.5 && norm < 112.5) return 'Đông';
+  if (norm >= 112.5 && norm < 157.5) return 'Đông Nam';
+  if (norm >= 157.5 && norm < 202.5) return 'Nam';
+  if (norm >= 202.5 && norm < 247.5) return 'Tây Nam';
+  if (norm >= 247.5 && norm < 292.5) return 'Tây';
+  return 'Tây Bắc';
+}

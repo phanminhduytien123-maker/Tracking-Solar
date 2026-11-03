@@ -2,6 +2,7 @@
 // TUÂN THỦ NGUYÊN TẮC: CHỈ HIỂN THỊ, KHÔNG TỰ TÍNH LẠI HẰNG SỐ VẬT LÝ, PHÂN BIỆT THẬT/GIẢ
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/database';
+import { generate30DaysHistory, generateIntradayProfile } from './mockDataService';
 
 export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
 export const STALE_THRESHOLD_MS = 6000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
@@ -165,6 +166,9 @@ export class FirebaseSolarService {
     this.onTelemetry = () => { };
     this.onStatusChange = () => { };
     this.onError = () => { };
+    this.onHistory = () => { };
+    this.lastHistoryCount = 0;
+    this.hasProcessedHistory = false;
 
     // Heartbeat Tracking: Lưu mốc thời gian nhận gói tin mới nhất của từng tấm
     this.lastTrackingRawUpdate = null;
@@ -182,6 +186,7 @@ export class FirebaseSolarService {
     this.onTelemetry = callbacks.onTelemetry || (() => { });
     this.onStatusChange = callbacks.onStatusChange || (() => { });
     this.onError = callbacks.onError || (() => { });
+    this.onHistory = callbacks.onHistory || (() => { });
 
     if (!config.databaseURL || !config.apiKey) {
       console.warn('[Firebase] Incomplete Firebase configuration');
@@ -263,6 +268,9 @@ export class FirebaseSolarService {
 
           const mappedTelemetry = this.mapFirebaseToTelemetry(data);
           this.onTelemetry(mappedTelemetry);
+          if (data && data.history) {
+            this.processHistory(data.history, data.tracking);
+          }
         } else {
           this.isConnected = true;
           this.onStatusChange({ connected: true, connecting: false });
@@ -305,6 +313,130 @@ export class FirebaseSolarService {
    * - Kiểm tra trường `source`: 'device' (thật), 'mock' (ảo), thiếu -> 'unknown' (cảnh báo vàng).
    * - Firmware chưa có PID/Fuzzy/PSO -> không hiển thị số, gán has_algo_data = false.
    */
+  
+  processHistory(historyData, trackingData = {}) {
+    if (!historyData || typeof historyData !== 'object') return;
+    const historyCount = Object.keys(historyData).length;
+    if (historyCount === this.lastHistoryCount && this.hasProcessedHistory) return;
+    this.lastHistoryCount = historyCount;
+    this.hasProcessedHistory = true;
+
+    const historyList = generate30DaysHistory();
+    const dateIndexMap = new Map();
+    historyList.forEach((item, idx) => {
+      dateIndexMap.set(item.date, idx);
+    });
+
+    const byDay = {};
+    const now = new Date();
+    const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+    Object.entries(historyData).forEach(([tsKey, rec]) => {
+      if (!rec || typeof rec !== 'object') return;
+      const ts = rec.epoch_ts || Number(tsKey);
+      if (!ts) return;
+      const d = new Date(ts * 1000);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dayKey = `${dd}/${mm}`;
+
+      if (!byDay[dayKey]) {
+        byDay[dayKey] = {
+          date: dayKey,
+          maxTrk: 0,
+          maxSta: 0,
+          sumTrk: 0,
+          sumSta: 0,
+          count: 0,
+          slots: new Map()
+        };
+      }
+      const trk = Number(rec.wh_trk || 0);
+      const sta = Number(rec.wh_sta || 0);
+      byDay[dayKey].count++;
+      if (trk > byDay[dayKey].maxTrk) byDay[dayKey].maxTrk = trk;
+      if (sta > byDay[dayKey].maxSta) byDay[dayKey].maxSta = sta;
+      byDay[dayKey].sumTrk += trk;
+      byDay[dayKey].sumSta += sta;
+
+      const hour = d.getHours();
+      const min = d.getMinutes();
+      if (hour >= 5 && hour <= 19) {
+        const slot = `${String(hour).padStart(2, '0')}:${min < 30 ? '00' : '30'}`;
+        let pTrk = Number(rec.p_trk || 0);
+        let pSta = Number(rec.p_sta || 0);
+        if (pTrk > 50) pTrk = pTrk / 37.0;
+        if (pSta > 50) pSta = pSta / 37.0;
+        byDay[dayKey].slots.set(slot, {
+          pTracking: parseFloat(pTrk.toFixed(1)),
+          pStatic: parseFloat(pSta.toFixed(1))
+        });
+      }
+    });
+
+    // 1. Cập nhật tích lũy 30 ngày (historyList)
+    Object.values(byDay).forEach((dayInfo) => {
+      const idx = dateIndexMap.get(dayInfo.date);
+      if (idx !== undefined) {
+        let trkWh = dayInfo.maxTrk;
+        let staWh = dayInfo.maxSta;
+
+        if (dayInfo.date === todayStr && trackingData && trackingData.dailyEnergyWh) {
+          const liveTrkWh = Number(trackingData.dailyEnergyWh || 0);
+          if (liveTrkWh > trkWh) trkWh = liveTrkWh;
+        }
+
+        trkWh = parseFloat(trkWh.toFixed(1));
+        staWh = parseFloat(staWh.toFixed(1));
+        const diffWh = parseFloat((trkWh - staWh).toFixed(1));
+        const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
+        const expectedStaWh = 1.018 * staWh;
+        const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
+
+        historyList[idx] = {
+          ...historyList[idx],
+          trackingWh: trkWh,
+          trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
+          staticWh: staWh,
+          staticKwh: parseFloat((staWh / 1000).toFixed(3)),
+          diffWh,
+          diffKwh,
+          gainPercent: gain
+        };
+      }
+    });
+
+    // 2. Tạo hồ sơ công suất trong ngày (intradayProfilesByDate) cho TẤT CẢ các ngày có dữ liệu
+    const allIntradayProfiles = {};
+    const availableDates = Object.keys(byDay).sort().reverse(); // Ngày mới nhất lên trước
+
+    // Đảm bảo luôn có ngày hôm nay trong danh sách
+    if (!availableDates.includes(todayStr)) {
+      availableDates.unshift(todayStr);
+    }
+
+    availableDates.forEach((dKey) => {
+      const profile = generateIntradayProfile();
+      const daySlots = byDay[dKey]?.slots;
+      if (daySlots) {
+        profile.forEach((pt) => {
+          if (daySlots.has(pt.time)) {
+            const slotData = daySlots.get(pt.time);
+            pt.pTracking = slotData.pTracking;
+            pt.pStatic = slotData.pStatic;
+            const exp = 1.018 * slotData.pStatic;
+            pt.gain = exp > 0 ? parseFloat((((slotData.pTracking / exp) - 1) * 100).toFixed(1)) : 0;
+          }
+        });
+      }
+      allIntradayProfiles[dKey] = profile;
+    });
+
+    if (this.onHistory) {
+      this.onHistory(historyList, allIntradayProfiles, availableDates);
+    }
+  }
+
   mapFirebaseToTelemetry(fbData) {
     if (!fbData || (!fbData.tracking && !fbData.static)) {
       return getCleanZeroTelemetry();
@@ -407,7 +539,7 @@ export class FirebaseSolarService {
     const isSystemOnline = (trkConnStatus !== 'DISCONNECTED' || staConnStatus !== 'DISCONNECTED');
 
     // 3. THỐNG NHẤT TRẠNG THÁI HỆ THỐNG GIỮA THẺ NGOÀI VÀ MODAL
-    const isSleeping = tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true;
+    const isSleeping = (tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true) && tracking.state !== 'TRACKING' && tracking.state !== 'HOLD_15M' && tracking.state !== 'MOVE' && tracking.status !== 'TRACKING_ACTIVE';
     const wakeAt = tracking.wake_at || tracking.wakeAt || null;
 
     let displayState = 'MẤT KẾT NỐI';
@@ -660,6 +792,11 @@ export class FirebaseSolarService {
         }
       },
       motors: {
+        isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
+        limit_az_min: Boolean(tracking.limitHome),
+        limit_az_max: false,
+        limit_el_min: Boolean(tracking.limitHome2 || tracking.limitSwitch90),
+        limit_el_max: false,
         azimuth: {
           phi: curPhi,
           targetPhi: tgtPhi,
@@ -678,7 +815,7 @@ export class FirebaseSolarService {
           soft_limit_status: softLimitStatus,
           softLimitViolated: Boolean(tracking.softLimitViolatedAz),
           moving: Boolean(tracking.movingAz || (errorAzDeg !== null && Math.abs(errorAzDeg) > 0.3)),
-          isHomed: tracking.isHomed !== false,
+          isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
           flag_stall: Boolean(tracking.flag_stall_az),
           compass_calibrated: compassCalibrated
         },
@@ -700,7 +837,7 @@ export class FirebaseSolarService {
           soft_limit_status: softLimitStatus,
           softLimitViolated: Boolean(tracking.softLimitViolatedEl),
           moving: Boolean(tracking.movingEl || (errorElDeg !== null && Math.abs(errorElDeg) > 0.3)),
-          isHomed: tracking.isHomed !== false,
+          isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
           flag_stall: Boolean(tracking.flag_stall_el)
         }
       },

@@ -78,9 +78,10 @@ void ParamRegistryClass::init() {
   // 6. Giới hạn mềm phần mềm & Hình học công tắc Home
   registerParam("SOFT_MIN_AZ",         0.0f,     "deg",   -360.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("SOFT_MAX_AZ",         270.0f,   "deg",   -360.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
-  registerParam("G_AZ_HOME",           45.0f,    "deg",   -360.0f,   360.0f,   POLICY_MANUAL_ONLY,     "INIT");
+  registerParam("G_AZ_HOME",           180.0f,    "deg",   -360.0f,   360.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("H_AZ_OFFSET",         0.0f,     "deg",   -180.0f,   180.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("J_EL_HOME",           90.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
+  registerParam("J_EL_ZENITH",         50.0f,    "deg",     10.0f,    90.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("L_EL_MIN_SOFT",       10.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("SOFT_MAX_EL",         90.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
 
@@ -107,6 +108,7 @@ void ParamRegistryClass::init() {
   registerParam("INA_MAX_CURR_TRK",    10.0f,    "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
   registerParam("INA_SHUNT_STA",       0.002f,   "ohm",     0.0001f, 1.0f,     POLICY_MANUAL_ONLY,     "B14");
   registerParam("INA_MAX_CURR_STA",    10.0f,    "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
+  registerParam("INA_SCALE_FACTOR",    10.0f,    "ratio",   0.1f,    100.0f,   POLICY_MANUAL_ONLY,     "B14");
 
   // 11. Tấm cố định đối chứng (Fixed Panel Parameters)
   registerParam("FIXED_AZ_DEG",        180.0f,   "deg",     0.0f,    360.0f,   POLICY_MANUAL_ONLY,     "INIT");
