@@ -13,6 +13,7 @@ import SignInPage from './components/SignInPage';
 import {
   MockTelemetryEngine,
   generate30DaysHistory,
+  generateRealistic30DaysDataset,
   generateIntradayProfile
 } from './services/mockDataService';
 import { ESP32CommunicationService } from './services/esp32Service';
@@ -143,7 +144,57 @@ export default function App() {
     return dataSource === 'firebase' ? getCleanZeroTelemetry() : mockEngineRef.current.getNextState();
   });
   const [intradayData, setIntradayData] = useState(() => generateIntradayProfile());
-  const [history30Days, setHistory30Days] = useState(() => generate30DaysHistory());
+  const [history30Days, setHistory30Days] = useState(() => {
+    const saved = localStorage.getItem('solar_custom_history_30d');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { }
+    }
+    return generate30DaysHistory();
+  });
+  const [targetEditDate, setTargetEditDate] = useState(null);
+
+  const handleUpdateDayData = (updatedRecord) => {
+    setHistory30Days((prev) => {
+      const next = prev.map((item) => (item.date === updatedRecord.date ? updatedRecord : item));
+      localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleDeleteDayData = (dateStr) => {
+    setHistory30Days((prev) => {
+      const next = prev.filter((item) => item.date !== dateStr);
+      localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleAddDayData = (newRecord) => {
+    setHistory30Days((prev) => {
+      const next = [...prev, newRecord];
+      localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleResetHistoryData = () => {
+    localStorage.removeItem('solar_custom_history_30d');
+    setHistory30Days(generate30DaysHistory());
+  };
+
+  const handleLoadRealisticDataset = () => {
+    const dataset = generateRealistic30DaysDataset();
+    localStorage.setItem('solar_custom_history_30d', JSON.stringify(dataset));
+    setHistory30Days(dataset);
+  };
+
+  const handleOpenDataSettings = (dateStr = null) => {
+    setTargetEditDate(dateStr);
+    openSettingsTab('data_history');
+  };
   const [allIntradayProfiles, setAllIntradayProfiles] = useState({});
   const [availableHistoryDates, setAvailableHistoryDates] = useState(() => {
     const now = new Date();
@@ -794,6 +845,7 @@ export default function App() {
                 setIntradayData(allIntradayProfiles[dateStr]);
               }
             }}
+            onOpenDataSettings={handleOpenDataSettings}
           />
         </section>
 
@@ -860,6 +912,13 @@ export default function App() {
         onConfirmLocation={handleConfirmSiteLocation}
         weatherData={weatherData}
         initialTab={settingsInitialTab}
+        history30Days={history30Days}
+        onUpdateDayData={handleUpdateDayData}
+        onDeleteDayData={handleDeleteDayData}
+        onAddDayData={handleAddDayData}
+        onResetHistoryData={handleResetHistoryData}
+        onLoadRealisticDataset={handleLoadRealisticDataset}
+        targetEditDate={targetEditDate}
       />
 
       {/* 4. FOOTER */}

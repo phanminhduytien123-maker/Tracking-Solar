@@ -25,12 +25,98 @@ export function generate30DaysHistory() {
       gainPercent: 0.0,
       diffKwh: 0.0,
       diffWh: 0.0,
+      voc_trk: 0.0,
+      voc_sta: 0.0,
+      isc_trk: 0.0,
+      isc_sta: 0.0,
+      temp_trk: 0.0,
+      temp_sta: 0.0,
+      sample_count: 0,
+      weather_note: 'Bình thường',
       severe_invalid: isDayInvalid,
       invalid_reasons: reasons,
       minutes_affected: isDayInvalid ? (i === 4 ? 25 : 180) : 0,
       start_time: isDayInvalid ? (i === 4 ? "10:15:00" : "05:48:00") : null,
       end_time: isDayInvalid ? (i === 4 ? "10:40:00" : "08:48:00") : null,
       actor_uid: isDayInvalid ? (i === 4 ? "admin_uid_42200522" : "system_rtc_ds3231") : null
+    });
+  }
+  return history;
+}
+
+export function generateRealistic30DaysDataset() {
+  const history = [];
+  const today = new Date();
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+
+    const daySeed = (i * 7 + 13) % 10;
+    let weatherType = 'Nắng tốt';
+    let baseWhTrk = 224;
+    let baseWhSta = 168;
+    let vocTrk = 21.65;
+    let vocSta = 21.08;
+    let iscTrk = 1.86;
+    let iscSta = 1.40;
+    let tempTrk = 42.5;
+    let tempSta = 45.2;
+
+    if (daySeed === 3 || daySeed === 7) {
+      weatherType = 'Mây rải rác';
+      baseWhTrk = 186;
+      baseWhSta = 143;
+      vocTrk = 21.35;
+      vocSta = 20.85;
+      iscTrk = 1.56;
+      iscSta = 1.22;
+      tempTrk = 38.0;
+      tempSta = 40.8;
+    } else if (daySeed === 5) {
+      weatherType = 'Mưa dông chiều';
+      baseWhTrk = 138;
+      baseWhSta = 110;
+      vocTrk = 20.75;
+      vocSta = 20.35;
+      iscTrk = 1.18;
+      iscSta = 0.94;
+      tempTrk = 33.2;
+      tempSta = 34.6;
+    }
+
+    const jitter = ((i % 5) - 2) * 3.2;
+    const trkWh = parseFloat((baseWhTrk + jitter).toFixed(1));
+    const staWh = parseFloat((baseWhSta + jitter * 0.7).toFixed(1));
+    const diffWh = parseFloat((trkWh - staWh).toFixed(1));
+    const gain = staWh > 0 ? parseFloat((((trkWh / (1.018 * staWh)) - 1) * 100).toFixed(1)) : 0;
+
+    const isDayInvalid = (i === 12);
+    history.push({
+      date: dateStr,
+      fullDate: d.toISOString().split('T')[0],
+      staticKwh: parseFloat((staWh / 1000).toFixed(3)),
+      trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
+      staticWh: staWh,
+      trackingWh: trkWh,
+      gainPercent: gain,
+      diffKwh: parseFloat((diffWh / 1000).toFixed(3)),
+      diffWh: diffWh,
+      voc_trk: parseFloat((vocTrk + (i % 3 - 1) * 0.12).toFixed(2)),
+      voc_sta: parseFloat((vocSta + (i % 3 - 1) * 0.10).toFixed(2)),
+      isc_trk: parseFloat((iscTrk + (i % 3 - 1) * 0.03).toFixed(2)),
+      isc_sta: parseFloat((iscSta + (i % 3 - 1) * 0.02).toFixed(2)),
+      temp_trk: parseFloat((tempTrk + (i % 4 - 2) * 0.7).toFixed(1)),
+      temp_sta: parseFloat((tempSta + (i % 4 - 2) * 0.8).toFixed(1)),
+      sample_count: 5040,
+      weather_note: weatherType,
+      severe_invalid: isDayInvalid,
+      invalid_reasons: isDayInvalid ? ["CALIBRATION_TEST"] : [],
+      minutes_affected: isDayInvalid ? 15 : 0,
+      start_time: isDayInvalid ? "07:15:00" : null,
+      end_time: isDayInvalid ? "07:30:00" : null,
+      actor_uid: isDayInvalid ? "tester_lab" : null
     });
   }
   return history;

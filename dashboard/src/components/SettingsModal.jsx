@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { getStoredUsers, fetchCloudUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
 import InstallationLocationTab from './InstallationLocationTab';
+import HistoryDataManagementTab from './HistoryDataManagementTab';
 
 export default function SettingsModal({
   isOpen,
@@ -25,7 +26,14 @@ export default function SettingsModal({
   onSelectLocation = null,
   onConfirmLocation = null,
   weatherData = null,
-  initialTab = null
+  initialTab = null,
+  history30Days = [],
+  onUpdateDayData = null,
+  onDeleteDayData = null,
+  onAddDayData = null,
+  onResetHistoryData = null,
+  onLoadRealisticDataset = null,
+  targetEditDate = null
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
@@ -329,6 +337,18 @@ void loop() {
             <span>Quản lý người dùng</span>
             {usersList.some(u => u.status !== 'active') && (
               <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('data_history')}
+            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'data_history'
+                ? 'border-blue-700 text-blue-700 bg-white'
+                : 'border-transparent text-zinc-600 hover:text-zinc-900'
+              }`}
+          >
+            <span>Tùy biến dữ liệu 30 ngày</span>
+            {history30Days?.some(d => d.severe_invalid) && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Có ngày lỗi dữ liệu"></span>
             )}
           </button>
           <button
@@ -810,6 +830,19 @@ void loop() {
                 {esp32FixedCode}
               </pre>
             </div>
+          )}
+
+          {/* TAB MỚI: TÙY BIẾN DỮ LIỆU 30 NGÀY (VOC, ISC, NHIỆT ĐỘ, NĂNG LƯỢNG) */}
+          {activeTab === 'data_history' && (
+            <HistoryDataManagementTab
+              history30Days={history30Days}
+              onUpdateDayData={onUpdateDayData}
+              onDeleteDayData={onDeleteDayData}
+              onAddDayData={onAddDayData}
+              onResetHistoryData={onResetHistoryData}
+              onLoadRealisticDataset={onLoadRealisticDataset}
+              initialTargetDate={targetEditDate}
+            />
           )}
 
           {/* TAB 6: RAW JSON LIVE */}

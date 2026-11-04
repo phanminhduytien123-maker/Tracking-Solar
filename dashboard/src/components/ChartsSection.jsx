@@ -12,7 +12,21 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { Maximize2, X } from 'lucide-react';
+import {
+  Maximize2,
+  X,
+  FileSpreadsheet,
+  Sliders,
+  Sun,
+  Zap,
+  Thermometer,
+  Calendar,
+  CheckCircle2,
+  AlertTriangle,
+  Search,
+  Activity,
+  Edit3
+} from 'lucide-react';
 import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
 
 ChartJS.register(
@@ -36,17 +50,24 @@ const RANGE_OPTIONS = [
 
 export default function ChartsSection({
   intradayData,
-  history30Days,
+  history30Days = [],
   onClearCharts,
   isAdmin = false,
   themeMode = 'light',
   availableDates = [],
   selectedIntradayDate = '',
-  onSelectIntradayDate = null
+  onSelectIntradayDate = null,
+  onOpenDataSettings = null
 }) {
   const [historyRange, setHistoryRange] = useState(1);
-  const [expandedChart, setExpandedChart] = useState(null);
+  const [expandedChart, setExpandedChart] = useState(null); // 'intraday' | 'history' | 'voc_isc' | 'temp'
   const [includeExcludedDays, setIncludeExcludedDays] = useState(false);
+
+  // Bộ lọc cho bảng dữ liệu 30 ngày
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableFilterStatus, setTableFilterStatus] = useState('ALL'); // 'ALL' | 'VALID' | 'INVALID'
+  // Bộ lọc hiển thị đồ thị Voc/Isc
+  const [vocIscViewMode, setVocIscViewMode] = useState('ALL'); // 'ALL' | 'VOC' | 'ISC'
 
   // Nhận diện trạng thái dark mode chuẩn xác
   const isDark = themeMode === 'dark' || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
@@ -158,9 +179,7 @@ export default function ChartsSection({
     },
     scales: {
       x: {
-        grid: {
-          color: chartGridColor
-        },
+        grid: { color: chartGridColor },
         ticks: {
           color: chartTickColor,
           font: { family: 'Be Vietnam Pro', size: 11, weight: '500' },
@@ -169,9 +188,7 @@ export default function ChartsSection({
         }
       },
       y: {
-        grid: {
-          color: chartGridColor
-        },
+        grid: { color: chartGridColor },
         ticks: {
           color: chartTickColor,
           font: { family: 'Be Vietnam Pro', size: 11, weight: '500' },
@@ -310,9 +327,346 @@ export default function ChartsSection({
     }
   };
 
+  // =========================================================================
+  // 3. TÍNH TOÁN CÁC CHỈ SỐ KPI TỔNG HỢP 30 NGÀY
+  // =========================================================================
+  const validHistory = history30Days.filter(d => !d.severe_invalid);
+  const totalTrkWh = history30Days.reduce((acc, d) => acc + (d.trackingWh !== undefined ? d.trackingWh : (Number(d.trackingKwh || 0) * 1000)), 0);
+  const totalStaWh = history30Days.reduce((acc, d) => acc + (d.staticWh !== undefined ? d.staticWh : (Number(d.staticKwh || 0) * 1000)), 0);
+  const totalDiffWh = totalTrkWh - totalStaWh;
+  const overallGain = totalStaWh > 0 ? (((totalTrkWh / (1.018 * totalStaWh)) - 1) * 100) : 0;
+
+  const vocTrkDays = validHistory.filter(d => Number(d.voc_trk) > 0);
+  const avgVocTrk = vocTrkDays.length > 0 ? vocTrkDays.reduce((acc, d) => acc + Number(d.voc_trk), 0) / vocTrkDays.length : 0;
+  const vocStaDays = validHistory.filter(d => Number(d.voc_sta) > 0);
+  const avgVocSta = vocStaDays.length > 0 ? vocStaDays.reduce((acc, d) => acc + Number(d.voc_sta), 0) / vocStaDays.length : 0;
+
+  const iscTrkDays = validHistory.filter(d => Number(d.isc_trk) > 0);
+  const avgIscTrk = iscTrkDays.length > 0 ? iscTrkDays.reduce((acc, d) => acc + Number(d.isc_trk), 0) / iscTrkDays.length : 0;
+  const iscStaDays = validHistory.filter(d => Number(d.isc_sta) > 0);
+  const avgIscSta = iscStaDays.length > 0 ? iscStaDays.reduce((acc, d) => acc + Number(d.isc_sta), 0) / iscStaDays.length : 0;
+
+  const tempTrkDays = validHistory.filter(d => Number(d.temp_trk) > 0);
+  const avgTempTrk = tempTrkDays.length > 0 ? tempTrkDays.reduce((acc, d) => acc + Number(d.temp_trk), 0) / tempTrkDays.length : 0;
+  const tempStaDays = validHistory.filter(d => Number(d.temp_sta) > 0);
+  const avgTempSta = tempStaDays.length > 0 ? tempStaDays.reduce((acc, d) => acc + Number(d.temp_sta), 0) / tempStaDays.length : 0;
+
+  // =========================================================================
+  // 4. CẤU HÌNH ĐỒ THỊ 3: ĐỐI CHỨNG VOC VÀ ISC 30 NGÀY
+  // =========================================================================
+  const all30Labels = history30Days.map(d => d.date);
+  const vocTrkData = history30Days.map(d => (d.voc_trk !== undefined ? Number(d.voc_trk) : 0));
+  const vocStaData = history30Days.map(d => (d.voc_sta !== undefined ? Number(d.voc_sta) : 0));
+  const iscTrkData = history30Days.map(d => (d.isc_trk !== undefined ? Number(d.isc_trk) : 0));
+  const iscStaData = history30Days.map(d => (d.isc_sta !== undefined ? Number(d.isc_sta) : 0));
+
+  const vocIscDatasets = [];
+  if (vocIscViewMode === 'ALL' || vocIscViewMode === 'VOC') {
+    vocIscDatasets.push(
+      {
+        type: 'line',
+        label: 'Voc Tracker (V)',
+        data: vocTrkData,
+        borderColor: trkLineColor,
+        backgroundColor: trkLineColor,
+        borderWidth: 2,
+        tension: 0.2,
+        yAxisID: 'y_voc',
+        pointRadius: 2.5,
+        order: 1
+      },
+      {
+        type: 'line',
+        label: 'Voc Cố định (V)',
+        data: vocStaData,
+        borderColor: staLineColor,
+        backgroundColor: staLineColor,
+        borderWidth: 2,
+        borderDash: [4, 4],
+        tension: 0.2,
+        yAxisID: 'y_voc',
+        pointRadius: 2.5,
+        order: 2
+      }
+    );
+  }
+  if (vocIscViewMode === 'ALL' || vocIscViewMode === 'ISC') {
+    vocIscDatasets.push(
+      {
+        type: 'bar',
+        label: 'Isc Tracker (A)',
+        data: iscTrkData,
+        backgroundColor: isDark ? 'rgba(74, 222, 128, 0.7)' : 'rgba(21, 128, 61, 0.7)',
+        borderRadius: 2,
+        maxBarThickness: 16,
+        yAxisID: 'y_isc',
+        order: 3
+      },
+      {
+        type: 'bar',
+        label: 'Isc Cố định (A)',
+        data: iscStaData,
+        backgroundColor: isDark ? 'rgba(250, 204, 21, 0.7)' : 'rgba(202, 138, 4, 0.7)',
+        borderRadius: 2,
+        maxBarThickness: 16,
+        yAxisID: 'y_isc',
+        order: 4
+      }
+    );
+  }
+
+  const vocIscChartData = {
+    labels: all30Labels,
+    datasets: vocIscDatasets
+  };
+
+  const vocIscOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: {
+          color: chartLegendColor,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '600' },
+          boxWidth: 12,
+          padding: 8
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        borderColor: '#334155',
+        borderWidth: 1,
+        titleColor: '#ffffff',
+        bodyColor: '#f8fafc',
+        padding: 10,
+        callbacks: {
+          label: function (ctx) {
+            const isV = ctx.dataset.label.includes('Voc');
+            const unit = isV ? ' V' : ' A';
+            return ` ${ctx.dataset.label}: ${formatDecimal(ctx.parsed.y, 2)}${unit}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: chartGridColor },
+        ticks: { color: chartTickColor, font: { family: 'Be Vietnam Pro', size: 10, weight: '500' } }
+      },
+      y_voc: {
+        type: 'linear',
+        position: 'left',
+        grid: { color: chartGridColor },
+        ticks: {
+          color: chartTickColor,
+          font: { family: 'Be Vietnam Pro', size: 10, weight: '500' },
+          callback: (v) => `${formatDecimal(v, 0)} V`
+        },
+        beginAtZero: true,
+        suggestedMax: 25
+      },
+      y_isc: {
+        type: 'linear',
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: {
+          color: isDark ? '#4ade80' : '#15803d',
+          font: { family: 'Be Vietnam Pro', size: 10, weight: '600' },
+          callback: (v) => `${formatDecimal(v, 1)} A`
+        },
+        beginAtZero: true,
+        suggestedMax: 2.5
+      }
+    }
+  };
+
+  // =========================================================================
+  // 5. CẤU HÌNH ĐỒ THỊ 4: NHIỆT ĐỘ VÀ CHÊNH LỆCH NHIỆT ĐỘ 30 NGÀY
+  // =========================================================================
+  const tempTrkData = history30Days.map(d => (d.temp_trk !== undefined ? Number(d.temp_trk) : 0));
+  const tempStaData = history30Days.map(d => (d.temp_sta !== undefined ? Number(d.temp_sta) : 0));
+  const tempDiffData = history30Days.map(d => {
+    const t = Number(d.temp_trk) || 0;
+    const s = Number(d.temp_sta) || 0;
+    return t > 0 && s > 0 ? parseFloat((t - s).toFixed(1)) : 0;
+  });
+
+  const tempChartData = {
+    labels: all30Labels,
+    datasets: [
+      {
+        type: 'line',
+        label: 'Nhiệt độ Tracker (°C)',
+        data: tempTrkData,
+        borderColor: trkLineColor,
+        backgroundColor: trkLineColor,
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 2.5,
+        yAxisID: 'y_temp',
+        order: 1
+      },
+      {
+        type: 'line',
+        label: 'Nhiệt độ Cố định (°C)',
+        data: tempStaData,
+        borderColor: '#ef4444',
+        backgroundColor: '#ef4444',
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 2.5,
+        yAxisID: 'y_temp',
+        order: 2
+      },
+      {
+        type: 'bar',
+        label: 'Chênh lệch ΔT (°C)',
+        data: tempDiffData,
+        backgroundColor: isDark ? 'rgba(192, 132, 252, 0.45)' : 'rgba(147, 51, 234, 0.35)',
+        borderRadius: 2,
+        maxBarThickness: 16,
+        yAxisID: 'y_diff',
+        order: 3
+      }
+    ]
+  };
+
+  const tempOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: {
+          color: chartLegendColor,
+          font: { family: 'Be Vietnam Pro', size: 11, weight: '600' },
+          boxWidth: 12,
+          padding: 8
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        borderColor: '#334155',
+        borderWidth: 1,
+        titleColor: '#ffffff',
+        bodyColor: '#f8fafc',
+        padding: 10,
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${formatDecimal(ctx.parsed.y, 1)} °C`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: chartGridColor },
+        ticks: { color: chartTickColor, font: { family: 'Be Vietnam Pro', size: 10, weight: '500' } }
+      },
+      y_temp: {
+        type: 'linear',
+        position: 'left',
+        grid: { color: chartGridColor },
+        ticks: {
+          color: chartTickColor,
+          font: { family: 'Be Vietnam Pro', size: 10, weight: '500' },
+          callback: (v) => `${formatDecimal(v, 0)} °C`
+        },
+        beginAtZero: false,
+        suggestedMin: 20,
+        suggestedMax: 55
+      },
+      y_diff: {
+        type: 'linear',
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: {
+          color: isDark ? '#c084fc' : '#9333ea',
+          font: { family: 'Be Vietnam Pro', size: 10, weight: '600' },
+          callback: (v) => `${formatSignedNumber(v, 0, '°C')}`
+        },
+        suggestedMin: -10,
+        suggestedMax: 10
+      }
+    }
+  };
+
+  // =========================================================================
+  // 6. XUẤT CSV DỮ LIỆU ĐO 30 NGÀY (UTF-8 BOM CHO EXCEL)
+  // =========================================================================
+  const handleExportCSV = () => {
+    const headers = [
+      'STT',
+      'Ngay',
+      'Ngay_Day_Du',
+      'San_Luong_Tracker_Wh',
+      'San_Luong_Co_Dinh_Wh',
+      'Chenh_Lech_Wh',
+      'Phan_Tram_Gain',
+      'Voc_Tracker_V',
+      'Voc_Co_Dinh_V',
+      'Isc_Tracker_A',
+      'Isc_Co_Dinh_A',
+      'Nhiet_Do_Tracker_C',
+      'Nhiet_Do_Co_Dinh_C',
+      'Trang_Thai',
+      'Thoi_Tiet_Ghi_Chu'
+    ];
+
+    const rows = history30Days.map((d, idx) => {
+      const trkWh = d.trackingWh !== undefined ? d.trackingWh : (Number(d.trackingKwh || 0) * 1000);
+      const staWh = d.staticWh !== undefined ? d.staticWh : (Number(d.staticKwh || 0) * 1000);
+      return [
+        idx + 1,
+        d.date,
+        d.fullDate || '',
+        trkWh,
+        staWh,
+        d.diffWh || (trkWh - staWh),
+        d.gainPercent || 0,
+        d.voc_trk || 0,
+        d.voc_sta || 0,
+        d.isc_trk || 0,
+        d.isc_sta || 0,
+        d.temp_trk || 0,
+        d.temp_sta || 0,
+        d.severe_invalid ? 'LOI_LOAI_TRU' : 'HOP_LE',
+        `"${(d.weather_note || (Array.isArray(d.invalid_reasons) ? d.invalid_reasons.join('; ') : d.invalid_reasons) || 'Binh thuong').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `solar_tracker_30days_voc_isc_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Lọc bảng dữ liệu
+  const filteredTableData = history30Days.filter((item) => {
+    if (tableFilterStatus === 'VALID' && item.severe_invalid) return false;
+    if (tableFilterStatus === 'INVALID' && !item.severe_invalid) return false;
+    if (tableSearch.trim()) {
+      const q = tableSearch.toLowerCase().trim();
+      const matchDate = item.date.toLowerCase().includes(q);
+      const matchNote = (item.weather_note || '').toLowerCase().includes(q);
+      return matchDate || matchNote;
+    }
+    return true;
+  });
+
   return (
-    <div id="section-charts" className="space-y-4">
-      {/* 2 ĐỒ THỊ LỚN BỐ TRÍ SONG SONG HOẶC TRÊN DƯỚI */}
+    <div id="section-charts" className="space-y-5">
+      {/* ===================================================================== */}
+      {/* 2 ĐỒ THỊ LỚN HIỆN TẠI (GIỮ NGUYÊN 100% CẤU TRÚC VÀ VỊ TRÍ) */}
+      {/* ===================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ĐỒ THỊ 1: CÔNG SUẤT TRONG NGÀY */}
         <div className="lab-card p-4 flex flex-col justify-between">
@@ -330,7 +684,7 @@ export default function ChartsSection({
                 So sánh công suất tức thời (W) theo khung giờ đo 05:00 – 19:00
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {availableDates && availableDates.length > 0 && (
                 <div className="flex items-center gap-1.5">
@@ -410,13 +764,403 @@ export default function ChartsSection({
         </div>
       </div>
 
-      {/* MODAL PHÓNG TO ĐỒ THỊ NẾU CẦN */}
+      {/* ===================================================================== */}
+      {/* PHÂN KHU THEO DÕI ĐỐI CHỨNG 30 NGÀY (BỔ SUNG BÊN DƯỚI 2 ĐỒ THỊ TRÊN) */}
+      {/* ===================================================================== */}
+      <div className="space-y-4 pt-1">
+        {/* THANH TIÊU ĐỀ PHÂN KHU 30 NGÀY */}
+        <div className="lab-card p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-sm">
+                <Activity className="w-4 h-4" />
+              </span>
+              <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+                Theo dõi & Đối chứng Chu kỳ đo 30 ngày (Voc, Isc, Nhiệt độ & Năng lượng)
+              </h2>
+            </div>
+            <p className="text-xs text-zinc-600 dark:text-slate-300 mt-1">
+              Phân tích so sánh hiệu quả thu hoạch năng lượng theo chuẩn MDPI Sustainability (2022) và Luận văn tốt nghiệp
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              title="Tải toàn bộ số liệu 30 ngày về máy dạng file CSV tương thích Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Xuất CSV 30 ngày</span>
+            </button>
+
+            {onOpenDataSettings && (
+              <button
+                onClick={() => onOpenDataSettings()}
+                className="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                title="Mở tab cài đặt để chỉnh sửa, xóa hoặc thêm mới ngày đo"
+              >
+                <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                <span>Tùy biến dữ liệu</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 5 THẺ KPI TỔNG KẾT 30 NGÀY */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* KPI 1: Năng lượng */}
+          <div className="lab-card p-3 border-l-4 border-l-blue-600">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-500" />
+              <span>Tổng năng lượng 30N</span>
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-base font-bold text-zinc-900 dark:text-white font-mono">
+                {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-normal text-zinc-500">kWh</span>
+              </span>
+              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                {formatSignedNumber(overallGain, 1, '%')}
+              </span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+              <span>Cố định: {formatDecimal(totalStaWh / 1000, 2)} kWh</span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400">+{formatDecimal(totalDiffWh / 1000, 2)}</span>
+            </div>
+          </div>
+
+          {/* KPI 2: Điện áp Voc */}
+          <div className="lab-card p-3 border-l-4 border-l-sky-500">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
+              <Sun className="w-3 h-3 text-sky-500" />
+              <span>Voc trung bình</span>
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-base font-bold text-sky-700 dark:text-sky-300 font-mono">
+                {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-normal text-zinc-500">V</span>
+              </span>
+              <span className="text-xs text-zinc-500 font-mono">
+                Sta: {formatDecimal(avgVocSta, 2)}V
+              </span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+              <span>Chênh lệch áp:</span>
+              <span className="font-semibold text-zinc-800 dark:text-slate-200 font-mono">
+                {formatSignedNumber(avgVocTrk - avgVocSta, 2, 'V')}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 3: Dòng Isc */}
+          <div className="lab-card p-3 border-l-4 border-l-emerald-500">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
+              <Activity className="w-3 h-3 text-emerald-500" />
+              <span>Isc đỉnh trung bình</span>
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-base font-bold text-emerald-700 dark:text-emerald-300 font-mono">
+                {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-normal text-zinc-500">A</span>
+              </span>
+              <span className="text-xs text-zinc-500 font-mono">
+                Sta: {formatDecimal(avgIscSta, 2)}A
+              </span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+              <span>Tăng trưởng dòng:</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+                {avgIscSta > 0 ? `+${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%` : '--'}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 4: Nhiệt độ */}
+          <div className="lab-card p-3 border-l-4 border-l-rose-500">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
+              <Thermometer className="w-3 h-3 text-rose-500" />
+              <span>Nhiệt độ TB (Tcell)</span>
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-base font-bold text-zinc-900 dark:text-white font-mono">
+                {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-normal text-zinc-500">°C</span>
+              </span>
+              <span className="text-xs text-zinc-500 font-mono">
+                Sta: {formatDecimal(avgTempSta, 1)}°C
+              </span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+              <span>Chênh lệch ΔT:</span>
+              <span className="font-semibold text-purple-600 dark:text-purple-400 font-mono">
+                {formatSignedNumber(avgTempTrk - avgTempSta, 1, '°C')}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI 5: Trạng thái đo */}
+          <div className="lab-card p-3 border-l-4 border-l-amber-500 col-span-2 sm:col-span-1">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-amber-500" />
+              <span>Độ tin cậy chu kỳ</span>
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                {validHistory.length}/{history30Days.length}
+              </span>
+              <span className="text-xs text-zinc-500">ngày hợp lệ</span>
+            </div>
+            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+              <span>Ngày loại trừ:</span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {history30Days.length - validHistory.length} ngày
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2 ĐỒ THỊ ĐỐI CHỨNG MỚI: VOC & ISC 30 NGÀY VÀ NHIỆT ĐỘ 30 NGÀY */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* ĐỒ THỊ 3: VOC VÀ ISC */}
+          <div className="lab-card p-4 flex flex-col justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <span>Đối chứng Voc & Isc 30 ngày</span>
+                </h3>
+                <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
+                  Điện áp hở mạch Voc (Trục trái) & Dòng ngắn mạch Isc (Trục phải)
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center border border-zinc-300 dark:border-slate-700 rounded-sm p-0.5 bg-zinc-50 dark:bg-slate-800 text-[11px]">
+                  <button
+                    onClick={() => setVocIscViewMode('ALL')}
+                    className={`px-2 py-0.5 rounded-xs cursor-pointer ${
+                      vocIscViewMode === 'ALL'
+                        ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white shadow-xs'
+                        : 'text-zinc-600 dark:text-slate-300'
+                    }`}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    onClick={() => setVocIscViewMode('VOC')}
+                    className={`px-2 py-0.5 rounded-xs cursor-pointer ${
+                      vocIscViewMode === 'VOC'
+                        ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white shadow-xs'
+                        : 'text-zinc-600 dark:text-slate-300'
+                    }`}
+                  >
+                    Chỉ Voc
+                  </button>
+                  <button
+                    onClick={() => setVocIscViewMode('ISC')}
+                    className={`px-2 py-0.5 rounded-xs cursor-pointer ${
+                      vocIscViewMode === 'ISC'
+                        ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white shadow-xs'
+                        : 'text-zinc-600 dark:text-slate-300'
+                    }`}
+                  >
+                    Chỉ Isc
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setExpandedChart('voc_isc')}
+                  className="p-1.5 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
+                  title="Phóng to đồ thị"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="h-[260px] sm:h-[300px] w-full">
+              <Bar data={vocIscChartData} options={vocIscOptions} />
+            </div>
+          </div>
+
+          {/* ĐỒ THỊ 4: NHIỆT ĐỘ VÀ CHÊNH LỆCH NHIỆT ĐỘ */}
+          <div className="lab-card p-4 flex flex-col justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <span>Đối chứng Nhiệt độ bề mặt pin 30 ngày</span>
+                </h3>
+                <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
+                  Nhiệt độ Tcell (°C) và chênh lệch nhiệt độ ΔT = T_trk − T_sta
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setExpandedChart('temp')}
+                  className="p-1.5 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-slate-700 hover:bg-zinc-100 dark:hover:bg-slate-800 rounded-sm cursor-pointer transition-colors"
+                  title="Phóng to đồ thị"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="h-[260px] sm:h-[300px] w-full">
+              <Bar data={tempChartData} options={tempOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* BẢNG NHẬT KÝ SỐ LIỆU ĐO 30 NGÀY CHI TIẾT */}
+        <div className="lab-card p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <span>Bảng số liệu thực nghiệm 30 ngày</span>
+                <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 dark:bg-slate-800 text-zinc-700 dark:text-slate-300 rounded-sm">
+                  {filteredTableData.length} bản ghi
+                </span>
+              </h3>
+              <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
+                Bảng số liệu tổng hợp đối chứng từng ngày: Sản lượng Wh, % Gain, Voc, Isc và Nhiệt độ
+              </p>
+            </div>
+
+            {/* Bộ lọc bảng */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2" />
+                <input
+                  type="text"
+                  placeholder="Tìm ngày (VD: 04/11)..."
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  className="pl-7 pr-2.5 py-1 text-xs border border-zinc-300 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 focus:outline-blue-600 w-36 sm:w-44"
+                />
+              </div>
+
+              <select
+                value={tableFilterStatus}
+                onChange={(e) => setTableFilterStatus(e.target.value)}
+                className="py-1 px-2 text-xs border border-zinc-300 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 cursor-pointer font-medium"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="VALID">Chỉ ngày hợp lệ</option>
+                <option value="INVALID">Ngày có lỗi / cảnh báo</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bảng dữ liệu có cuộn dọc */}
+          <div className="border border-zinc-200 dark:border-slate-800 rounded-sm overflow-x-auto max-h-[380px]">
+            <table className="w-full text-left border-collapse text-xs tabular-nums">
+              <thead className="bg-zinc-100 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2 px-2.5 font-bold">STT</th>
+                  <th className="py-2 px-2.5 font-bold">Ngày</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Tracker (Wh)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Cố định (Wh)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">% Gain</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Voc Trk (V)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Voc Sta (V)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Isc Trk (A)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Isc Sta (A)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">T° Trk (°C)</th>
+                  <th className="py-2 px-2.5 text-right font-bold">T° Sta (°C)</th>
+                  <th className="py-2 px-2.5 font-bold">Thời tiết / Ghi chú</th>
+                  <th className="py-2 px-2.5 text-center font-bold">Trạng thái</th>
+                  {onOpenDataSettings && <th className="py-2 px-2.5 text-center font-bold">Thao tác</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
+                {filteredTableData.length === 0 ? (
+                  <tr>
+                    <td colSpan={14} className="py-8 text-center text-zinc-500 dark:text-slate-400">
+                      Không tìm thấy bản ghi nào phù hợp với bộ lọc.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTableData.map((row, idx) => {
+                    const trkWh = row.trackingWh !== undefined ? row.trackingWh : (Number(row.trackingKwh || 0) * 1000);
+                    const staWh = row.staticWh !== undefined ? row.staticWh : (Number(row.staticKwh || 0) * 1000);
+                    return (
+                      <tr key={row.date} className="hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="py-2 px-2.5 text-zinc-400">{idx + 1}</td>
+                        <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">{row.date}</td>
+                        <td className="py-2 px-2.5 text-right font-mono font-semibold text-blue-700 dark:text-blue-400">
+                          {formatDecimal(trkWh, 1)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-amber-700 dark:text-amber-400">
+                          {formatDecimal(staWh, 1)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatSignedNumber(row.gainPercent, 1, '%')}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-zinc-800 dark:text-slate-200">
+                          {formatDecimal(row.voc_trk, 2)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                          {formatDecimal(row.voc_sta, 2)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-emerald-700 dark:text-emerald-300 font-semibold">
+                          {formatDecimal(row.isc_trk, 2)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                          {formatDecimal(row.isc_sta, 2)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-zinc-800 dark:text-slate-200">
+                          {formatDecimal(row.temp_trk, 1)}
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                          {formatDecimal(row.temp_sta, 1)}
+                        </td>
+                        <td className="py-2 px-2.5 text-zinc-600 dark:text-slate-300 max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
+                          {row.weather_note || 'Bình thường'}
+                        </td>
+                        <td className="py-2 px-2.5 text-center">
+                          {row.severe_invalid ? (
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-sm">
+                              Lỗi
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-sm">
+                              Hợp lệ
+                            </span>
+                          )}
+                        </td>
+                        {onOpenDataSettings && (
+                          <td className="py-2 px-2.5 text-center">
+                            <button
+                              onClick={() => onOpenDataSettings(row.date)}
+                              className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xs cursor-pointer transition-colors"
+                              title={`Chỉnh sửa dữ liệu ngày ${row.date}`}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* MODAL PHÓNG TO ĐỒ THỊ (HỖ TRỢ CẢ 4 ĐỒ THỊ) */}
+      {/* ===================================================================== */}
       {expandedChart && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-zinc-300 dark:border-slate-700 rounded-sm w-full max-w-5xl p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                {expandedChart === 'intraday' ? 'Đồ thị công suất trong ngày (Phóng to)' : 'Đồ thị năng lượng tích lũy (Phóng to)'}
+                {expandedChart === 'intraday'
+                  ? 'Đồ thị công suất trong ngày (Phóng to)'
+                  : expandedChart === 'history'
+                  ? 'Đồ thị năng lượng tích lũy (Phóng to)'
+                  : expandedChart === 'voc_isc'
+                  ? 'Đồ thị đối chứng Voc & Isc 30 ngày (Phóng to)'
+                  : 'Đồ thị đối chứng Nhiệt độ 30 ngày (Phóng to)'}
               </h3>
               <button
                 onClick={() => setExpandedChart(null)}
@@ -428,8 +1172,12 @@ export default function ChartsSection({
             <div className="h-[60vh] w-full">
               {expandedChart === 'intraday' ? (
                 <Line data={intradayChartData} options={intradayOptions} />
-              ) : (
+              ) : expandedChart === 'history' ? (
                 <Bar data={historyChartData} options={historyOptions} />
+              ) : expandedChart === 'voc_isc' ? (
+                <Bar data={vocIscChartData} options={vocIscOptions} />
+              ) : (
+                <Bar data={tempChartData} options={tempOptions} />
               )}
             </div>
           </div>
