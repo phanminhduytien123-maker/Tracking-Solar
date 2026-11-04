@@ -339,18 +339,20 @@ void loop() {
               <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab('data_history')}
-            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'data_history'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-              }`}
-          >
-            <span>Tùy biến dữ liệu 30 ngày</span>
-            {history30Days?.some(d => d.severe_invalid) && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Có ngày lỗi dữ liệu"></span>
-            )}
-          </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('data_history')}
+              className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${activeTab === 'data_history'
+                  ? 'border-blue-700 text-blue-700 bg-white'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900'
+                }`}
+            >
+              <span>Tùy biến dữ liệu 30 ngày</span>
+              {history30Days?.some(d => d.severe_invalid) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Có ngày lỗi dữ liệu"></span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('esp32_trk')}
             className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'esp32_trk'
@@ -832,17 +834,29 @@ void loop() {
             </div>
           )}
 
-          {/* TAB MỚI: TÙY BIẾN DỮ LIỆU 30 NGÀY (VOC, ISC, NHIỆT ĐỘ, NĂNG LƯỢNG) */}
+          {/* TAB MỚI: TÙY BIẾN DỮ LIỆU 30 NGÀY (CHỈ DÀNH CHO QUẢN TRỊ VIÊN ADMIN) */}
           {activeTab === 'data_history' && (
-            <HistoryDataManagementTab
-              history30Days={history30Days}
-              onUpdateDayData={onUpdateDayData}
-              onDeleteDayData={onDeleteDayData}
-              onAddDayData={onAddDayData}
-              onResetHistoryData={onResetHistoryData}
-              onLoadRealisticDataset={onLoadRealisticDataset}
-              initialTargetDate={targetEditDate}
-            />
+            currentUser?.role === 'admin' ? (
+              <HistoryDataManagementTab
+                history30Days={history30Days}
+                onUpdateDayData={onUpdateDayData}
+                onDeleteDayData={onDeleteDayData}
+                onAddDayData={onAddDayData}
+                onResetHistoryData={onResetHistoryData}
+                onLoadRealisticDataset={onLoadRealisticDataset}
+                initialTargetDate={targetEditDate}
+              />
+            ) : (
+              <div className="p-8 text-center space-y-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
+                  <span className="text-xl">🔒</span>
+                </div>
+                <h3 className="text-sm font-bold text-zinc-900">Yêu cầu quyền Quản trị viên</h3>
+                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                  Tính năng tùy biến sâu dữ liệu chu kỳ 30 ngày chỉ dành riêng cho tài khoản Quản trị viên (Admin). Tài khoản khách chỉ có quyền giám sát số liệu trực tiếp.
+                </p>
+              </div>
+            )
           )}
 
           {/* TAB 6: RAW JSON LIVE */}
