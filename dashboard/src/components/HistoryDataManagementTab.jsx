@@ -1,18 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Save,
-  Trash2,
-  Plus,
-  RefreshCw,
-  Sliders,
-  Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Sun,
-  Zap,
-  Thermometer,
-  Sparkles
-} from 'lucide-react';
 import { formatDecimal, formatSignedNumber } from '../utils/formatters';
 
 export default function HistoryDataManagementTab({
@@ -94,7 +80,6 @@ export default function HistoryDataManagementTab({
   const handleChange = (field, value) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
-      // Auto recalculate gain if not manual
       if ((field === 'trackingWh' || field === 'staticWh') && !isManualGain) {
         const trk = Number(field === 'trackingWh' ? value : prev.trackingWh);
         const sta = Number(field === 'staticWh' ? value : prev.staticWh);
@@ -155,13 +140,13 @@ export default function HistoryDataManagementTab({
   // Delete day
   const handleDelete = () => {
     if (!selectedDateStr) return;
-    if (window.confirm(`Bạn có chắc chắn muốn xóa bản ghi ngày ${selectedDateStr} khỏi chu kỳ 30 ngày?`)) {
+    if (window.confirm(`Xác nhận xóa bản ghi ngày ${selectedDateStr} khỏi chu kỳ 30 ngày?`)) {
       if (onDeleteDayData) {
         onDeleteDayData(selectedDateStr);
       }
       setFeedback({
         type: 'warning',
-        message: `Đã xóa ngày ${selectedDateStr} khỏi danh sách đo.`
+        message: `Đã xóa ngày ${selectedDateStr} khỏi danh sách.`
       });
       setTimeout(() => setFeedback(null), 3500);
     }
@@ -204,19 +189,19 @@ export default function HistoryDataManagementTab({
     setNewDateInput('');
     setFeedback({
       type: 'success',
-      message: `Đã thêm thành công ngày mới ${formatted}!`
+      message: `Đã thêm ngày mới ${formatted}!`
     });
     setTimeout(() => setFeedback(null), 3500);
   };
 
   // Load realistic dataset
   const handleLoadDemoDataset = () => {
-    if (window.confirm('Hệ thống sẽ điền 30 ngày dữ liệu mẫu thực nghiệm theo bài báo MDPI Sustainability (Tracker +25-35%, Voc ~21.5V, Isc ~1.8A, Temp ~42°C). Tiếp tục?')) {
+    if (window.confirm('Hệ thống sẽ điền dữ liệu mẫu 30 ngày vào chu kỳ đối chứng. Tiếp tục?')) {
       if (onLoadRealisticDataset) {
         onLoadRealisticDataset();
         setFeedback({
           type: 'success',
-          message: 'Đã nạp 30 ngày dữ liệu thực nghiệm chuẩn khoa học thành công!'
+          message: 'Đã nạp 30 ngày dữ liệu mẫu thành công!'
         });
         setTimeout(() => setFeedback(null), 4000);
       }
@@ -225,7 +210,7 @@ export default function HistoryDataManagementTab({
 
   // Reset
   const handleReset = () => {
-    if (window.confirm('Đặt lại toàn bộ dữ liệu 30 ngày về trạng thái khởi tạo ban đầu?')) {
+    if (window.confirm('Đặt lại toàn bộ dữ liệu 30 ngày về trạng thái ban đầu?')) {
       if (onResetHistoryData) {
         onResetHistoryData();
         setFeedback({
@@ -238,93 +223,82 @@ export default function HistoryDataManagementTab({
   };
 
   return (
-    <div className="space-y-5">
-      {/* 1. THANH CÔNG CỤ NHANH */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+    <div className="space-y-4">
+      {/* 1. THANH CÔNG CỤ */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-200">
         <div>
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-1.5">
-            <Sliders className="w-4 h-4 text-blue-600" />
-            <span>Tùy biến dữ liệu chu kỳ đo 30 ngày</span>
+          <h3 className="text-sm font-bold text-zinc-900">
+            Tùy biến dữ liệu chu kỳ 30 ngày
           </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Chỉnh sửa, xóa hoặc bổ sung số liệu từng ngày (Năng lượng, Voc, Isc, Nhiệt độ) phục vụ báo cáo khoa học
+          <p className="text-xs text-zinc-500 mt-0.5 font-medium">
+            Chỉnh sửa, xóa hoặc bổ sung số liệu từng ngày đo
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleLoadDemoDataset}
-            className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-            title="Tự động điền 30 ngày dữ liệu chuẩn thực nghiệm bài báo MDPI để xem trước giao diện và làm báo cáo"
+            className="px-2.5 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm cursor-pointer transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Điền dữ liệu mẫu MDPI</span>
+            Điền dữ liệu mẫu
           </button>
 
           <button
             onClick={() => setIsAddingNewDay(!isAddingNewDay)}
-            className="px-2.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+            className="px-2.5 py-1 text-xs font-semibold bg-blue-700 hover:bg-blue-800 text-white rounded-sm cursor-pointer transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Thêm ngày mới</span>
+            Thêm ngày mới
           </button>
 
           <button
             onClick={handleReset}
-            className="px-2.5 py-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-300 hover:bg-zinc-100 rounded-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="Đặt lại về mặc định"
+            className="px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-white border border-zinc-300 hover:bg-zinc-50 rounded-sm cursor-pointer transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Đặt lại</span>
+            Đặt lại
           </button>
         </div>
       </div>
 
       {/* THÔNG BÁO PHẢN HỒI */}
       {feedback && (
-        <div className={`p-3 rounded-sm text-xs font-medium border flex items-center gap-2 ${
+        <div className={`p-2.5 rounded-sm text-xs font-medium border ${
           feedback.type === 'success'
             ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
             : feedback.type === 'warning'
             ? 'bg-amber-50 border-amber-300 text-amber-800'
             : 'bg-blue-50 border-blue-300 text-blue-800'
         }`}>
-          {feedback.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          )}
           <span>{feedback.message}</span>
         </div>
       )}
 
       {/* FORM THÊM NGÀY MỚI NẾU BẬT */}
       {isAddingNewDay && (
-        <form onSubmit={handleAddNewDaySubmit} className="p-3 bg-blue-50/70 border border-blue-200 rounded-sm space-y-2">
+        <form onSubmit={handleAddNewDaySubmit} className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-900">Thêm một ngày đo mới vào chu kỳ:</span>
+            <span className="text-xs font-bold text-zinc-900">Thêm một ngày đo mới:</span>
             <button
               type="button"
               onClick={() => setIsAddingNewDay(false)}
-              className="text-xs text-blue-700 hover:underline cursor-pointer"
+              className="text-xs text-zinc-500 hover:underline cursor-pointer"
             >
-              Hủy bỏ
+              Hủy
             </button>
           </div>
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Ví dụ: 04/11 hoặc 15/10"
+              placeholder="VD: 04/11"
               value={newDateInput}
               onChange={(e) => setNewDateInput(e.target.value)}
-              className="px-2.5 py-1 text-xs border border-blue-300 rounded-sm bg-white focus:outline-blue-600 w-44 font-semibold"
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded-sm bg-white focus:outline-blue-600 w-36 font-semibold"
               required
             />
             <button
               type="submit"
               className="px-3 py-1 text-xs font-semibold bg-blue-700 text-white rounded-sm hover:bg-blue-800 cursor-pointer"
             >
-              Xác nhận thêm
+              Xác nhận
             </button>
           </div>
         </form>
@@ -333,13 +307,7 @@ export default function HistoryDataManagementTab({
       {/* 2. BỘ CHỌN NGÀY CẦN CHỈNH SỬA */}
       <div className="space-y-1.5">
         <label className="text-xs font-bold text-zinc-800 flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Chọn ngày muốn chỉnh sửa / xem dữ liệu ({history30Days.length} ngày hiện có):</span>
-          </span>
-          <span className="text-[11px] text-zinc-500 font-normal">
-            Nhấp chuột vào ngày bên dưới hoặc chọn trong danh sách
-          </span>
+          <span>Chọn ngày muốn chỉnh sửa ({history30Days.length} ngày hiện có):</span>
         </label>
 
         {/* Thanh cuộn ngang các ngày để chọn nhanh */}
@@ -352,18 +320,18 @@ export default function HistoryDataManagementTab({
                 key={item.date}
                 type="button"
                 onClick={() => setSelectedDateStr(item.date)}
-                className={`px-2.5 py-1 rounded-sm text-xs font-semibold shrink-0 cursor-pointer transition-all border ${
+                className={`px-2.5 py-1 rounded-sm text-xs font-semibold shrink-0 cursor-pointer transition-all border font-mono ${
                   isSelected
-                    ? 'bg-blue-700 text-white border-blue-700 shadow-xs'
+                    ? 'bg-blue-700 text-white border-blue-700'
                     : item.severe_invalid
                     ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                     : hasData
-                    ? 'bg-white text-zinc-800 border-zinc-300 hover:border-blue-500 hover:bg-blue-50/50'
+                    ? 'bg-white text-zinc-800 border-zinc-300 hover:border-blue-500'
                     : 'bg-zinc-100 text-zinc-400 border-zinc-200'
                 }`}
               >
                 <span>{item.date}</span>
-                {item.severe_invalid && <span className="ml-1 text-[10px]">⚠️</span>}
+                {item.severe_invalid && <span className="ml-1 text-[10px]">!</span>}
               </button>
             );
           })}
@@ -372,18 +340,18 @@ export default function HistoryDataManagementTab({
 
       {/* 3. FORM CHI TIẾT CHỈNH SỬA NGÀY ĐANG CHỌN */}
       {selectedDateStr && (
-        <div className="border border-zinc-300 rounded-sm bg-white p-4 space-y-4 shadow-2xs">
+        <div className="border border-zinc-200 rounded-sm bg-white p-4 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-200 pb-2.5">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-zinc-900">
                 Chi tiết ngày đo: <span className="text-blue-700 font-mono">{formData.date}</span>
               </span>
               {formData.severe_invalid ? (
-                <span className="px-2 py-0.5 text-[11px] font-bold bg-red-100 text-red-800 rounded-sm">
-                  Đang đánh dấu: Có lỗi / Loại trừ
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-red-100 text-red-800 rounded-xs">
+                  Loại trừ
                 </span>
               ) : (
-                <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded-sm">
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 rounded-xs">
                   Hợp lệ
                 </span>
               )}
@@ -393,20 +361,17 @@ export default function HistoryDataManagementTab({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-sm flex items-center gap-1 cursor-pointer transition-colors"
-                title="Xóa ngày này"
+                className="px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-sm cursor-pointer transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa ngày này</span>
+                Xóa ngày này
               </button>
 
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-3.5 py-1 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                className="px-3.5 py-1 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer shadow-xs transition-colors"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Lưu thay đổi</span>
+                Lưu thay đổi
               </button>
             </div>
           </div>
@@ -414,9 +379,8 @@ export default function HistoryDataManagementTab({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* NHÓM 1: SẢN LƯỢNG ĐIỆN & HIỆU SUẤT */}
             <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-500" />
-                <span>Năng lượng sản sinh (Wh)</span>
+              <div className="text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
+                Năng lượng sản sinh (Wh)
               </div>
 
               <div>
@@ -477,9 +441,8 @@ export default function HistoryDataManagementTab({
 
             {/* NHÓM 2: ĐO VOC VÀ ISC */}
             <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
-                <Sun className="w-3.5 h-3.5 text-blue-600" />
-                <span>Điện áp Voc & Dòng Isc</span>
+              <div className="text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
+                Điện áp Voc và Dòng Isc
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -531,9 +494,8 @@ export default function HistoryDataManagementTab({
 
             {/* NHÓM 3: NHIỆT ĐỘ & TRẠNG THÁI */}
             <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
-                <Thermometer className="w-3.5 h-3.5 text-red-500" />
-                <span>Nhiệt độ & Điều kiện</span>
+              <div className="text-xs font-bold text-zinc-900 border-b border-zinc-200 pb-1.5">
+                Nhiệt độ và Điều kiện
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -560,13 +522,13 @@ export default function HistoryDataManagementTab({
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-zinc-700">Thời tiết / Ghi chú:</label>
+                <label className="text-[11px] font-semibold text-zinc-700">Ghi chú:</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Nắng tốt, Mây rải rác..."
+                  placeholder="VD: Nắng tốt..."
                   value={formData.weather_note}
                   onChange={(e) => handleChange('weather_note', e.target.value)}
-                  className="w-full mt-1 px-2.5 py-1 text-xs border border-zinc-300 rounded-sm bg-white"
+                  className="w-full mt-1 px-2.5 py-1 text-xs border border-zinc-300 rounded-sm bg-white font-medium"
                 />
               </div>
 
@@ -585,7 +547,7 @@ export default function HistoryDataManagementTab({
                 {formData.severe_invalid && (
                   <input
                     type="text"
-                    placeholder="Lý do (VD: MANUAL_JOG, RTC_LOST...)"
+                    placeholder="Lý do..."
                     value={formData.invalid_reasons}
                     onChange={(e) => handleChange('invalid_reasons', e.target.value)}
                     className="w-full mt-1.5 px-2 py-0.5 text-xs border border-red-300 rounded-sm bg-red-50 text-red-800"
@@ -599,22 +561,22 @@ export default function HistoryDataManagementTab({
 
       {/* 4. BẢNG XEM NHANH TẤT CẢ CÁC NGÀY TRONG CHU KỲ */}
       <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
-        <div className="bg-zinc-100 px-3 py-2 border-b border-zinc-200 text-xs font-bold text-zinc-800 flex items-center justify-between">
-          <span>Danh sách tóm tắt {history30Days.length} ngày đã đo:</span>
-          <span className="text-[11px] font-normal text-zinc-500">Bấm vào hàng bất kỳ để chỉnh sửa</span>
+        <div className="bg-zinc-50 px-3 py-2 border-b border-zinc-200 text-xs font-bold text-zinc-800 flex items-center justify-between">
+          <span>Danh sách {history30Days.length} ngày đã đo:</span>
+          <span className="text-[11px] font-normal text-zinc-500">Nhấp chọn hàng để chỉnh sửa</span>
         </div>
         <div className="max-h-56 overflow-y-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead className="bg-zinc-50 text-zinc-600 sticky top-0 border-b border-zinc-200">
+          <table className="w-full text-left border-collapse text-xs tabular-nums">
+            <thead className="bg-zinc-50 text-zinc-700 sticky top-0 border-b border-zinc-200">
               <tr>
-                <th className="py-1.5 px-2.5">Ngày</th>
-                <th className="py-1.5 px-2.5 text-right">Tracker (Wh)</th>
-                <th className="py-1.5 px-2.5 text-right">Cố định (Wh)</th>
-                <th className="py-1.5 px-2.5 text-right">% Gain</th>
-                <th className="py-1.5 px-2.5 text-right">Voc Trk (V)</th>
-                <th className="py-1.5 px-2.5 text-right">Isc Trk (A)</th>
-                <th className="py-1.5 px-2.5 text-right">Nhiệt độ Trk</th>
-                <th className="py-1.5 px-2.5 text-center">Trạng thái</th>
+                <th className="py-2 px-2.5 font-bold">Ngày</th>
+                <th className="py-2 px-2.5 text-right font-bold">Tracker (Wh)</th>
+                <th className="py-2 px-2.5 text-right font-bold">Cố định (Wh)</th>
+                <th className="py-2 px-2.5 text-right font-bold">% Gain</th>
+                <th className="py-2 px-2.5 text-right font-bold">Voc Trk (V)</th>
+                <th className="py-2 px-2.5 text-right font-bold">Isc Trk (A)</th>
+                <th className="py-2 px-2.5 text-right font-bold">Nhiệt độ Trk</th>
+                <th className="py-2 px-2.5 text-center font-bold">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
@@ -628,14 +590,14 @@ export default function HistoryDataManagementTab({
                     onClick={() => setSelectedDateStr(d.date)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-blue-100/70 font-semibold'
+                        ? 'bg-blue-50 font-semibold'
                         : 'hover:bg-zinc-50'
                     }`}
                   >
-                    <td className="py-1.5 px-2.5 font-medium">{d.date}</td>
+                    <td className="py-1.5 px-2.5 font-bold font-mono">{d.date}</td>
                     <td className="py-1.5 px-2.5 text-right font-mono text-blue-700">{formatDecimal(trkWh, 1)}</td>
                     <td className="py-1.5 px-2.5 text-right font-mono text-amber-700">{formatDecimal(staWh, 1)}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono font-semibold text-emerald-700">
+                    <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-700">
                       {formatSignedNumber(d.gainPercent, 1, '%')}
                     </td>
                     <td className="py-1.5 px-2.5 text-right font-mono text-zinc-700">{formatDecimal(d.voc_trk, 2)}</td>
@@ -643,11 +605,11 @@ export default function HistoryDataManagementTab({
                     <td className="py-1.5 px-2.5 text-right font-mono text-zinc-700">{formatDecimal(d.temp_trk, 1)}°C</td>
                     <td className="py-1.5 px-2.5 text-center">
                       {d.severe_invalid ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-800 rounded-xs">
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-red-100 text-red-800 rounded-xs">
                           Lỗi
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-xs">
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 rounded-xs">
                           Hợp lệ
                         </span>
                       )}
@@ -662,4 +624,3 @@ export default function HistoryDataManagementTab({
     </div>
   );
 }
-

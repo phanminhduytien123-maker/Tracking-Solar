@@ -12,21 +12,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import {
-  Maximize2,
-  X,
-  FileSpreadsheet,
-  Sliders,
-  Sun,
-  Zap,
-  Thermometer,
-  Calendar,
-  CheckCircle2,
-  AlertTriangle,
-  Search,
-  Activity,
-  Edit3
-} from 'lucide-react';
+import { Maximize2, X } from 'lucide-react';
 import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
 
 ChartJS.register(
@@ -663,7 +649,7 @@ export default function ChartsSection({
   });
 
   return (
-    <div id="section-charts" className="space-y-5">
+    <div id="section-charts" className="space-y-4">
       {/* ===================================================================== */}
       {/* 2 ĐỒ THỊ LỚN HIỆN TẠI (GIỮ NGUYÊN 100% CẤU TRÚC VÀ VỊ TRÍ) */}
       {/* ===================================================================== */}
@@ -765,43 +751,36 @@ export default function ChartsSection({
       </div>
 
       {/* ===================================================================== */}
-      {/* PHÂN KHU THEO DÕI ĐỐI CHỨNG 30 NGÀY (BỔ SUNG BÊN DƯỚI 2 ĐỒ THỊ TRÊN) */}
+      {/* PHÂN KHU SỐ LIỆU ĐỐI CHỨNG 30 NGÀY (THIẾT KẾ ĐỒNG BỘ GIAO DIỆN PHÒNG LAB) */}
       {/* ===================================================================== */}
       <div className="space-y-4 pt-1">
         {/* THANH TIÊU ĐỀ PHÂN KHU 30 NGÀY */}
         <div className="lab-card p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-sm">
-                <Activity className="w-4 h-4" />
-              </span>
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">
-                Theo dõi & Đối chứng Chu kỳ đo 30 ngày (Voc, Isc, Nhiệt độ & Năng lượng)
-              </h2>
-            </div>
-            <p className="text-xs text-zinc-600 dark:text-slate-300 mt-1">
-              Phân tích so sánh hiệu quả thu hoạch năng lượng theo chuẩn MDPI Sustainability (2022) và Luận văn tốt nghiệp
+            <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+              Số liệu đối chứng 30 ngày
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
+              Tổng hợp sản lượng điện, điện áp Voc, dòng Isc và nhiệt độ tấm pin
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportCSV}
-              className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-              title="Tải toàn bộ số liệu 30 ngày về máy dạng file CSV tương thích Excel"
+              className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
+              title="Tải toàn bộ số liệu 30 ngày về máy dạng file CSV"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Xuất CSV 30 ngày</span>
+              Xuất CSV 30 ngày
             </button>
 
             {isAdmin && onOpenDataSettings && (
               <button
                 onClick={() => onOpenDataSettings()}
-                className="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-                title="Mở tab cài đặt để chỉnh sửa, xóa hoặc thêm mới ngày đo"
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer shadow-xs transition-colors"
+                title="Mở tab cài đặt để chỉnh sửa dữ liệu"
               >
-                <Sliders className="w-3.5 h-3.5 text-blue-400" />
-                <span>Tùy biến dữ liệu</span>
+                Tùy biến dữ liệu
               </button>
             )}
           </div>
@@ -810,40 +789,38 @@ export default function ChartsSection({
         {/* 5 THẺ KPI TỔNG KẾT 30 NGÀY */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* KPI 1: Năng lượng */}
-          <div className="lab-card p-3 border-l-4 border-l-blue-600">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
-              <Zap className="w-3 h-3 text-amber-500" />
-              <span>Tổng năng lượng 30N</span>
+          <div className="lab-card p-3.5 flex flex-col justify-between">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+              Tổng năng lượng 30 ngày
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base font-bold text-zinc-900 dark:text-white font-mono">
+              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
                 {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-normal text-zinc-500">kWh</span>
               </span>
               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                 {formatSignedNumber(overallGain, 1, '%')}
               </span>
             </div>
-            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Cố định: {formatDecimal(totalStaWh / 1000, 2)} kWh</span>
               <span className="font-semibold text-blue-600 dark:text-blue-400">+{formatDecimal(totalDiffWh / 1000, 2)}</span>
             </div>
           </div>
 
           {/* KPI 2: Điện áp Voc */}
-          <div className="lab-card p-3 border-l-4 border-l-sky-500">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
-              <Sun className="w-3 h-3 text-sky-500" />
-              <span>Voc trung bình</span>
+          <div className="lab-card p-3.5 flex flex-col justify-between">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+              Voc trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base font-bold text-sky-700 dark:text-sky-300 font-mono">
+              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
                 {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-normal text-zinc-500">V</span>
               </span>
               <span className="text-xs text-zinc-500 font-mono">
                 Sta: {formatDecimal(avgVocSta, 2)}V
               </span>
             </div>
-            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch áp:</span>
               <span className="font-semibold text-zinc-800 dark:text-slate-200 font-mono">
                 {formatSignedNumber(avgVocTrk - avgVocSta, 2, 'V')}
@@ -852,20 +829,19 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 3: Dòng Isc */}
-          <div className="lab-card p-3 border-l-4 border-l-emerald-500">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
-              <Activity className="w-3 h-3 text-emerald-500" />
-              <span>Isc đỉnh trung bình</span>
+          <div className="lab-card p-3.5 flex flex-col justify-between">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+              Isc đỉnh trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base font-bold text-emerald-700 dark:text-emerald-300 font-mono">
+              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
                 {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-normal text-zinc-500">A</span>
               </span>
               <span className="text-xs text-zinc-500 font-mono">
                 Sta: {formatDecimal(avgIscSta, 2)}A
               </span>
             </div>
-            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Tăng trưởng dòng:</span>
               <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
                 {avgIscSta > 0 ? `+${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%` : '--'}
@@ -874,20 +850,19 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 4: Nhiệt độ */}
-          <div className="lab-card p-3 border-l-4 border-l-rose-500">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
-              <Thermometer className="w-3 h-3 text-rose-500" />
-              <span>Nhiệt độ TB (Tcell)</span>
+          <div className="lab-card p-3.5 flex flex-col justify-between">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+              Nhiệt độ TB (Tcell)
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base font-bold text-zinc-900 dark:text-white font-mono">
+              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
                 {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-normal text-zinc-500">°C</span>
               </span>
               <span className="text-xs text-zinc-500 font-mono">
                 Sta: {formatDecimal(avgTempSta, 1)}°C
               </span>
             </div>
-            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch ΔT:</span>
               <span className="font-semibold text-purple-600 dark:text-purple-400 font-mono">
                 {formatSignedNumber(avgTempTrk - avgTempSta, 1, '°C')}
@@ -896,20 +871,19 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 5: Trạng thái đo */}
-          <div className="lab-card p-3 border-l-4 border-l-amber-500 col-span-2 sm:col-span-1">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-slate-400 flex items-center gap-1">
-              <Calendar className="w-3 h-3 text-amber-500" />
-              <span>Độ tin cậy chu kỳ</span>
+          <div className="lab-card p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+              Độ tin cậy chu kỳ
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                 {validHistory.length}/{history30Days.length}
               </span>
-              <span className="text-xs text-zinc-500">ngày hợp lệ</span>
+              <span className="text-xs text-zinc-500">ngày</span>
             </div>
-            <div className="text-[11px] text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Ngày loại trừ:</span>
-              <span className="font-semibold text-amber-600 dark:text-amber-400">
+              <span className="font-semibold text-amber-600 dark:text-amber-400 font-mono">
                 {history30Days.length - validHistory.length} ngày
               </span>
             </div>
@@ -922,11 +896,11 @@ export default function ChartsSection({
           <div className="lab-card p-4 flex flex-col justify-between">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
               <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <span>Đối chứng Voc & Isc 30 ngày</span>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                  Đồ thị Voc & Isc 30 ngày
                 </h3>
-                <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
-                  Điện áp hở mạch Voc (Trục trái) & Dòng ngắn mạch Isc (Trục phải)
+                <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
+                  Điện áp hở mạch Voc (V) và dòng ngắn mạch Isc (A)
                 </p>
               </div>
 
@@ -979,15 +953,15 @@ export default function ChartsSection({
             </div>
           </div>
 
-          {/* ĐỒ THỊ 4: NHIỆT ĐỘ VÀ CHÊNH LỆCH NHIỆT ĐỘ */}
+          {/* ĐỒ THỊ 4: NHIỆT ĐỘ */}
           <div className="lab-card p-4 flex flex-col justify-between">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
               <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <span>Đối chứng Nhiệt độ bề mặt pin 30 ngày</span>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                  Đồ thị nhiệt độ tấm pin 30 ngày
                 </h3>
-                <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
-                  Nhiệt độ Tcell (°C) và chênh lệch nhiệt độ ΔT = T_trk − T_sta
+                <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
+                  Nhiệt độ bề mặt pin (°C) và chênh lệch nhiệt độ
                 </p>
               </div>
 
@@ -1013,28 +987,25 @@ export default function ChartsSection({
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <span>Bảng số liệu thực nghiệm 30 ngày</span>
-                <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 dark:bg-slate-800 text-zinc-700 dark:text-slate-300 rounded-sm">
+                <span>Bảng số liệu 30 ngày</span>
+                <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 dark:bg-slate-800 text-zinc-700 dark:text-slate-300 rounded-sm font-mono">
                   {filteredTableData.length} bản ghi
                 </span>
               </h3>
-              <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
-                Bảng số liệu tổng hợp đối chứng từng ngày: Sản lượng Wh, % Gain, Voc, Isc và Nhiệt độ
+              <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
+                Nhật ký số liệu đối chứng chi tiết từng ngày
               </p>
             </div>
 
             {/* Bộ lọc bảng */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2" />
-                <input
-                  type="text"
-                  placeholder="Tìm ngày (VD: 04/11)..."
-                  value={tableSearch}
-                  onChange={(e) => setTableSearch(e.target.value)}
-                  className="pl-7 pr-2.5 py-1 text-xs border border-zinc-300 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 focus:outline-blue-600 w-36 sm:w-44"
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Tìm ngày..."
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-slate-700 rounded-sm bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 focus:outline-blue-600 w-32 sm:w-40 font-medium"
+              />
 
               <select
                 value={tableFilterStatus}
@@ -1051,22 +1022,22 @@ export default function ChartsSection({
           {/* Bảng dữ liệu có cuộn dọc */}
           <div className="border border-zinc-200 dark:border-slate-800 rounded-sm overflow-x-auto max-h-[380px]">
             <table className="w-full text-left border-collapse text-xs tabular-nums">
-              <thead className="bg-zinc-100 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700">
+              <thead className="bg-zinc-50/90 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700">
                 <tr>
-                  <th className="py-2 px-2.5 font-bold">STT</th>
-                  <th className="py-2 px-2.5 font-bold">Ngày</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Tracker (Wh)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Cố định (Wh)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">% Gain</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Voc Trk (V)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Voc Sta (V)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Isc Trk (A)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Isc Sta (A)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">T° Trk (°C)</th>
-                  <th className="py-2 px-2.5 text-right font-bold">T° Sta (°C)</th>
-                  <th className="py-2 px-2.5 font-bold">Thời tiết / Ghi chú</th>
-                  <th className="py-2 px-2.5 text-center font-bold">Trạng thái</th>
-                  {isAdmin && onOpenDataSettings && <th className="py-2 px-2.5 text-center font-bold">Thao tác</th>}
+                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">STT</th>
+                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">Ngày</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Tracker (Wh)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Cố định (Wh)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">% Gain</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Voc Trk (V)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Voc Sta (V)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Isc Trk (A)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Isc Sta (A)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">T° Trk (°C)</th>
+                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">T° Sta (°C)</th>
+                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">Ghi chú</th>
+                  <th className="py-2.5 px-3 text-center font-bold text-zinc-900 dark:text-white">Trạng thái</th>
+                  {isAdmin && onOpenDataSettings && <th className="py-2.5 px-3 text-center font-bold text-zinc-900 dark:text-white">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
@@ -1082,57 +1053,57 @@ export default function ChartsSection({
                     const staWh = row.staticWh !== undefined ? row.staticWh : (Number(row.staticKwh || 0) * 1000);
                     return (
                       <tr key={row.date} className="hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-2 px-2.5 text-zinc-400">{idx + 1}</td>
-                        <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">{row.date}</td>
-                        <td className="py-2 px-2.5 text-right font-mono font-semibold text-blue-700 dark:text-blue-400">
+                        <td className="py-2 px-3 text-zinc-400 font-mono">{idx + 1}</td>
+                        <td className="py-2 px-3 font-bold text-zinc-900 dark:text-white font-mono">{row.date}</td>
+                        <td className="py-2 px-3 text-right font-mono font-semibold text-blue-700 dark:text-blue-400">
                           {formatDecimal(trkWh, 1)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-amber-700 dark:text-amber-400">
+                        <td className="py-2 px-3 text-right font-mono text-amber-700 dark:text-amber-400">
                           {formatDecimal(staWh, 1)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {formatSignedNumber(row.gainPercent, 1, '%')}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-zinc-800 dark:text-slate-200">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-800 dark:text-slate-200">
                           {formatDecimal(row.voc_trk, 2)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
                           {formatDecimal(row.voc_sta, 2)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-emerald-700 dark:text-emerald-300 font-semibold">
+                        <td className="py-2 px-3 text-right font-mono text-emerald-700 dark:text-emerald-300 font-semibold">
                           {formatDecimal(row.isc_trk, 2)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
                           {formatDecimal(row.isc_sta, 2)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-zinc-800 dark:text-slate-200">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-800 dark:text-slate-200">
                           {formatDecimal(row.temp_trk, 1)}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
                           {formatDecimal(row.temp_sta, 1)}
                         </td>
-                        <td className="py-2 px-2.5 text-zinc-600 dark:text-slate-300 max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
+                        <td className="py-2 px-3 text-zinc-600 dark:text-slate-300 max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
                           {row.weather_note || 'Bình thường'}
                         </td>
-                        <td className="py-2 px-2.5 text-center">
+                        <td className="py-2 px-3 text-center">
                           {row.severe_invalid ? (
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-sm">
+                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-xs">
                               Lỗi
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-sm">
+                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-xs">
                               Hợp lệ
                             </span>
                           )}
                         </td>
                         {isAdmin && onOpenDataSettings && (
-                          <td className="py-2 px-2.5 text-center">
+                          <td className="py-2 px-3 text-center">
                             <button
                               onClick={() => onOpenDataSettings(row.date)}
-                              className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xs cursor-pointer transition-colors"
+                              className="px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
                               title={`Chỉnh sửa dữ liệu ngày ${row.date}`}
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              Sửa
                             </button>
                           </td>
                         )}
@@ -1159,8 +1130,8 @@ export default function ChartsSection({
                   : expandedChart === 'history'
                   ? 'Đồ thị năng lượng tích lũy (Phóng to)'
                   : expandedChart === 'voc_isc'
-                  ? 'Đồ thị đối chứng Voc & Isc 30 ngày (Phóng to)'
-                  : 'Đồ thị đối chứng Nhiệt độ 30 ngày (Phóng to)'}
+                  ? 'Đồ thị Voc & Isc 30 ngày (Phóng to)'
+                  : 'Đồ thị nhiệt độ 30 ngày (Phóng to)'}
               </h3>
               <button
                 onClick={() => setExpandedChart(null)}
