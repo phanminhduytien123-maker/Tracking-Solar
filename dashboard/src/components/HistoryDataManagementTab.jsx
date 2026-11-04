@@ -22,6 +22,8 @@ export default function HistoryDataManagementTab({
   const [isManualGain, setIsManualGain] = useState(false);
   const [isAddingNewDay, setIsAddingNewDay] = useState(false);
   const [newDateInput, setNewDateInput] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const lastLoadedDateRef = React.useRef(null);
 
   // Form values state for the selected day
   const [formData, setFormData] = useState({
@@ -50,10 +52,14 @@ export default function HistoryDataManagementTab({
     }
   }, [initialTargetDate, history30Days]);
 
-  // Load selected day's data into formData
+  // Load selected day's data into formData (chỉ nạp lại khi chuyển ngày hoặc chưa nạp)
   useEffect(() => {
     const found = history30Days.find(d => d.date === selectedDateStr);
-    if (found) {
+    if (!found) return;
+
+    if (lastLoadedDateRef.current !== selectedDateStr) {
+      lastLoadedDateRef.current = selectedDateStr;
+      setIsDirty(false);
       const trkWh = found.trackingWh !== undefined ? found.trackingWh : (Number(found.trackingKwh || 0) * 1000);
       const staWh = found.staticWh !== undefined ? found.staticWh : (Number(found.staticKwh || 0) * 1000);
       setFormData({
@@ -78,6 +84,7 @@ export default function HistoryDataManagementTab({
 
   // Handler for input change
   const handleChange = (field, value) => {
+    setIsDirty(true);
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if ((field === 'trackingWh' || field === 'staticWh') && !isManualGain) {
@@ -95,36 +102,41 @@ export default function HistoryDataManagementTab({
   };
 
   // Save changes
-  const handleSave = () => {
-    if (!selectedDateStr) return;
-    const trkWh = parseFloat(Number(formData.trackingWh).toFixed(1));
-    const staWh = parseFloat(Number(formData.staticWh).toFixed(1));
+  const handleSave = (customTarget = null) => {
+    const targetData = customTarget || formData;
+    if (!targetData.date) return;
+    const trkWh = parseFloat(Number(targetData.trackingWh).toFixed(1));
+    const staWh = parseFloat(Number(targetData.staticWh).toFixed(1));
     const diffWh = parseFloat((trkWh - staWh).toFixed(1));
     const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
-    const reasonsArray = formData.invalid_reasons
-      ? formData.invalid_reasons.split(',').map(s => s.trim()).filter(Boolean)
+    const reasonsArray = targetData.invalid_reasons
+      ? (typeof targetData.invalid_reasons === 'string' ? targetData.invalid_reasons.split(',').map(s => s.trim()).filter(Boolean) : targetData.invalid_reasons)
       : [];
 
     const updatedRecord = {
-      date: formData.date,
-      fullDate: formData.fullDate || '',
+      date: targetData.date,
+      fullDate: targetData.fullDate || '',
       trackingWh: trkWh,
       trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
       staticWh: staWh,
       staticKwh: parseFloat((staWh / 1000).toFixed(3)),
       diffWh,
       diffKwh,
-      gainPercent: parseFloat(Number(formData.gainPercent).toFixed(1)),
-      voc_trk: parseFloat(Number(formData.voc_trk).toFixed(2)),
-      voc_sta: parseFloat(Number(formData.voc_sta).toFixed(2)),
-      isc_trk: parseFloat(Number(formData.isc_trk).toFixed(2)),
-      isc_sta: parseFloat(Number(formData.isc_sta).toFixed(2)),
-      temp_trk: parseFloat(Number(formData.temp_trk).toFixed(1)),
-      temp_sta: parseFloat(Number(formData.temp_sta).toFixed(1)),
-      severe_invalid: formData.severe_invalid,
+      gainPercent: parseFloat(Number(targetData.gainPercent).toFixed(1)),
+      voc_trk: parseFloat(Number(targetData.voc_trk).toFixed(2)),
+      voc_sta: parseFloat(Number(targetData.voc_sta).toFixed(2)),
+      isc_trk: parseFloat(Number(targetData.isc_trk).toFixed(2)),
+      isc_sta: parseFloat(Number(targetData.isc_sta).toFixed(2)),
+      temp_trk: parseFloat(Number(targetData.temp_trk).toFixed(1)),
+      temp_sta: parseFloat(Number(targetData.temp_sta).toFixed(1)),
+      severe_invalid: targetData.severe_invalid,
       invalid_reasons: reasonsArray,
-      weather_note: formData.weather_note || 'Bình thường'
+      weather_note: targetData.weather_note || 'Bình thường',
+      isCustomized: true
     };
+
+    setIsDirty(false);
+    lastLoadedDateRef.current = targetData.date;
 
     if (onUpdateDayData) {
       onUpdateDayData(updatedRecord);
@@ -132,15 +144,27 @@ export default function HistoryDataManagementTab({
 
     setFeedback({
       type: 'success',
-      message: `Đã lưu thành công dữ liệu ngày ${formData.date}!`
+      message: `Đã lưu thành công dữ liệu ngày ${targetData.date}!`
     });
     setTimeout(() => setFeedback(null), 3500);
+  };
+
+  // Chuyển chọn ngày có kiểm tra lưu tự động
+  const handleSelectDay = (targetDate) => {
+    if (targetDate === selectedDateStr) return;
+    if (isDirty) {
+      handleSave();
+    }
+    lastLoadedDateRef.current = null;
+    setSelectedDateStr(targetDate);
   };
 
   // Delete day
   const handleDelete = () => {
     if (!selectedDateStr) return;
     if (window.confirm(`Xác nhận xóa bản ghi ngày ${selectedDateStr} khỏi chu kỳ 30 ngày?`)) {
+      lastLoadedDateRef.current = null;
+      setIsDirty(false);
       if (onDeleteDayData) {
         onDeleteDayData(selectedDateStr);
       }
@@ -181,6 +205,8 @@ export default function HistoryDataManagementTab({
       invalid_reasons: [],
       weather_note: 'Bình thường'
     };
+    lastLoadedDateRef.current = null;
+    setIsDirty(false);
     if (onAddDayData) {
       onAddDayData(newRecord);
     }
@@ -197,6 +223,8 @@ export default function HistoryDataManagementTab({
   // Load realistic dataset
   const handleLoadDemoDataset = () => {
     if (window.confirm('Hệ thống sẽ điền dữ liệu mẫu 30 ngày vào chu kỳ đối chứng. Tiếp tục?')) {
+      lastLoadedDateRef.current = null;
+      setIsDirty(false);
       if (onLoadRealisticDataset) {
         onLoadRealisticDataset();
         setFeedback({
@@ -211,6 +239,8 @@ export default function HistoryDataManagementTab({
   // Reset
   const handleReset = () => {
     if (window.confirm('Đặt lại toàn bộ dữ liệu 30 ngày về trạng thái ban đầu?')) {
+      lastLoadedDateRef.current = null;
+      setIsDirty(false);
       if (onResetHistoryData) {
         onResetHistoryData();
         setFeedback({
@@ -319,7 +349,7 @@ export default function HistoryDataManagementTab({
               <button
                 key={item.date}
                 type="button"
-                onClick={() => setSelectedDateStr(item.date)}
+                onClick={() => handleSelectDay(item.date)}
                 className={`px-2.5 py-1 rounded-sm text-xs font-semibold shrink-0 cursor-pointer transition-all border font-mono ${
                   isSelected
                     ? 'bg-blue-700 text-white border-blue-700'
@@ -346,6 +376,11 @@ export default function HistoryDataManagementTab({
               <span className="text-sm font-bold text-zinc-900">
                 Chi tiết ngày đo: <span className="text-blue-700 font-mono">{formData.date}</span>
               </span>
+              {isDirty && (
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-amber-100 text-amber-800 rounded-xs border border-amber-300 animate-pulse">
+                  Chưa lưu
+                </span>
+              )}
               {formData.severe_invalid ? (
                 <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-red-100 text-red-800 rounded-xs">
                   Loại trừ
@@ -368,10 +403,14 @@ export default function HistoryDataManagementTab({
 
               <button
                 type="button"
-                onClick={handleSave}
-                className="px-3.5 py-1 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer shadow-xs transition-colors"
+                onClick={() => handleSave()}
+                className={`px-3.5 py-1 text-xs font-bold text-white rounded-sm cursor-pointer shadow-xs transition-all ${
+                  isDirty
+                    ? 'bg-blue-600 hover:bg-blue-700 ring-2 ring-blue-400 font-extrabold'
+                    : 'bg-blue-700 hover:bg-blue-800'
+                }`}
               >
-                Lưu thay đổi
+                {isDirty ? 'Lưu thay đổi *' : 'Lưu thay đổi'}
               </button>
             </div>
           </div>
@@ -587,7 +626,7 @@ export default function HistoryDataManagementTab({
                 return (
                   <tr
                     key={d.date}
-                    onClick={() => setSelectedDateStr(d.date)}
+                    onClick={() => handleSelectDay(d.date)}
                     className={`cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-blue-50 font-semibold'

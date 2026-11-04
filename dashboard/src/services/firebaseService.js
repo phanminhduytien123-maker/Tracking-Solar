@@ -169,6 +169,8 @@ export class FirebaseSolarService {
     this.onHistory = () => { };
     this.lastHistoryCount = 0;
     this.hasProcessedHistory = false;
+    this.customHistoryRef = null;
+    this.customHistoryData = null;
 
     // Heartbeat Tracking: Lưu mốc thời gian nhận gói tin mới nhất của từng tấm
     this.lastTrackingRawUpdate = null;
@@ -235,6 +237,25 @@ export class FirebaseSolarService {
 
     // 4. Lắng nghe node telemetry chính /solar
     this.solarRef = ref(this.db, 'solar');
+
+    // 4b. Lắng nghe node tùy biến lịch sử /solar/custom_history_30d
+    this.customHistoryRef = ref(this.db, 'solar/custom_history_30d');
+    onValue(this.customHistoryRef, (snapshot) => {
+      const customVal = snapshot.val();
+      if (customVal && Array.isArray(customVal) && customVal.length > 0) {
+        this.customHistoryData = customVal;
+        try {
+          localStorage.setItem('solar_custom_history_30d', JSON.stringify(customVal));
+        } catch (e) {}
+        if (this.latestRawData && this.latestRawData.history) {
+          this.processHistory(this.latestRawData.history, this.latestRawData.tracking);
+        } else if (this.onHistory) {
+          this.onHistory(customVal, null, null);
+        }
+      } else {
+        this.customHistoryData = null;
+      }
+    });
     onValue(
       this.solarRef,
       (snapshot) => {
@@ -298,6 +319,10 @@ export class FirebaseSolarService {
       off(this.serverOffsetRef);
       this.serverOffsetRef = null;
     }
+    if (this.customHistoryRef) {
+      off(this.customHistoryRef);
+      this.customHistoryRef = null;
+    }
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
       this.watchdogTimer = null;
@@ -321,7 +346,7 @@ export class FirebaseSolarService {
     this.lastHistoryCount = historyCount;
     this.hasProcessedHistory = true;
 
-    const historyList = generate30DaysHistory();
+    let historyList = generate30DaysHistory();
     const dateIndexMap = new Map();
     historyList.forEach((item, idx) => {
       dateIndexMap.set(item.date, idx);
@@ -459,6 +484,32 @@ export class FirebaseSolarService {
       }
       allIntradayProfiles[dKey] = profile;
     });
+
+    // Hợp nhất dữ liệu tùy biến từ Cloud (custom_history_30d) hoặc localStorage
+    let customList = this.customHistoryData;
+    if (!customList && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem('solar_custom_history_30d');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) customList = parsed;
+        }
+      } catch (e) {}
+    }
+
+    if (customList && Array.isArray(customList)) {
+      const customMap = new Map();
+      customList.forEach(item => {
+        if (item && item.date) customMap.set(item.date, item);
+      });
+      historyList = historyList.map(item => {
+        if (customMap.has(item.date)) {
+          const c = customMap.get(item.date);
+          return { ...item, ...c };
+        }
+        return item;
+      });
+    }
 
     if (this.onHistory) {
       this.onHistory(historyList, allIntradayProfiles, availableDates);
@@ -1081,6 +1132,35 @@ export class FirebaseSolarService {
       return true;
     } catch (err) {
       console.error('[Firebase Confirm SiteConfig Error]', err);
+      return false;
+    }
+  }
+
+  async saveCustomHistory30d(historyList) {
+    if (!this.db) {
+      console.warn('[Firebase] Database not connected');
+      return false;
+    }
+    try {
+      const histRef = ref(this.db, 'solar/custom_history_30d');
+      await set(histRef, historyList);
+      this.customHistoryData = historyList;
+      return true;
+    } catch (err) {
+      console.error('[Firebase Save Custom History Error]', err);
+      return false;
+    }
+  }
+
+  async removeCustomHistory30d() {
+    if (!this.db) return false;
+    try {
+      const histRef = ref(this.db, 'solar/custom_history_30d');
+      await remove(histRef);
+      this.customHistoryData = null;
+      return true;
+    } catch (err) {
+      console.error('[Firebase Remove Custom History Error]', err);
       return false;
     }
   }
