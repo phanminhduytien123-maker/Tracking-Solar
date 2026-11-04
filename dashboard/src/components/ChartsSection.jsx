@@ -794,7 +794,7 @@ export default function ChartsSection({
               <span>Xuất CSV 30 ngày</span>
             </button>
 
-            {onOpenDataSettings && (
+            {isAdmin && onOpenDataSettings && (
               <button
                 onClick={() => onOpenDataSettings()}
                 className="px-3 py-1.5 text-xs font-semibold bg-zinc-800 hover:bg-zinc-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
@@ -1066,7 +1066,7 @@ export default function ChartsSection({
                   <th className="py-2 px-2.5 text-right font-bold">T° Sta (°C)</th>
                   <th className="py-2 px-2.5 font-bold">Thời tiết / Ghi chú</th>
                   <th className="py-2 px-2.5 text-center font-bold">Trạng thái</th>
-                  {onOpenDataSettings && <th className="py-2 px-2.5 text-center font-bold">Thao tác</th>}
+                  {isAdmin && onOpenDataSettings && <th className="py-2 px-2.5 text-center font-bold">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
@@ -1125,7 +1125,7 @@ export default function ChartsSection({
                             </span>
                           )}
                         </td>
-                        {onOpenDataSettings && (
+                        {isAdmin && onOpenDataSettings && (
                           <td className="py-2 px-2.5 text-center">
                             <button
                               onClick={() => onOpenDataSettings(row.date)}

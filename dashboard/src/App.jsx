@@ -192,6 +192,10 @@ export default function App() {
   };
 
   const handleOpenDataSettings = (dateStr = null) => {
+    if (authSession?.role !== 'admin') {
+      alert('Tính năng tùy biến dữ liệu chỉ dành cho tài khoản Quản trị viên (Admin). Tài khoản khách chỉ có quyền giám sát số liệu.');
+      return;
+    }
     setTargetEditDate(dateStr);
     openSettingsTab('data_history');
   };
