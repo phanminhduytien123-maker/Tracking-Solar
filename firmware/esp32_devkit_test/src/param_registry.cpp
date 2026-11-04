@@ -116,8 +116,8 @@ void ParamRegistryClass::init() {
 
   // 12. Địa lý & La bàn địa từ
   registerParam("COMPASS_DECLINATION", -0.5f,    "deg",    -30.0f,   30.0f,    POLICY_MANUAL_ONLY,     "B9");
-  registerParam("PANEL_LATITUDE",      10.7831f, "deg",    -90.0f,   90.0f,    POLICY_MANUAL_ONLY,     "INIT");
-  registerParam("PANEL_LONGITUDE",     106.6721f,"deg",    -180.0f,  180.0f,   POLICY_MANUAL_ONLY,     "INIT");
+  registerParam("PANEL_LATITUDE",      10.78816f, "deg",    -90.0f,   90.0f,    POLICY_MANUAL_ONLY,     "INIT");
+  registerParam("PANEL_LONGITUDE",     106.66617f,"deg",    -180.0f,  180.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("TIMEZONE_OFFSET",     7.0f,     "hours",  -12.0f,   14.0f,    POLICY_MANUAL_ONLY,     "INIT");
 
   // 13. Thuật toán hợp nhất Hybrid (NOAA Feedforward + TEMT6000 Optical Feedback)

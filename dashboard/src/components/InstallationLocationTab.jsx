@@ -13,8 +13,23 @@ export default function InstallationLocationTab({
   currentUser = null,
   onConfirmLocation = null
 }) {
-  const [selectedLat, setSelectedLat] = useState(() => currentLocation?.lat || HCMC_COORDINATES.lat);
-  const [selectedLon, setSelectedLon] = useState(() => currentLocation?.lon || HCMC_COORDINATES.lon);
+  const [selectedLat, setSelectedLat] = useState(() => {
+    const lat = currentLocation?.lat;
+    return (lat !== undefined && lat !== null && !isNaN(lat)) ? Number(lat) : HCMC_COORDINATES.lat;
+  });
+  const [selectedLon, setSelectedLon] = useState(() => {
+    const lon = currentLocation?.lon;
+    return (lon !== undefined && lon !== null && !isNaN(lon)) ? Number(lon) : HCMC_COORDINATES.lon;
+  });
+  const [latInput, setLatInput] = useState(() => String(currentLocation?.lat || HCMC_COORDINATES.lat));
+  const [lonInput, setLonInput] = useState(() => String(currentLocation?.lon || HCMC_COORDINATES.lon));
+
+  const parseCoordinate = (val, fallback = 0) => {
+    if (val === undefined || val === null || val === '') return fallback;
+    const clean = String(val).replace(/,/g, '.').trim();
+    const num = parseFloat(clean);
+    return isNaN(num) ? fallback : num;
+  };
   const [locationName, setLocationName] = useState(() => currentLocation?.locationName || currentLocation?.name || HCMC_COORDINATES.locationName);
   const [wardName, setWardName] = useState(() => currentLocation?.ward || HCMC_COORDINATES.ward);
 
@@ -134,8 +149,16 @@ export default function InstallationLocationTab({
   // Sync if currentLocation prop updates from outside
   useEffect(() => {
     if (currentLocation) {
-      if (currentLocation.lat) setSelectedLat(currentLocation.lat);
-      if (currentLocation.lon) setSelectedLon(currentLocation.lon);
+      if (currentLocation.lat !== undefined && currentLocation.lat !== null && !isNaN(currentLocation.lat)) {
+        const val = Number(currentLocation.lat);
+        setSelectedLat(val);
+        setLatInput(String(val));
+      }
+      if (currentLocation.lon !== undefined && currentLocation.lon !== null && !isNaN(currentLocation.lon)) {
+        const val = Number(currentLocation.lon);
+        setSelectedLon(val);
+        setLonInput(String(val));
+      }
       if (currentLocation.locationName || currentLocation.name) {
         setLocationName(currentLocation.locationName || currentLocation.name);
       }
@@ -167,10 +190,12 @@ export default function InstallationLocationTab({
 
   // Update coordinates and move map pin
   const updateCoordinates = (lat, lon, name = null, ward = null) => {
-    const cleanLat = Number(Number(lat).toFixed(5));
-    const cleanLon = Number(Number(lon).toFixed(5));
+    const cleanLat = Number(parseCoordinate(lat, selectedLat).toFixed(5));
+    const cleanLon = Number(parseCoordinate(lon, selectedLon).toFixed(5));
     setSelectedLat(cleanLat);
     setSelectedLon(cleanLon);
+    setLatInput(String(cleanLat));
+    setLonInput(String(cleanLon));
 
     if (name) {
       setLocationName(name);
@@ -182,6 +207,32 @@ export default function InstallationLocationTab({
     if (mapInstanceRef.current && markerRef.current) {
       markerRef.current.setLatLng([cleanLat, cleanLon]);
       mapInstanceRef.current.panTo([cleanLat, cleanLon], { animate: true });
+    }
+  };
+
+  const handleLatInputChange = (val) => {
+    setLatInput(val);
+    const parsed = parseCoordinate(val, null);
+    if (parsed !== null && !isNaN(parsed)) {
+      const fixed = Number(parsed.toFixed(5));
+      setSelectedLat(fixed);
+      if (mapInstanceRef.current && markerRef.current) {
+        markerRef.current.setLatLng([fixed, selectedLon]);
+        mapInstanceRef.current.panTo([fixed, selectedLon], { animate: true });
+      }
+    }
+  };
+
+  const handleLonInputChange = (val) => {
+    setLonInput(val);
+    const parsed = parseCoordinate(val, null);
+    if (parsed !== null && !isNaN(parsed)) {
+      const fixed = Number(parsed.toFixed(5));
+      setSelectedLon(fixed);
+      if (mapInstanceRef.current && markerRef.current) {
+        markerRef.current.setLatLng([selectedLat, fixed]);
+        mapInstanceRef.current.panTo([selectedLat, fixed], { animate: true });
+      }
     }
   };
 
@@ -330,12 +381,25 @@ export default function InstallationLocationTab({
 
   // Apply location and save
   const handleSaveLocation = () => {
+    const parsedLat = Number(parseCoordinate(latInput, selectedLat).toFixed(5));
+    const parsedLon = Number(parseCoordinate(lonInput, selectedLon).toFixed(5));
+
+    if (isNaN(parsedLat) || isNaN(parsedLon) || (Math.abs(parsedLat) < 0.001 && Math.abs(parsedLon) < 0.001)) {
+      alert('Tọa độ không hợp lệ. Vui lòng nhập số thập phân chính xác!');
+      return;
+    }
+
     const locObj = {
-      lat: Number(selectedLat),
-      lon: Number(selectedLon),
+      lat: parsedLat,
+      lon: parsedLon,
       locationName: locationName || 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
       ward: wardName || 'Phường Nhiêu Lộc, TP.HCM'
     };
+
+    setSelectedLat(parsedLat);
+    setSelectedLon(parsedLon);
+    setLatInput(String(parsedLat));
+    setLonInput(String(parsedLon));
 
     localStorage.setItem('solar_custom_location', JSON.stringify(locObj));
 
@@ -343,7 +407,7 @@ export default function InstallationLocationTab({
       onSelectLocation(locObj);
     }
 
-    setSaveSuccessMsg(`Đã lưu vĩnh viễn tọa độ ${Number(selectedLat).toFixed(5)}°N, ${Number(selectedLon).toFixed(5)}°E (${locObj.locationName}) cho toàn hệ thống & Firebase!`);
+    setSaveSuccessMsg(`Đã lưu thành công tọa độ ${parsedLat.toFixed(5)}°N, ${parsedLon.toFixed(5)}°E (${locObj.locationName})!`);
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
@@ -567,26 +631,36 @@ export default function InstallationLocationTab({
           />
         </div>
 
-        {/* Latitude Input */}
+        {/* Latitude Input (Hỗ trợ cả dấu chấm và dấu phẩy kiểu VN) */}
         <div className="sm:col-span-3 space-y-1">
           <label className="text-[11px] font-semibold text-zinc-700 uppercase tracking-wide block">Vĩ độ (Lat):</label>
           <input
-            type="number"
-            step="0.00001"
-            value={selectedLat}
-            onChange={(e) => updateCoordinates(e.target.value, selectedLon)}
+            type="text"
+            inputMode="decimal"
+            value={latInput}
+            onChange={(e) => handleLatInputChange(e.target.value)}
+            onBlur={() => {
+              const p = parseCoordinate(latInput, selectedLat);
+              setLatInput(String(Number(p.toFixed(5))));
+            }}
+            placeholder="10.78816 hoặc 10,78816"
             className="w-full px-3 py-1.5 rounded bg-white border border-zinc-300 text-xs sm:text-sm font-mono text-zinc-900 focus:outline-none focus:border-blue-600"
           />
         </div>
 
-        {/* Longitude Input */}
+        {/* Longitude Input (Hỗ trợ cả dấu chấm và dấu phẩy kiểu VN) */}
         <div className="sm:col-span-3 space-y-1">
           <label className="text-[11px] font-semibold text-zinc-700 uppercase tracking-wide block">Kinh độ (Lon):</label>
           <input
-            type="number"
-            step="0.00001"
-            value={selectedLon}
-            onChange={(e) => updateCoordinates(selectedLat, e.target.value)}
+            type="text"
+            inputMode="decimal"
+            value={lonInput}
+            onChange={(e) => handleLonInputChange(e.target.value)}
+            onBlur={() => {
+              const p = parseCoordinate(lonInput, selectedLon);
+              setLonInput(String(Number(p.toFixed(5))));
+            }}
+            placeholder="106.66617 hoặc 106,66617"
             className="w-full px-3 py-1.5 rounded bg-white border border-zinc-300 text-xs sm:text-sm font-mono text-zinc-900 focus:outline-none focus:border-blue-600"
           />
         </div>

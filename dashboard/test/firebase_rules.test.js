@@ -96,8 +96,8 @@ describe('Firebase Security Rules - Phân Quyền Hệ Thống Solar Tracking', 
     test('Khách BỊ TỪ CHỐI khi cố tình ghi vào /solar/config/site', async () => {
       const unauthDb = testEnv.unauthenticatedContext().database();
       await assertFails(unauthDb.ref('solar/config/site').set({
-        lat_deg: 10.78310,
-        lon_deg: 106.67210,
+        lat_deg: 10.78816,
+        lon_deg: 106.66617,
         rev: 1
       }));
     });
@@ -136,8 +136,8 @@ describe('Firebase Security Rules - Phân Quyền Hệ Thống Solar Tracking', 
     test('ESP32 BỊ TỪ CHỐI khi cố tình sửa cấu hình tọa độ /solar/config/site', async () => {
       const esp32Db = testEnv.authenticatedContext('esp32_tracker_node', { role: 'device' }).database();
       await assertFails(esp32Db.ref('solar/config/site').set({
-        lat_deg: 10.78310,
-        lon_deg: 106.67210,
+        lat_deg: 10.78816,
+        lon_deg: 106.66617,
         rev: 2
       }));
     });
@@ -148,8 +148,8 @@ describe('Firebase Security Rules - Phân Quyền Hệ Thống Solar Tracking', 
     test('Admin ĐƯỢC PHÉP cập nhật tọa độ hợp lệ và tăng rev', async () => {
       const adminDb = testEnv.authenticatedContext('admin_uid', { admin: true }).database();
       await assertSucceeds(adminDb.ref('solar/config/site').set({
-        lat_deg: 10.78310,
-        lon_deg: 106.67210,
+        lat_deg: 10.78816,
+        lon_deg: 106.66617,
         rev: 1
       }));
 
@@ -175,15 +175,15 @@ describe('Firebase Security Rules - Phân Quyền Hệ Thống Solar Tracking', 
       const adminDb = testEnv.authenticatedContext('admin_uid', { admin: true }).database();
       // Khởi tạo rev = 5
       await adminDb.ref('solar/config/site').set({
-        lat_deg: 10.78310,
-        lon_deg: 106.67210,
+        lat_deg: 10.78816,
+        lon_deg: 106.66617,
         rev: 5
       });
 
       // Cố tình gửi rev = 4 hoặc rev = 5 -> BỊ TỪ CHỐI
       await assertFails(adminDb.ref('solar/config/site').set({
-        lat_deg: 10.78310,
-        lon_deg: 106.67210,
+        lat_deg: 10.78816,
+        lon_deg: 106.66617,
         rev: 4
       }));
     });

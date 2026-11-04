@@ -20,14 +20,14 @@ extern "C" {
 // =============================================================================
 
 /** [A] Vĩ độ nơi lắp đặt hệ thống (Độ thập phân, Dương = Bắc, Âm = Nam).
- *  Giá trị mặc định: 10.78310° N (TP. Hồ Chí Minh).
+ *  Giá trị mặc định: 10.78816° N (TP. Hồ Chí Minh).
  *  Thứ tự ưu tiên: 1. Firebase SiteConfig -> 2. NVS Flash -> 3. Giá trị mặc định này. */
-#define CFG_A_LATITUDE_DEG                  (10.78310)
+#define CFG_A_LATITUDE_DEG                  (10.78816)
 
 /** [B] Kinh độ nơi lắp đặt hệ thống (Độ thập phân, Dương = Đông, Âm = Tây).
- *  Giá trị mặc định: 106.67210° E (TP. Hồ Chí Minh).
+ *  Giá trị mặc định: 106.66617° E (TP. Hồ Chí Minh).
  *  Thứ tự ưu tiên: 1. Firebase SiteConfig -> 2. NVS Flash -> 3. Giá trị mặc định này. */
-#define CFG_B_LONGITUDE_DEG                 (106.67210)
+#define CFG_B_LONGITUDE_DEG                 (106.66617)
 
 /** Múi giờ địa phương cố định UTC+7 (Việt Nam không có giờ mùa hè DST).
  *  Quy ước bất biến: RTC DS3231 LƯU THEO MỘT QUY ƯỚC DUY NHẤT LÀ GIỜ ĐỊA PHƯƠNG UTC+7. */
