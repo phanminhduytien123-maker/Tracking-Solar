@@ -94,14 +94,13 @@ export default function Header({
             <button
               id="btn-emergency-cover"
               onClick={onOpenEmergencyModal}
-              className={`px-3 py-1 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${
-                system?.emergencyActive
+              className={`px-3 py-1 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${system?.emergencyActive
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse border border-amber-300'
                   : 'bg-red-700 hover:bg-red-800 text-white font-bold'
-              }`}
+                }`}
               title={system?.emergencyActive ? "Nhấn để nhập mật khẩu mở khóa hệ thống" : "Nhấn để dừng khẩn cấp & hạ góc Max phủ bạt che mưa bão"}
             >
-              {system?.emergencyActive ? '🔓 MỞ KHÓA HOẠT ĐỘNG' : '🔴 DỪNG KHẨN CẤP (PHỦ BẠT)'}
+              {system?.emergencyActive ? 'MỞ KHÓA HOẠT ĐỘNG' : 'DỪNG KHẨN CẤP  '}
             </button>
           )}
 
@@ -156,13 +155,12 @@ export default function Header({
             {/* Trạng thái máy & Đếm ngược thời gian xoay */}
             <div className="flex items-center gap-1">
               <span>Trạng thái: </span>
-              <span className={`font-semibold ${
-                system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
+              <span className={`font-semibold ${system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
                   ? 'text-blue-700 dark:text-sky-300 font-mono'
                   : system?.displayState && system?.displayState.includes('ĐIỀU CHỈNH')
-                  ? 'text-amber-700 dark:text-amber-300 font-mono animate-pulse'
-                  : 'text-zinc-900 dark:text-white'
-              }`}>
+                    ? 'text-amber-700 dark:text-amber-300 font-mono animate-pulse'
+                    : 'text-zinc-900 dark:text-white'
+                }`}>
                 {system?.displayState || 'Bình thường'}
               </span>
             </div>
@@ -204,13 +202,12 @@ export default function Header({
             {/* Nguồn dữ liệu */}
             <div>
               <span>Nguồn: </span>
-              <span className={`font-semibold ${
-                system?.isMock || dataSource === 'mock' 
-                  ? 'text-red-700 dark:text-rose-400' 
-                  : system?.source === 'device' 
-                    ? 'text-emerald-700 dark:text-emerald-400' 
+              <span className={`font-semibold ${system?.isMock || dataSource === 'mock'
+                  ? 'text-red-700 dark:text-rose-400'
+                  : system?.source === 'device'
+                    ? 'text-emerald-700 dark:text-emerald-400'
                     : 'text-amber-700 dark:text-amber-300'
-              }`}>
+                }`}>
                 {system?.isMock || dataSource === 'mock'
                   ? 'Dữ liệu giả lập'
                   : system?.source === 'device'
