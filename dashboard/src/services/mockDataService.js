@@ -450,6 +450,13 @@ export class MockTelemetryEngine {
         }
       },
       motors: {
+        k_enc_deg_per_pulse: 0.1500,
+        az_soft_min_deg: 0.0,
+        az_soft_max_deg: 270.0,
+        el_soft_min_deg: 10.0,
+        el_soft_max_deg: 90.0,
+        step_error_counts: 0,
+        step_error_deg: 0.0,
         azimuth: {
           phi: parseFloat(this.phi.toFixed(1)),
           targetPhi: parseFloat(this.targetPhi.toFixed(1)),
