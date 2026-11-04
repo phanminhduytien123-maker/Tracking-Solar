@@ -76,7 +76,13 @@ export default function DetailedTelemetryModal({
         <div className="px-4 py-2 bg-zinc-50 dark:bg-slate-800/80 border-b border-zinc-200 dark:border-slate-800 text-xs text-zinc-600 dark:text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
           <div>
             <span>Trạng thái máy: </span>
-            <span className="font-semibold text-zinc-900 dark:text-white">{system.displayState || 'Bình thường'}</span>
+            <span className={`font-semibold ${
+              system.displayState && system.displayState.includes('GIỮ BƯỚC')
+                ? 'text-blue-700 dark:text-sky-300 font-mono'
+                : 'text-zinc-900 dark:text-white'
+            }`}>
+              {system.displayState || 'Bình thường'}
+            </span>
           </div>
           <div>
             <span>Mất bước: </span>

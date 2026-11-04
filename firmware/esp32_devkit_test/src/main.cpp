@@ -1878,13 +1878,26 @@ void pushTelemetryToFirebase() {
     trk.set("wake_at", "AWAKE");
   }
   if (isEmergencyCoverActive) {
-    trk.set("displayState", "KHAN CAP (Goc Max phu bat)");
+    trk.set("displayState", "KHẨN CẤP (Góc Max phủ bạt)");
+    trk.set("holdRemainSec", 0);
   } else if (isDeviceSleeping) {
     trk.set("displayState", "NGỦ ĐÔNG (04:00)");
+    trk.set("holdRemainSec", 0);
   } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
-    trk.set("displayState", "GIỮ BƯỚC (CHỜ 15P)");
+    unsigned long holdDuration = (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f);
+    if (holdDuration < 60000UL) holdDuration = 900000UL;
+    unsigned long elapsedHold = millis() - trackHoldStartTimeMs;
+    unsigned long remainSec = (holdDuration > elapsedHold) ? ((holdDuration - elapsedHold) / 1000UL) : 0;
+    char holdBuf[32];
+    snprintf(holdBuf, sizeof(holdBuf), "GIỮ BƯỚC (%02lu:%02lu)", remainSec / 60, remainSec % 60);
+    trk.set("displayState", holdBuf);
+    trk.set("holdRemainSec", (int)remainSec);
+  } else if (trackCyclePhase == TRACK_CYCLE_ADJUSTING) {
+    trk.set("displayState", "ĐANG ĐIỀU CHỈNH");
+    trk.set("holdRemainSec", 0);
   } else {
     trk.set("displayState", stStr);
+    trk.set("holdRemainSec", 0);
   }
   
   // Nguồn thuật toán bám (Mục 4 & 5): EPHEMERIS_ONLY, SENSOR_ONLY, HYBRID, NONE
