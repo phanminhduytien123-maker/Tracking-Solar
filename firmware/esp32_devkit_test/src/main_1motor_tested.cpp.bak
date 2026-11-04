@@ -1,0 +1,529 @@
+// =========================================================================
+// FIRMWARE TEST 1 ĐỘNG CƠ BƯỚC NEMA 23 + DRIVER DM556 + HOME + ENCODER 3806
+// CẢI TIẾN:
+//   1. CHỈ IN SERIAL KHI CÓ THAY ĐỔI ÍT NHẤT 1 GIÁ TRỊ (Góc, CTHT, Trạng thái,
+//   Mốc M).
+//      Khi đứng yên màn hình sẽ đứng yên hoàn toàn, không spam trôi chữ!
+//   2. Mốc mặc định M = +141.52° (629 counts) nhớ vĩnh viễn trong Flash NVS.
+//   3. Tốc độ Auto Homing phím [G] siêu nhanh (160 us).
+// Bo mạch điều khiển: ESP32 DevKit V1 (ESP-WROOM-32) - Baudrate: 115200
+// =========================================================================
+
+#include <Arduino.h>
+#include <Preferences.h>
+
+Preferences prefs;
+
+// -------------------------------------------------------------------------
+// 1. CẤU HÌNH CHÂN NGOẠI VI
+// -------------------------------------------------------------------------
+#define M1_PUL_PIN 25 // Xung PUL+ Driver DM556 (PUL- nối GND)
+#define M1_DIR_PIN 26 // Hướng DIR+ Driver DM556 (DIR- nối GND)
+
+#define HOME_SW_PIN 19 // Công tắc hành trình (Chân NO vào GPIO 19, COM vào GND)
+#define HOME_ACTIVE_LEVEL                                                      \
+  LOW // Mức tích cực khi chạm Home (LOW do kéo INPUT_PULLUP)
+
+#define ENC_A_PIN 16 // Pha A của Encoder 3806 (Dây Trắng)
+#define ENC_B_PIN 17 // Pha B của Encoder 3806 (Dây Xanh Lá)
+
+// Chiều quay cơ khí:
+#define DIR_TOWARD_HOME LOW // Chiều Trái: Đi vào công tắc Home (A, Q)
+#define DIR_AWAY_HOME HIGH  // Chiều Phải: Lùi ra xa công tắc Home (D, E)
+
+// -------------------------------------------------------------------------
+// 2. THAM SỐ CƠ KHÍ & ENCODER & TỐC ĐỘ
+// -------------------------------------------------------------------------
+const float ENCODER_PPR = 600.0f; // Số xung 1 vòng của encoder 3806 (400 PPR)
+const float COUNTS_PER_REV = 4.0f * ENCODER_PPR;     // 1600 counts / vòng
+const float DEG_PER_COUNT = 360.0f / COUNTS_PER_REV; // 0.225° / count
+
+volatile int32_t encoderCount = 0;
+bool invertEncoderDir = false; // Đảo chiều đếm nếu lỡ ngược pha (Phím I)
+
+// TỐC ĐỘ (ĐỘ RỘNG XUNG US - CÀNG NHỎ CÀNG NHANH)
+int manualSpeedDelayUs =
+    350; // Tốc độ chạy tay (Phím A, D, Q, E) - Mặc định 350us
+int autoSpeedDelayUs = 160; // TỐC ĐỘ CHẠY TỰ ĐỘNG PHÍM G - 160us SIÊU NHANH
+int stepsPerPress = 400;    // Số bước mỗi lần nhấn A / D
+
+// -------------------------------------------------------------------------
+// 3. VỊ TRÍ MẶC ĐỊNH M (CÀI SẴN GÓC +141.52° VÀ LƯU FLASH VĨNH VIỄN)
+// -------------------------------------------------------------------------
+const int32_t INIT_DEFAULT_COUNTS = 629; // 629 counts thực tế
+const float INIT_DEFAULT_DEG = 141.525f; // +141.52° thực tế
+
+bool isHomed = false;
+bool hasDefaultPos = true;
+int32_t defaultEncoderCount = INIT_DEFAULT_COUNTS;
+float defaultAngleDeg = INIT_DEFAULT_DEG;
+
+enum SystemState {
+  STATE_IDLE = 0,
+  STATE_MANUAL_LEFT,  // Quay trái liên tục (phím Q)
+  STATE_MANUAL_RIGHT, // Quay phải liên tục (phím E)
+  STATE_AUTO_HOMING,  // Đang tự động quay về chạm Home tốc độ cao
+  STATE_AUTO_SEEK_DEFAULT // Sau khi chạm Home, đang quay sang vị trí mặc định
+                          // tốc độ cao
+};
+
+SystemState currentState = STATE_IDLE;
+bool lastHomePinState = false;
+
+// Biến lưu trạng thái trước đó để kiểm tra thay đổi
+int32_t prevEncoderCount = -999999;
+bool prevHomePinState = false;
+SystemState prevState = (SystemState)-1;
+int32_t prevDefaultCount = -999999;
+unsigned long lastPrintTime = 0;
+
+// -------------------------------------------------------------------------
+// 4. NGẮT ĐỌC ENCODER 4X (LOOKUP TABLE)
+// -------------------------------------------------------------------------
+const int8_t ENC_STATES[] = {0,  -1, 1, 0, 1, 0, 0,  -1,
+                             -1, 0,  0, 1, 0, 1, -1, 0};
+
+void IRAM_ATTR isrEncoder() {
+  static uint8_t oldState = 0;
+  oldState = (oldState << 2) |
+             ((digitalRead(ENC_A_PIN) << 1) | digitalRead(ENC_B_PIN));
+  int8_t diff = ENC_STATES[oldState & 0x0F];
+  if (invertEncoderDir)
+    diff = -diff;
+  encoderCount += diff;
+}
+
+float getEncoderAngle() { return (float)encoderCount * DEG_PER_COUNT; }
+
+bool isHomeTriggered() {
+  return (digitalRead(HOME_SW_PIN) == HOME_ACTIVE_LEVEL);
+}
+
+// -------------------------------------------------------------------------
+// 5. IN TRẠNG THÁI RA SERIAL (CHỈ KHI CÓ THAY ĐỔI)
+// -------------------------------------------------------------------------
+void printTelemetryIfChanged() {
+  bool currentHomePin = isHomeTriggered();
+
+  // Kiểm tra xem có ít nhất 1 giá trị bị thay đổi không
+  bool isChanged = (encoderCount != prevEncoderCount) ||
+                   (currentHomePin != prevHomePinState) ||
+                   (currentState != prevState) ||
+                   (defaultEncoderCount != prevDefaultCount);
+
+  if (isChanged) {
+    // Khi đang quay tốc độ cao, giới hạn tần số in tối đa ~25Hz (mỗi 40ms) để
+    // không nghẽn Serial Khi động cơ dừng (IDLE) thì in ngay tức thì
+    if (currentState == STATE_IDLE || (millis() - lastPrintTime >= 40)) {
+      lastPrintTime = millis();
+      prevEncoderCount = encoderCount;
+      prevHomePinState = currentHomePin;
+      prevState = currentState;
+      prevDefaultCount = defaultEncoderCount;
+
+      float currentDeg = getEncoderAngle();
+      Serial.printf("[ENCODER] Goc: %+6.2f | Counts: %6ld | CTHT: %-7s | "
+                    "M.Dinh: %+.1f | TT: %s\n",
+                    currentDeg, encoderCount, currentHomePin ? "CHAM" : "HO",
+                    hasDefaultPos ? defaultAngleDeg : 0.0f,
+                    currentState == STATE_IDLE
+                        ? "DUNG"
+                        : (currentState == STATE_AUTO_HOMING
+                               ? "AUTO-HOME(NHANH)"
+                               : (currentState == STATE_AUTO_SEEK_DEFAULT
+                                      ? "TIM-M.DINH(NHANH)"
+                                      : "DANG CHAY")));
+    }
+  }
+}
+
+// In menu phím tắt trực quan ra Serial Monitor
+void printMenu() {
+  Serial.println("\n=======================================================");
+  Serial.println("  HE THONG DIEU KHIEN DONG CO BUOC + ENCODER 3806");
+  Serial.println("=======================================================");
+  Serial.println(" [A] : Xoay TRAI (ve huong Home) theo buoc");
+  Serial.println(" [D] : Xoay PHAI (lui ra xa Home) theo buoc");
+  Serial.println(" [Q] : Xoay TRAI LIEN TUC (Cham Home tu dong dung)");
+  Serial.println(" [E] : Xoay PHAI LIEN TUC");
+  Serial.println(" [S] / [Space] : DUNG KHAN CAP NGAY");
+  Serial.println("-------------------------------------------------------");
+  Serial.println(" [M] : GHI DE GOC HIEN TAI LAM VI TRI MAC DINH (Luu Flash)");
+  Serial.println(" [G] : TU DONG TOC DO CAO: CHAM HOME -> VE VI TRI MAC DINH");
+  Serial.println(" [0] : Set truc tiep vi tri hien tai ve 0.0°");
+  Serial.println(" [I] : Dao chieu dem Encoder (+/-)");
+  Serial.println(" [+] / [-] : Tang / Giam so buoc tay (moi lan +/- 100)");
+  Serial.println(" [>] / [<] : Tang / Giam toc do chay tay");
+  Serial.println(" [}] / [{] : Tang / Giam TOC DO TU DONG [G] (Delay us)");
+  Serial.println(" [?] / [H] : In lai menu nay");
+  Serial.println("=======================================================");
+  Serial.printf(" VI TRI MAC DINH DANG LUU : %+.2f do (%ld counts)\n",
+                defaultAngleDeg, defaultEncoderCount);
+  Serial.printf(" TOC DO AUTO PHIM [G]     : %d us (Sieu nhanh)\n",
+                autoSpeedDelayUs);
+  Serial.printf(" TOC DO CHAY TAY [A,D,Q,E]: %d us\n", manualSpeedDelayUs);
+  Serial.println(" * CHE DO SERIAL: Chi cap nhat khi co gia tri thay doi.");
+  Serial.println("=======================================================\n");
+}
+
+// Phát xung bước thủ công có bảo vệ Home
+bool stepMotor(bool direction, int steps, int delayUs) {
+  if (direction == DIR_TOWARD_HOME && isHomeTriggered()) {
+    Serial.println(
+        ">> [KHOA CHIEU TRAI] Dang cham CTHT! Khong the quay them ve Trai.");
+    Serial.println(">> Hay nhan [D] hoac [E] de quay sang Phai lui ra xa.");
+    return false;
+  }
+
+  digitalWrite(M1_DIR_PIN, direction);
+  delayMicroseconds(50);
+
+  for (int i = 0; i < steps; i++) {
+    if (direction == DIR_TOWARD_HOME && isHomeTriggered()) {
+      encoderCount = 0;
+      isHomed = true;
+      Serial.println(
+          "\n>> [HOME TRIGGERED] Da cham CTHT -> DUNG & SET GOC 0.0°!");
+      printTelemetryIfChanged();
+      return false;
+    }
+
+    digitalWrite(M1_PUL_PIN, HIGH);
+    delayMicroseconds(delayUs);
+    digitalWrite(M1_PUL_PIN, LOW);
+    delayMicroseconds(delayUs);
+
+    // Cập nhật telemetry nếu góc encoder thay đổi khi phát bước
+    printTelemetryIfChanged();
+  }
+
+  return true;
+}
+
+// -------------------------------------------------------------------------
+// 6. SETUP
+// -------------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  // 1. Cấu hình Driver DM556
+  pinMode(M1_PUL_PIN, OUTPUT);
+  pinMode(M1_DIR_PIN, OUTPUT);
+  digitalWrite(M1_PUL_PIN, LOW);
+  digitalWrite(M1_DIR_PIN, LOW);
+
+  // 2. Cấu hình Công tắc hành trình Home
+  pinMode(HOME_SW_PIN, INPUT_PULLUP);
+
+  // 3. Cấu hình chân Encoder và gắn ngắt phần cứng 4 cạnh
+  pinMode(ENC_A_PIN, INPUT_PULLUP);
+  pinMode(ENC_B_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENC_A_PIN), isrEncoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_B_PIN), isrEncoder, CHANGE);
+
+  lastHomePinState = isHomeTriggered();
+
+  // 4. Khởi tạo Flash NVS (Preferences) để nhớ vĩnh viễn mốc M
+  prefs.begin("solar_pos", false);
+  if (prefs.isKey("def_counts")) {
+    defaultEncoderCount = prefs.getInt("def_counts", INIT_DEFAULT_COUNTS);
+    defaultAngleDeg = prefs.getFloat("def_deg", INIT_DEFAULT_DEG);
+    hasDefaultPos = true;
+    Serial.printf("\n[FLASH NVS] Da doc vi tri mac dinh tu bo nho: %+.2f do "
+                  "(%ld counts)\n",
+                  defaultAngleDeg, defaultEncoderCount);
+  } else {
+    prefs.putInt("def_counts", INIT_DEFAULT_COUNTS);
+    prefs.putFloat("def_deg", INIT_DEFAULT_DEG);
+    defaultEncoderCount = INIT_DEFAULT_COUNTS;
+    defaultAngleDeg = INIT_DEFAULT_DEG;
+    hasDefaultPos = true;
+    Serial.printf("\n[FLASH NVS] Da khoi tao goc mac dinh vao Flash: %+.2f do "
+                  "(%ld counts)\n",
+                  defaultAngleDeg, defaultEncoderCount);
+  }
+
+  printMenu();
+  if (isHomeTriggered()) {
+    encoderCount = 0;
+    isHomed = true;
+    Serial.println("[LUU Y] Khoi dong khi CTHT dang cham -> Da set moc 0.0°!");
+  }
+
+  // In trạng thái ban đầu 1 lần
+  printTelemetryIfChanged();
+}
+
+// -------------------------------------------------------------------------
+// 7. LOOP
+// -------------------------------------------------------------------------
+void loop() {
+  bool currentHomePin = isHomeTriggered();
+
+  if (lastHomePinState == true && currentHomePin == false) {
+    Serial.println("\n>> [CTHT RELEASED] Cong tac hanh trinh da nha ra!");
+  }
+  lastHomePinState = currentHomePin;
+
+  // -----------------------------------------------------------------------
+  // A. XỬ LÝ LỆNH TỪ SERIAL MONITOR
+  // -----------------------------------------------------------------------
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    if (cmd == '\r' || cmd == '\n')
+      return;
+
+    if (cmd == ' ' || cmd == 's' || cmd == 'S') {
+      currentState = STATE_IDLE;
+      Serial.println("\n>> [STOP] DA DUNG DONG CO NGAY LAP TUC!");
+      printTelemetryIfChanged();
+      return;
+    }
+
+    switch (cmd) {
+    case 'a':
+    case 'A':
+      currentState = STATE_IDLE;
+      Serial.printf(">> [TRAI - STEP] Dang xoay TRAI %d buoc...\n",
+                    stepsPerPress);
+      stepMotor(DIR_TOWARD_HOME, stepsPerPress, manualSpeedDelayUs);
+      break;
+
+    case 'd':
+    case 'D':
+      currentState = STATE_IDLE;
+      Serial.printf(">> [PHAI - STEP] Dang xoay PHAI %d buoc...\n",
+                    stepsPerPress);
+      stepMotor(DIR_AWAY_HOME, stepsPerPress, manualSpeedDelayUs);
+      break;
+
+    case 'q':
+    case 'Q':
+      if (isHomeTriggered()) {
+        Serial.println(
+            ">> [CANH BAO] Dang o moc Home, khong the quay tiep sang Trai!");
+      } else {
+        currentState = STATE_MANUAL_LEFT;
+        digitalWrite(M1_DIR_PIN, DIR_TOWARD_HOME);
+        delayMicroseconds(50);
+        Serial.println("\n>> [RUN CONTINUOUS] Dang xoay TRAI ve huong Home "
+                       "(Cham CTHT se tu dung)...");
+      }
+      break;
+
+    case 'e':
+    case 'E':
+      currentState = STATE_MANUAL_RIGHT;
+      digitalWrite(M1_DIR_PIN, DIR_AWAY_HOME);
+      delayMicroseconds(50);
+      Serial.println("\n>> [RUN CONTINUOUS] Dang xoay PHAI lui khoi Home (Bam "
+                     "'s' de dung)...");
+      break;
+
+    // LƯU VỊ TRÍ MẶC ĐỊNH M VÀO FLASH NVS
+    case 'm':
+    case 'M':
+      defaultEncoderCount = encoderCount;
+      defaultAngleDeg = getEncoderAngle();
+      hasDefaultPos = true;
+      prefs.putInt("def_counts", defaultEncoderCount);
+      prefs.putFloat("def_deg", defaultAngleDeg);
+      Serial.println(
+          "\n=======================================================");
+      Serial.printf(">> [DA LUU VI TRI MAC DINH VAO FLASH NVS (VINH VIEN)]\n");
+      Serial.printf("   Goc mac dinh  : %+.2f do\n", defaultAngleDeg);
+      Serial.printf("   Encoder Counts: %ld xung\n", defaultEncoderCount);
+      Serial.println("   (Tat nguon hay nap lai code van khong bi mat!)");
+      Serial.println(
+          "   -> Nhan [G] de tu dong ve Home roi quay ve day sieu nhanh!");
+      Serial.println(
+          "=======================================================\n");
+      break;
+
+    // TỰ ĐỘNG VỀ HOME RỒI VỀ VỊ TRÍ MẶC ĐỊNH TỐC ĐỘ CAO [G]
+    case 'g':
+    case 'G':
+      if (!hasDefaultPos) {
+        Serial.println("\n>> [CHUA CO VI TRI MAC DINH]!");
+      } else {
+        Serial.println(
+            "\n=======================================================");
+        Serial.printf(">> [KICH HOAT AUTO FAST HOMING -> DEFAULT (G)]\n");
+        Serial.printf("   Muc tieu: %+.2f do (%ld counts) | Toc do: %d us\n",
+                      defaultAngleDeg, defaultEncoderCount, autoSpeedDelayUs);
+        Serial.println("   Pha 1: Dang chay ve cham CTHT Home sieu nhanh...");
+        Serial.println(
+            "=======================================================");
+
+        if (isHomeTriggered()) {
+          encoderCount = 0;
+          isHomed = true;
+          currentState = STATE_AUTO_SEEK_DEFAULT;
+          digitalWrite(M1_DIR_PIN, DIR_AWAY_HOME);
+          delayMicroseconds(50);
+          Serial.println("   -> Dang o Home san. Bat dau Pha 2: Quay ve vi tri "
+                         "mac dinh...");
+        } else {
+          currentState = STATE_AUTO_HOMING;
+          digitalWrite(M1_DIR_PIN, DIR_TOWARD_HOME);
+          delayMicroseconds(50);
+        }
+      }
+      break;
+
+    case '0':
+      encoderCount = 0;
+      isHomed = true;
+      Serial.println("\n>> [RESET] Da set vi tri hien tai la Goc 0.0°!");
+      break;
+
+    case 'i':
+    case 'I':
+      invertEncoderDir = !invertEncoderDir;
+      Serial.printf("\n>> [DAO CHIEU ENCODER] Hien tai: %s\n",
+                    invertEncoderDir ? "DAO NGUOC (-)" : "THUAN (+)");
+      break;
+
+    // CHỈNH TỐC ĐỘ AUTO [G]
+    case ']':
+    case '}':
+      if (autoSpeedDelayUs > 80)
+        autoSpeedDelayUs -= 20;
+      Serial.printf(">> TANG TOC DO AUTO [G]: Delay = %d us (Sieu nhanh)\n",
+                    autoSpeedDelayUs);
+      break;
+
+    case '[':
+    case '{':
+      autoSpeedDelayUs += 20;
+      Serial.printf(">> GIAM TOC DO AUTO [G]: Delay = %d us\n",
+                    autoSpeedDelayUs);
+      break;
+
+    // CHỈNH BƯỚC VÀ TỐC ĐỘ TAY
+    case '+':
+    case '=':
+      stepsPerPress += 100;
+      Serial.printf(">> Tang so buoc tay: %d buoc/lan\n", stepsPerPress);
+      break;
+
+    case '-':
+    case '_':
+      if (stepsPerPress > 100)
+        stepsPerPress -= 100;
+      Serial.printf(">> Giam so buoc tay: %d buoc/lan\n", stepsPerPress);
+      break;
+
+    case '>':
+    case '.':
+      if (manualSpeedDelayUs > 150)
+        manualSpeedDelayUs -= 50;
+      Serial.printf(">> Tang toc do tay: Delay = %d us\n", manualSpeedDelayUs);
+      break;
+
+    case '<':
+    case ',':
+      manualSpeedDelayUs += 50;
+      Serial.printf(">> Giam toc do tay: Delay = %d us\n", manualSpeedDelayUs);
+      break;
+
+    case '?':
+    case 'h':
+    case 'H':
+      printMenu();
+      break;
+
+    default:
+      break;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // B. XỬ LÝ CÁC TRẠNG THÁI CHẠY LIÊN TỤC & TỰ ĐỘNG
+  // -----------------------------------------------------------------------
+  switch (currentState) {
+  case STATE_IDLE:
+    break;
+
+  // 1. Quay Trái liên tục bằng tay (Phím Q)
+  case STATE_MANUAL_LEFT:
+    if (isHomeTriggered()) {
+      encoderCount = 0;
+      isHomed = true;
+      currentState = STATE_IDLE;
+      Serial.println(
+          "\n>> [HOME TRIGGERED] Da cham CTHT -> DUNG & SET GOC 0.0°!");
+      printTelemetryIfChanged();
+      return;
+    }
+    digitalWrite(M1_PUL_PIN, HIGH);
+    delayMicroseconds(manualSpeedDelayUs);
+    digitalWrite(M1_PUL_PIN, LOW);
+    delayMicroseconds(manualSpeedDelayUs);
+    break;
+
+  // 2. Quay Phải liên tục bằng tay (Phím E)
+  case STATE_MANUAL_RIGHT:
+    digitalWrite(M1_PUL_PIN, HIGH);
+    delayMicroseconds(manualSpeedDelayUs);
+    digitalWrite(M1_PUL_PIN, LOW);
+    delayMicroseconds(manualSpeedDelayUs);
+    break;
+
+  // 3. Tự động Homing TỐC ĐỘ CAO (Pha 1 của phím G)
+  case STATE_AUTO_HOMING:
+    if (isHomeTriggered()) {
+      encoderCount = 0;
+      isHomed = true;
+      Serial.println("\n>> [AUTO HOMING - PHA 1 HOAN TAT] Da cham CTHT -> Da "
+                     "reset Encoder ve 0.0°!");
+      Serial.println(">> Bat dau Pha 2: Quay ve vi tri mac dinh sieu nhanh...");
+      printTelemetryIfChanged();
+
+      delay(250); // Nghỉ 0.25s triệt tiêu quán tính
+
+      currentState = STATE_AUTO_SEEK_DEFAULT;
+      digitalWrite(M1_DIR_PIN, DIR_AWAY_HOME);
+      delayMicroseconds(50);
+      return;
+    }
+    digitalWrite(M1_PUL_PIN, HIGH);
+    delayMicroseconds(autoSpeedDelayUs);
+    digitalWrite(M1_PUL_PIN, LOW);
+    delayMicroseconds(autoSpeedDelayUs);
+    break;
+
+  // 4. Tự động quay đến vị trí mặc định TỐC ĐỘ CAO (Pha 2 của phím G)
+  case STATE_AUTO_SEEK_DEFAULT:
+    if (encoderCount >= defaultEncoderCount) {
+      currentState = STATE_IDLE;
+      Serial.println(
+          "\n=======================================================");
+      Serial.println(">> [THANH CONG] DA VE DUNG VI TRI MAC DINH!");
+      Serial.printf("   Goc dat duoc  : %+.2f do\n", getEncoderAngle());
+      Serial.printf("   Encoder Counts: %ld xung\n", encoderCount);
+      Serial.println(
+          "=======================================================\n");
+      printTelemetryIfChanged();
+      return;
+    }
+
+    int currentDelay = autoSpeedDelayUs;
+    int32_t remaining = defaultEncoderCount - encoderCount;
+    if (remaining < 35) {
+      currentDelay = autoSpeedDelayUs + 140; // Giảm về 300us khi gần tới đích
+    }
+
+    digitalWrite(M1_PUL_PIN, HIGH);
+    delayMicroseconds(currentDelay);
+    digitalWrite(M1_PUL_PIN, LOW);
+    delayMicroseconds(currentDelay);
+    break;
+  }
+
+  // -----------------------------------------------------------------------
+  // C. CHỈ IN SERIAL KHI CÓ THAY ĐỔI
+  // -----------------------------------------------------------------------
+  printTelemetryIfChanged();
+}
