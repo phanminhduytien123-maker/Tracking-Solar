@@ -58,6 +58,8 @@ volatile int  remoteTestDirAxis       = 1;
 volatile int  remoteTestDirDir        = 1;
 volatile bool remoteResetFaultTrigger = false;
 volatile bool remotePsoTrigger        = false;
+volatile bool remoteSleepTrigger      = false;
+volatile bool remoteWakeTrigger       = false;
 String lastHandledCmdId = "";
 void parkPanels();
 
@@ -71,6 +73,8 @@ bool homeAxisToSwitch(int axis);
 bool runDualHomingToSwitches();
 void runDualAutoHoming();
 void runPsoOptimization();
+void enterNightSleepUntil4AM();
+void wakeUpAtDawn();
 bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun, float &elSun, float &zenithSun, float &ws, bool &isDaylight);
 void checkRemoteFirebaseCommands();
 
@@ -367,7 +371,7 @@ const uint32_t HOME_CREEP_SPEED_HZ = 200;  // Giai đoạn 3: Rà chậm tiếp 
 const int32_t  HOME_RETRACT_STEPS  = 300;  // Giai đoạn 2: Lùi nhả switch (~1.5 vòng vi bước)
 
 // Cấu hình khung giờ ngủ đêm và thức dậy (22:00 tối đến 04:00 sáng)
-const int NIGHT_SLEEP_START_HOUR   = 22;   // 22:00 (10:00 PM) - Người dùng yêu cầu chỉnh sang 22h
+const int NIGHT_SLEEP_START_HOUR   = 19;   // 19:00 (7:00 PM) - Người dùng cài đặt ngủ lúc 7h tối
 const int NIGHT_SLEEP_END_HOUR     = 4;    // 04:00 (4:00 AM)
 
 // -------------------------------------------------------------------------
@@ -875,24 +879,29 @@ void enterNightLightSleep(uint32_t sleepMinutes = 2) {
 }
 
 // Quy trình ngủ đêm chính thức: Homing 2 trục -> Trục 1 giữ Home, Trục 2 về Góc Max -> Ngủ tới 04:00 AM -> Homing lại -> Đón bình minh
+// Quy trình ngủ đêm chính thức: Homing 2 trục -> Trục 1 giữ Home, Trục 2 về Góc Max an toàn -> Giữ WiFi trực tuyến -> Đến 04:00 thức dậy
 void enterNightSleepUntil4AM() {
+  if (systemFsmState == FSM_STATE_LIGHT_SLEEP || systemFsmState == FSM_STATE_PREP_SLEEP) {
+    return; // Đã ở trạng thái ngủ đêm rồi
+  }
+
   Serial.println("\n=======================================================");
-  Serial.println(">> [NIGHT SLEEP 19:00] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
+  Serial.println(">> [NIGHT STANDBY 19:00] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
   Serial.println("   1. Auto Homing 2 truc ve switch (chot goc 0.0°)");
-  Serial.println("   2. Truc 1 giu nguyen Home, Truc 2 quay ve goc MAX (tua co cau dong co an toan)");
+  Serial.println("   2. Truc 1 giu moc Home (0.0°), Truc 2 quay ve goc MAX (tua co cau an toan)");
   Serial.println("   3. Driver DM556 tu ngat xung -> Chuyen Half-Current giu buoc 50%");
-  Serial.println("   4. ESP32-S3 Light Sleep tiet kiem dien");
-  Serial.println("   5. 04:00 sang: Thuc day -> Homing 2 truc -> Truc 2 cham switch Home 2 -> Truc 1 quay don binh minh");
+  Serial.println("   4. WIFI VA FIREBASE DUY TRI 100% SUOT DEM DE GIAM SAT LIEN TUC!");
+  Serial.println("   5. 04:00 sang: Thuc day lien mach, khong phai reconnect WiFi, khong chong cheo!");
   Serial.println("=======================================================");
 
   systemFsmState = FSM_STATE_PREP_SLEEP;
 
   // 1. Tự động về Home cả 2 trục để chốt mốc tuyệt đối 0.0°
-  Serial.println("   [1/6] Dang chay Homing ca 2 truc ve switch...");
+  Serial.println("   [1/4] Dang chay Homing ca 2 truc ve switch...");
   runDualHomingToSwitches();
 
-  // 2. Trục 1 giữ nguyên Home (0.0°). Trục 2 quay về góc MAX (CFG_L_EL_MIN_SOFT_LIMIT_DEG) để tựa cơ cấu an toàn khi ngủ
-  Serial.printf("   [2/6] Truc 1 giu moc Home (0.0°). Truc 2 quay ve goc MAX (%.1f°)...\n", CFG_L_EL_MIN_SOFT_LIMIT_DEG);
+  // 2. Trục 1 giữ nguyên Home (0.0°). Trục 2 quay về góc MAX để tựa cơ cấu an toàn khi ngủ
+  Serial.printf("   [2/4] Truc 1 giu moc Home (0.0°). Truc 2 quay ve goc MAX (%.1f°)...\n", CFG_L_EL_MIN_SOFT_LIMIT_DEG);
   stepPositionControl(2, CFG_L_EL_MIN_SOFT_LIMIT_DEG, autoSpeedHz);
 
   // Chờ Trục 2 chạy đến góc MAX và dừng hẳn (tối đa 25 giây)
@@ -907,107 +916,53 @@ void enterNightSleepUntil4AM() {
   Serial.printf("   -> Gian pin da chot vi tri ngu an toan: Truc 1 = %+.2f°, Truc 2 = %+.2f°!\n",
                 getAngleDeg1(), getElevationEpsilon());
 
-  // 3. Lấy giờ hiện tại từ RTC và hẹn báo thức Alarm 1 lúc 04:00:00 sáng
-  int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
-  float curTemp = 0.0f;
-  uint32_t totalSleepSec = 9 * 3600; // Mặc định 9 tiếng nếu không đọc được RTC
-  if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-    if (curH >= NIGHT_SLEEP_START_HOUR) {
-      totalSleepSec = ((24 - curH) + NIGHT_SLEEP_END_HOUR) * 3600 - curMin * 60 - curS;
-    } else if (curH < NIGHT_SLEEP_END_HOUR) {
-      totalSleepSec = (NIGHT_SLEEP_END_HOUR - curH) * 3600 - curMin * 60 - curS;
-    }
-    setDS3231Alarm1(4, 0, 0); // Đặt báo thức chính xác lúc 04:00:00 AM
-    Serial.printf("   [3/6] Hen gio RTC DS3231 Alarm 1 luc 04:00:00 sang (Hien tai: %02d:%02d:%02d, Ngu trong: %u phut)\n",
-                  curH, curMin, curS, (unsigned int)(totalSleepSec / 60));
-  } else {
-    Serial.println("   [3/6] [CANH BAO] Khong doc duoc RTC! Su dung Timer du phong 9 tieng.");
-  }
-
-  // 4. Đẩy thông báo trạng thái ngủ đêm lên Firebase
+  // 3. Đẩy thông báo trạng thái ngủ đêm lên Firebase (Web hiển thị SLEEP, wake_at: 04:00)
   if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
     FirebaseJson sleepJson;
-    sleepJson.set("state", "DEEP_SLEEP");
+    sleepJson.set("state", "SLEEP");
     sleepJson.set("status", "SLEEPING");
     sleepJson.set("wake_at", "04:00");
     sleepJson.set("isSleeping", true);
-    sleepJson.set("displayState", "Ngu dem an toan (Truc 2 tai goc Max)");
+    sleepJson.set("displayState", "Nghi dem an toan (Cho binh minh 04:00)");
     sleepJson.set("source", "device");
     Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &sleepJson);
-    Serial.println("   [4/6] Da cap nhat trang thai DEEP_SLEEP (wake_at: 04:00) len Firebase.");
+    Serial.println("   [3/4] Da cap nhat trang thai SLEEP (wake_at: 04:00) len Firebase.");
   }
 
-  // 5. Tắt WiFi để giảm thiểu dòng điện
-  Serial.println("   [5/6] Ngat ket noi WiFi de tiet kiem nang luong ban dem (Driver DM556 giu Half-Current 50%)...");
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  delay(100);
-
-  // 6. Cấu hình ngắt ngoài GPIO 47 và khởi động Light Sleep
-  gpio_wakeup_enable((gpio_num_t)DS3231_SQW_PIN, GPIO_INTR_LOW_LEVEL);
-  esp_sleep_enable_gpio_wakeup();
-
-  // Timer dự phòng bảo vệ an toàn (thêm 2 phút trừ hao)
-  esp_sleep_enable_timer_wakeup((uint64_t)(totalSleepSec + 120) * 1000000ULL);
-
-  Serial.println("   [6/6] ESP32-S3 bat dau Light Sleep. Hen gap lai luc 04:00 sang!\n");
-  Serial.flush();
-
+  // 4. Chuyển sang trạng thái ngủ đêm chờ (FSM_STATE_LIGHT_SLEEP) nhưng GIỮ NGUYÊN WIFI!
   systemFsmState = FSM_STATE_LIGHT_SLEEP;
+  Serial.println("   [4/4] He thong da vao che do NIGHT STANDBY! WiFi duy tri on dinh. Hen gap lai luc 04:00 sang!\n");
+}
 
-  // Tạm dừng TelemetryTask trên Core 0 để tránh đụng độ WiFi/Flash khi ngủ
-  if (telemetryTaskHandle != NULL) {
-    vTaskSuspend(telemetryTaskHandle);
+// Quy trình thức dậy lúc 04:00 sáng: WiFi đã có sẵn -> Homing -> Quay đón bình minh -> Bật Hybrid tracking
+void wakeUpAtDawn() {
+  if (systemFsmState != FSM_STATE_LIGHT_SLEEP && systemFsmState != FSM_STATE_PREP_SLEEP) {
+    return; // Không ở trạng thái ngủ thì không cần đánh thức
   }
 
-  // 7. BẮT ĐẦU LIGHT SLEEP (RAM VÀ TRẠNG THÁI CPU NGUYÊN VẸN 100%)
-  esp_light_sleep_start();
-
-  // ================== THỨC DẬY TẠI ĐÂY LÚC 04:00 SÁNG ==================
-  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
   Serial.println("\n>> =======================================================");
-  Serial.println(">> [WAKEUP 04:00 AM] ESP32-S3 DA THUC DAY TU LIGHT SLEEP!");
-  if (cause == ESP_SLEEP_WAKEUP_GPIO) {
-    Serial.printf(">> [WAKEUP CAUSE] Chinh xac boi ngat GPIO %d (DS3231 Alarm 1 SQW LOW luc 04:00)!\n", DS3231_SQW_PIN);
-  } else if (cause == ESP_SLEEP_WAKEUP_TIMER) {
-    Serial.println(">> [WAKEUP CAUSE] Boi Timer du phong!");
-  } else {
-    Serial.printf(">> [WAKEUP CAUSE] Nguyen nhan khac: %d\n", (int)cause);
-  }
+  Serial.println(">> [WAKEUP 04:00 AM] HE THONG THUC DAY DON BINH MINH TU CHE DO CHO DEM!");
+  Serial.println(">> WiFi va Firebase da san sang 100%, khong can ket noi lai (Khong chong cheo task)!");
+  Serial.println(">> =======================================================\n");
 
-  // 8. Xóa cờ báo thức A1F trên DS3231
-  clearDS3231Alarm1Flag();
-  Serial.println(">> [RTC] Da xoa co bao thuc A1F tren DS3231. Chan SQW da tro ve muc HIGH.");
+  systemFsmState = FSM_STATE_HOMING;
 
-  if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-    Serial.printf(">> [RTC GIO THUC] Thoi gian khi thuc day: %02d:%02d:%02d %02d/%02d/%04d\n",
-                  curH, curMin, curS, curD, curM, curY);
-  }
-
-  // 9. Bật lại WiFi
-  Serial.println(">> [WIFI] Bat lai WiFi ket noi he thong...");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  // Xóa cờ ngủ đông trên Firebase ngay khi thức dậy
-  if (telemetryTaskHandle != NULL) {
-    vTaskResume(telemetryTaskHandle);
-  }
+  // 1. Cập nhật ngay Firebase vì WiFi đang online sẵn
   if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
     FirebaseJson wakeJson;
     wakeJson.set("isSleeping", false);
-    wakeJson.set("wake_at", "DAWN");
+    wakeJson.set("wake_at", "AWAKE");
     wakeJson.set("state", "HOMING");
     wakeJson.set("status", "WAKEUP_DAWN");
     wakeJson.set("displayState", "Thuc day don binh minh");
     Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &wakeJson);
   }
 
-  // 10. Homing lại cả 2 trục và đưa về vị trí mặc định (Seek Default) đón ngày mới
+  // 2. Homing lại cả 2 trục và đưa về vị trí mặc định đón ngày mới
   Serial.println(">> [DAWN HOMING] Tu dong Dual Auto Homing ca 2 truc sau khi thuc day...");
   runDualAutoHoming();
 
-  // Trục 1: Tính toán góc phương vị mặt trời mọc hôm nay theo NOAA và quay đón sẵn
+  // 3. Trục 1: Tính toán góc phương vị mặt trời mọc hôm nay theo NOAA và quay đón sẵn
   float dawnAzTarget = defaultDeg1;
   float tAz = 0.0f, tEl = 0.0f, azS = 0.0f, elS = 0.0f, zenS = 0.0f, ws = 0.0f;
   bool isDay = false;
@@ -1031,7 +986,7 @@ void enterNightSleepUntil4AM() {
   Serial.println(">> [DAWN READY] Gian pin da vao vi tri don binh minh san sang cho ngay moi!");
   Serial.println(">> =======================================================\n");
 
-  // 11. Bật ngay chế độ tự động Hybrid Tracking ban ngày
+  // 4. Bật ngay chế độ tự động Hybrid Tracking ban ngày
   runPsoOptimization();
   currentTrackSource = TRACK_SRC_HYBRID;
   autoOpticalTracking = true;
@@ -2088,6 +2043,21 @@ void checkRemoteFirebaseCommands() {
           Serial.println(">> [REMOTE] Nhan lenh HOME lai toan bo he thong!");
         } else {
           Serial.println(">> [REMOTE] Bo qua lenh Home vi he thong dang o the KHAN CAP!");
+        }
+      }
+      // LỆNH NGỦ ĐÊM / THỨC DẬY TỪ XA
+      else if (cmd.equalsIgnoreCase("sleep")) {
+        if (!isEmergencyCoverActive) {
+          remoteSleepTrigger = true;
+          shouldAck = true;
+          Serial.println(">> [REMOTE] Nhan lenh SLEEP dua he thong vao trang thai ngu dem!");
+        }
+      }
+      else if (cmd.equalsIgnoreCase("wake") || cmd.equalsIgnoreCase("wakeup")) {
+        if (!isEmergencyCoverActive) {
+          remoteWakeTrigger = true;
+          shouldAck = true;
+          Serial.println(">> [REMOTE] Nhan lenh WAKE danh thuc he thong don binh minh!");
         }
       }
       // 3. LỆNH ĐƯA VỀ VỊ TRÍ NGHỈ (PARK)
@@ -3387,6 +3357,9 @@ void handleCliCommand(const String& cmdStr) {
       enterNightLightSleep(mins);
       systemFsmState = FSM_STATE_IDLE;
     }
+  } else if (cmdStr.equalsIgnoreCase("wake") || cmdStr.equalsIgnoreCase("wakeup")) {
+    Serial.println("\n>> [THU CONG] Kich hoat lenh danh thuc (Wakeup) don binh minh...");
+    wakeUpAtDawn();
   } else if (cmdStr.equalsIgnoreCase("help") || cmdStr.equalsIgnoreCase("menu") || cmdStr.equalsIgnoreCase("?")) {
     printMenu();
   } else {
@@ -3932,16 +3905,40 @@ void loop() {
     requestTelemetryPrint();
   }
 
-  // 0. TỰ ĐỘNG NGỦ ĐÊM (TỪ 22:00 TỐI ĐẾN 04:00 SÁNG) THEO ĐỒNG HỒ RTC DS3231
+  // XỬ LÝ LỆNH SLEEP / WAKE TỪ XA QUA FIREBASE
+  if (remoteSleepTrigger) {
+    remoteSleepTrigger = false;
+    Serial.println("\n>> [REMOTE SLEEP] Chuyen sang che do ngu dem giu WiFi...");
+    enterNightSleepUntil4AM();
+  }
+  if (remoteWakeTrigger) {
+    remoteWakeTrigger = false;
+    Serial.println("\n>> [REMOTE WAKE] Danh thuc he thong don binh minh...");
+    wakeUpAtDawn();
+  }
+
+  // 0. TỰ ĐỘNG QUẢN LÝ NGỦ ĐÊM / THỨC DẬY (TỪ 19:00 TỐI ĐẾN 04:00 SÁNG) THEO ĐỒNG HỒ RTC DS3231
   static unsigned long lastNightCheckMs = 0;
-  if (!isEmergencyCoverActive && (millis() - lastNightCheckMs >= 5000)) {
+  if (!isEmergencyCoverActive && (millis() - lastNightCheckMs >= 3000)) {
     lastNightCheckMs = millis();
     int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
     float curTemp = 0.0f;
     if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-      if ((curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) && (millis() - lastSerialCharMs >= 30000)) {
-        if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE) {
-          enterNightSleepUntil4AM();
+      bool isNightWindow = (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR);
+
+      if (isNightWindow) {
+        // Trong khung giờ ngủ đêm (19:00 - 04:00)
+        if (systemFsmState != FSM_STATE_LIGHT_SLEEP && systemFsmState != FSM_STATE_PREP_SLEEP) {
+          if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE && (millis() - lastSerialCharMs >= 15000)) {
+            Serial.printf("\n>> [AUTO NIGHT] Da den gio ngu dem (%02d:%02d:%02d). Kich hoat ngu dem giu WiFi!\n", curH, curMin, curS);
+            enterNightSleepUntil4AM();
+          }
+        }
+      } else {
+        // Trong khung giờ ban ngày (04:00 - 19:00): Nếu hệ thống còn đang ở trạng thái ngủ thì đánh thức
+        if (systemFsmState == FSM_STATE_LIGHT_SLEEP || systemFsmState == FSM_STATE_PREP_SLEEP) {
+          Serial.printf("\n>> [AUTO DAWN] Da den gio thuc day (%02d:%02d:%02d). Kich hoat danh thuc don binh minh!\n", curH, curMin, curS);
+          wakeUpAtDawn();
         }
       }
     }
@@ -3952,7 +3949,7 @@ void loop() {
   static unsigned long lastSolarTrackTime = 0;
   static unsigned long lastSolarLogTime   = 0;
 
-  if (!isEmergencyCoverActive && (autoOpticalTracking || currentTrackSource != TRACK_SRC_OFF)) {
+  if (!isEmergencyCoverActive && systemFsmState != FSM_STATE_LIGHT_SLEEP && (autoOpticalTracking || currentTrackSource != TRACK_SRC_OFF)) {
     if (currentTrackSource == TRACK_SRC_SENSOR || currentTrackSource == TRACK_SRC_OFF) {
       if (millis() - lastOpticalTrackTime >= 100) { // Chu kỳ bám 100ms
       lastOpticalTrackTime = millis();

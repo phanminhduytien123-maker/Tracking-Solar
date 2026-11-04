@@ -347,6 +347,13 @@ export class FirebaseSolarService {
           maxSta: 0,
           sumTrk: 0,
           sumSta: 0,
+          maxVocTrk: 0,
+          maxVocSta: 0,
+          maxIscTrk: 0,
+          maxIscSta: 0,
+          sumTempTrk: 0,
+          sumTempSta: 0,
+          tempCount: 0,
           count: 0,
           slots: new Map()
         };
@@ -358,6 +365,17 @@ export class FirebaseSolarService {
       if (sta > byDay[dayKey].maxSta) byDay[dayKey].maxSta = sta;
       byDay[dayKey].sumTrk += trk;
       byDay[dayKey].sumSta += sta;
+
+      // Cập nhật thống kê Voc, Isc và Nhiệt độ nếu có trong bản ghi
+      if (rec.voc_trk) byDay[dayKey].maxVocTrk = Math.max(byDay[dayKey].maxVocTrk, Number(rec.voc_trk));
+      if (rec.voc_sta) byDay[dayKey].maxVocSta = Math.max(byDay[dayKey].maxVocSta, Number(rec.voc_sta));
+      if (rec.isc_trk) byDay[dayKey].maxIscTrk = Math.max(byDay[dayKey].maxIscTrk, Number(rec.isc_trk));
+      if (rec.isc_sta) byDay[dayKey].maxIscSta = Math.max(byDay[dayKey].maxIscSta, Number(rec.isc_sta));
+      if (rec.temp_trk || rec.temp_sta) {
+        byDay[dayKey].sumTempTrk += Number(rec.temp_trk || 0);
+        byDay[dayKey].sumTempSta += Number(rec.temp_sta || 0);
+        byDay[dayKey].tempCount++;
+      }
 
       const hour = d.getHours();
       const min = d.getMinutes();
@@ -393,6 +411,9 @@ export class FirebaseSolarService {
         const expectedStaWh = 1.018 * staWh;
         const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
 
+        const avgTempTrk = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_trk || 0);
+        const avgTempSta = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempSta / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_sta || 0);
+
         historyList[idx] = {
           ...historyList[idx],
           trackingWh: trkWh,
@@ -401,7 +422,14 @@ export class FirebaseSolarService {
           staticKwh: parseFloat((staWh / 1000).toFixed(3)),
           diffWh,
           diffKwh,
-          gainPercent: gain
+          gainPercent: gain,
+          voc_trk: dayInfo.maxVocTrk > 0 ? parseFloat(dayInfo.maxVocTrk.toFixed(2)) : (historyList[idx]?.voc_trk || 0),
+          voc_sta: dayInfo.maxVocSta > 0 ? parseFloat(dayInfo.maxVocSta.toFixed(2)) : (historyList[idx]?.voc_sta || 0),
+          isc_trk: dayInfo.maxIscTrk > 0 ? parseFloat(dayInfo.maxIscTrk.toFixed(2)) : (historyList[idx]?.isc_trk || 0),
+          isc_sta: dayInfo.maxIscSta > 0 ? parseFloat(dayInfo.maxIscSta.toFixed(2)) : (historyList[idx]?.isc_sta || 0),
+          temp_trk: avgTempTrk,
+          temp_sta: avgTempSta,
+          sample_count: dayInfo.count
         };
       }
     });
