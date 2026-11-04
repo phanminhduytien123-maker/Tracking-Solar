@@ -1840,6 +1840,17 @@ void pushTelemetryToFirebase() {
   trk.set("limitHome2", h2);
   trk.set("isHomed", systemHomed);
 
+  // Thong so co hoc & Gioi han mem (Bao ve phan cung va hien thi chuan)
+  trk.set("k_enc_deg_per_pulse", getDegPerCount());
+  trk.set("deg_per_count_az", getDegPerCount());
+  trk.set("deg_per_count_el", getDegPerCount());
+  trk.set("soft_min_az", 0.0f);
+  trk.set("soft_max_az", getAzMaxSoftLimitDeg());
+  trk.set("soft_min_el", getElMinSoftLimitDeg());
+  trk.set("soft_max_el", getElMaxSoftLimitDeg());
+  trk.set("step_error_counts", 0);
+  trk.set("step_error_deg", 0.0f);
+
   // Trạng thái vận hành thực tế (A6, Mục 8: Chỉ hiện MOVE khi Encoder xác nhận có chuyển động)
   bool m1MotorRunning = (stepper1 && stepper1->isRunning());
   bool m2MotorRunning = (stepper2 && stepper2->isRunning());

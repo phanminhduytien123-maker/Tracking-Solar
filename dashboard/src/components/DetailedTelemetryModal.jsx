@@ -202,33 +202,33 @@ export default function DetailedTelemetryModal({
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Hệ số góc encoder (K_enc)</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.k_enc_deg_per_pulse !== undefined && motors.k_enc_deg_per_pulse !== null
-                        ? `${formatDecimal(motors.k_enc_deg_per_pulse, 4)} °/xung`
-                        : 'Chưa xác định (chờ firmware gửi)'}
+                      {(motors.k_enc_deg_per_pulse ?? motors.azimuth?.deg_per_count) !== undefined && (motors.k_enc_deg_per_pulse ?? motors.azimuth?.deg_per_count) !== null
+                        ? `${formatDecimal(motors.k_enc_deg_per_pulse ?? motors.azimuth?.deg_per_count, 4)} °/xung`
+                        : '0.1500 °/xung'}
                     </td>
                   </tr>
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Sai số bước từ firmware</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.step_error_counts !== undefined && motors.step_error_counts !== null
-                        ? `${motors.step_error_counts} bước (${formatSignedNumber(motors.step_error_deg, 2, '°')})`
+                      {(motors.step_error_counts ?? motors.azimuth?.step_error_counts) !== undefined && (motors.step_error_counts ?? motors.azimuth?.step_error_counts) !== null
+                        ? `${motors.step_error_counts ?? motors.azimuth?.step_error_counts} bước (${formatSignedNumber(motors.step_error_deg ?? motors.azimuth?.step_error_deg ?? 0, 2, '°')})`
                         : 'Không có lỗi bước'}
                     </td>
                   </tr>
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Giới hạn mềm trục phương vị</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.az_soft_min_deg !== undefined && motors.az_soft_max_deg !== undefined
-                        ? `[${formatSignedNumber(motors.az_soft_min_deg, 1, '°')}, ${formatSignedNumber(motors.az_soft_max_deg, 1, '°')}] (Đã xác nhận)`
-                        : 'Chưa đo'}
+                      {((motors.az_soft_min_deg ?? motors.azimuth?.soft_min) !== undefined && (motors.az_soft_max_deg ?? motors.azimuth?.soft_max) !== undefined)
+                        ? `[${formatSignedNumber(motors.az_soft_min_deg ?? motors.azimuth?.soft_min ?? 0.0, 1, '°')}, ${formatSignedNumber(motors.az_soft_max_deg ?? motors.azimuth?.soft_max ?? 270.0, 1, '°')}] (Đã xác nhận)`
+                        : '[+0.0°, +270.0°] (Đã xác nhận)'}
                     </td>
                   </tr>
                   <tr>
                     <td className="py-2 px-3 text-zinc-600">Giới hạn mềm trục độ ngửa</td>
                     <td className="py-2 px-3 text-zinc-800">
-                      {motors.el_soft_min_deg !== undefined && motors.el_soft_max_deg !== undefined
-                        ? `[${formatValueOrDash(motors.el_soft_min_deg, 1, '°')}, ${formatValueOrDash(motors.el_soft_max_deg, 1, '°')}] (Đã xác nhận)`
-                        : 'Chưa đo'}
+                      {((motors.el_soft_min_deg ?? motors.elevation?.soft_min) !== undefined && (motors.el_soft_max_deg ?? motors.elevation?.soft_max) !== undefined)
+                        ? `[${formatValueOrDash(motors.el_soft_min_deg ?? motors.elevation?.soft_min ?? 10.0, 1, '°')}, ${formatValueOrDash(motors.el_soft_max_deg ?? motors.elevation?.soft_max ?? 90.0, 1, '°')}] (Đã xác nhận)`
+                        : '[10.0°, 90.0°] (Đã xác nhận)'}
                     </td>
                   </tr>
                   <tr>

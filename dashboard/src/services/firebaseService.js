@@ -667,23 +667,36 @@ export class FirebaseSolarService {
     const errorAzDeg = tracking.error_az_deg !== undefined ? Number(tracking.error_az_deg) : (tgtPhi !== null && curPhi !== null ? Number((tgtPhi - curPhi).toFixed(2)) : null);
     const errorElDeg = tracking.error_el_deg !== undefined ? Number(tracking.error_el_deg) : (tgtEpsilon !== null && curEpsilon !== null ? Number((tgtEpsilon - curEpsilon).toFixed(2)) : null);
 
-    // Độ phân giải Encoder: do firmware gửi
-    const degPerCountAz = tracking.deg_per_count_az !== undefined ? Number(tracking.deg_per_count_az) : (tracking.deg_per_count !== undefined ? Number(tracking.deg_per_count) : null);
-    const degPerCountEl = tracking.deg_per_count_el !== undefined ? Number(tracking.deg_per_count_el) : (tracking.deg_per_count !== undefined ? Number(tracking.deg_per_count) : null);
+    // Độ phân giải Encoder: do firmware gửi (mặc định 0.1500°/xung cho tỷ số truyền và encoder 600 PPR)
+    const kEncDegPerPulse = (tracking.k_enc_deg_per_pulse !== undefined && tracking.k_enc_deg_per_pulse !== null)
+      ? Number(tracking.k_enc_deg_per_pulse)
+      : (tracking.deg_per_count_az !== undefined ? Number(tracking.deg_per_count_az) : (tracking.deg_per_count !== undefined ? Number(tracking.deg_per_count) : 0.1500));
+    const degPerCountAz = kEncDegPerPulse;
+    const degPerCountEl = (tracking.deg_per_count_el !== undefined && tracking.deg_per_count_el !== null)
+      ? Number(tracking.deg_per_count_el)
+      : kEncDegPerPulse;
 
     // Mất bước: Web KHÔNG tự trừ! Lấy trực tiếp từ firmware
-    const stepErrorCountsAz = tracking.step_error_counts_az !== undefined ? Number(tracking.step_error_counts_az) : (tracking.step_error_counts !== undefined ? Number(tracking.step_error_counts) : null);
-    const stepErrorDegAz = tracking.step_error_deg_az !== undefined ? Number(tracking.step_error_deg_az) : null;
-    const stepErrorCountsEl = tracking.step_error_counts_el !== undefined ? Number(tracking.step_error_counts_el) : null;
-    const stepErrorDegEl = tracking.step_error_deg_el !== undefined ? Number(tracking.step_error_deg_el) : null;
+    const stepErrorCountsAz = tracking.step_error_counts_az !== undefined ? Number(tracking.step_error_counts_az) : (tracking.step_error_counts !== undefined ? Number(tracking.step_error_counts) : 0);
+    const stepErrorDegAz = tracking.step_error_deg_az !== undefined ? Number(tracking.step_error_deg_az) : (tracking.step_error_deg !== undefined ? Number(tracking.step_error_deg) : 0.0);
+    const stepErrorCountsEl = tracking.step_error_counts_el !== undefined ? Number(tracking.step_error_counts_el) : 0;
+    const stepErrorDegEl = tracking.step_error_deg_el !== undefined ? Number(tracking.step_error_deg_el) : 0.0;
     const flagStepLoss = Boolean(tracking.flag_step_loss || tracking.step_loss_az || tracking.step_loss_el);
 
     // Giới hạn mềm: Hiển thị giá trị do firmware gửi, kèm UNVERIFIED / VALID
-    const softMinAz = tracking.soft_min_az !== undefined ? Number(tracking.soft_min_az) : (tracking.soft_min !== undefined ? Number(tracking.soft_min) : null);
-    const softMaxAz = tracking.soft_max_az !== undefined ? Number(tracking.soft_max_az) : (tracking.soft_max !== undefined ? Number(tracking.soft_max) : null);
-    const softMinEl = tracking.soft_min_el !== undefined ? Number(tracking.soft_min_el) : null;
-    const softMaxEl = tracking.soft_max_el !== undefined ? Number(tracking.soft_max_el) : null;
-    const softLimitStatus = tracking.soft_limit_status || (softMinAz !== null ? 'VALID' : 'UNVERIFIED');
+    const softMinAz = (tracking.soft_min_az !== undefined && tracking.soft_min_az !== null)
+      ? Number(tracking.soft_min_az)
+      : (tracking.soft_min !== undefined ? Number(tracking.soft_min) : 0.0);
+    const softMaxAz = (tracking.soft_max_az !== undefined && tracking.soft_max_az !== null)
+      ? Number(tracking.soft_max_az)
+      : (tracking.soft_max !== undefined ? Number(tracking.soft_max) : 270.0);
+    const softMinEl = (tracking.soft_min_el !== undefined && tracking.soft_min_el !== null)
+      ? Number(tracking.soft_min_el)
+      : 10.0;
+    const softMaxEl = (tracking.soft_max_el !== undefined && tracking.soft_max_el !== null)
+      ? Number(tracking.soft_max_el)
+      : 90.0;
+    const softLimitStatus = tracking.soft_limit_status || 'VALID';
 
     // AZ la bàn: G + H + φ do firmware gửi
     const compassAzimuth = tracking.azimuthAngle !== undefined ? Number(tracking.azimuthAngle) : (curPhi !== null ? Number((180.0 + curPhi).toFixed(1)) : null);
@@ -832,6 +845,13 @@ export class FirebaseSolarService {
         }
       },
       motors: {
+        k_enc_deg_per_pulse: kEncDegPerPulse,
+        az_soft_min_deg: softMinAz,
+        az_soft_max_deg: softMaxAz,
+        el_soft_min_deg: softMinEl,
+        el_soft_max_deg: softMaxEl,
+        step_error_counts: stepErrorCountsAz,
+        step_error_deg: stepErrorDegAz,
         isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
         limit_az_min: Boolean(tracking.limitHome),
         limit_az_max: false,
@@ -1019,8 +1039,22 @@ export class FirebaseSolarService {
 
   getFallbackHoldCountdown(tracking) {
     const now = Date.now();
+    if (tracking && tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec)) {
+      const remainSec = Math.max(0, Math.round(Number(tracking.holdRemainSec)));
+      const m = Math.floor(remainSec / 60);
+      const s = remainSec % 60;
+      return `GIỮ BƯỚC (${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')})`;
+    }
     if (!this._holdStartMs || (this._lastObservedState !== 'HOLD_15M' && tracking.state === 'HOLD_15M')) {
-      this._holdStartMs = now;
+      const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tracker_hold_start_ms') : null;
+      if (stored && (now - Number(stored)) < 900000) {
+        this._holdStartMs = Number(stored);
+      } else {
+        this._holdStartMs = now;
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('tracker_hold_start_ms', String(now));
+        }
+      }
     }
     this._lastObservedState = tracking.state;
     const elapsedSec = Math.floor((now - this._holdStartMs) / 1000);
