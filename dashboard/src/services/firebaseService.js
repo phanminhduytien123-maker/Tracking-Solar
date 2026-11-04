@@ -585,9 +585,18 @@ export class FirebaseSolarService {
     } else if (tracking.state === 'MAX_HOLD' || tracking.status === 'MAX_HOLD') {
       displayState = 'GÓC MAX (GIỮ ĐẾN 19H)';
       rawState = 'MAX_HOLD';
-    } else if (tracking.state === 'HOLD_15M' || tracking.status === 'HOLD_15M') {
-      displayState = 'GIỮ BƯỚC (CHỜ 15P)';
+    } else if (tracking.state === 'HOLD_15M' || tracking.status === 'HOLD_15M' || (tracking.displayState && tracking.displayState.includes('GIỮ BƯỚC'))) {
       rawState = 'HOLD_15M';
+      if (tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec)) {
+        const sec = Math.max(0, Math.round(Number(tracking.holdRemainSec)));
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        displayState = `GIỮ BƯỚC (${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')})`;
+      } else if (tracking.displayState && tracking.displayState.includes('(') && !tracking.displayState.includes('CHỜ 15P')) {
+        displayState = tracking.displayState;
+      } else {
+        displayState = this.getFallbackHoldCountdown(tracking);
+      }
     } else if (tracking.state === 'TRACKING' || tracking.status === 'TRACKING_ACTIVE') {
       displayState = 'TRACKING (ĐANG BÁM)';
       rawState = 'TRACKING';
@@ -757,6 +766,9 @@ export class FirebaseSolarService {
         displayState,
         wakeAt,
         isSleeping,
+        holdRemainSec: (tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec))
+          ? Number(tracking.holdRemainSec)
+          : (rawState === 'HOLD_15M' ? (this._fallbackRemainSec || 900) : null),
         activeAlgorithm: tracking.activeAlgorithm || (hasAlgoData ? 'PSO_FUZZY_PID' : 'CHƯA CÓ DỮ LIỆU'),
         estop: Boolean(tracking.estop || tracking.emergencyActive),
         emergencyActive: Boolean(tracking.emergencyActive),
@@ -1003,6 +1015,21 @@ export class FirebaseSolarService {
       console.error('[Firebase Save SiteConfig Error]', err);
       return false;
     }
+  }
+
+  getFallbackHoldCountdown(tracking) {
+    const now = Date.now();
+    if (!this._holdStartMs || (this._lastObservedState !== 'HOLD_15M' && tracking.state === 'HOLD_15M')) {
+      this._holdStartMs = now;
+    }
+    this._lastObservedState = tracking.state;
+    const elapsedSec = Math.floor((now - this._holdStartMs) / 1000);
+    const totalSec = 15 * 60;
+    const remainSec = Math.max(0, totalSec - (elapsedSec % totalSec));
+    this._fallbackRemainSec = remainSec;
+    const m = Math.floor(remainSec / 60);
+    const s = remainSec % 60;
+    return `GIỮ BƯỚC (${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')})`;
   }
 
   async confirmSiteConfig(confirmedBy = 'admin') {

@@ -153,6 +153,20 @@ export default function Header({
               </span>
             </div>
 
+            {/* Trạng thái máy & Đếm ngược thời gian xoay */}
+            <div className="flex items-center gap-1">
+              <span>Trạng thái: </span>
+              <span className={`font-semibold ${
+                system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
+                  ? 'text-blue-700 dark:text-sky-300 font-mono'
+                  : system?.displayState && system?.displayState.includes('ĐIỀU CHỈNH')
+                  ? 'text-amber-700 dark:text-amber-300 font-mono animate-pulse'
+                  : 'text-zinc-900 dark:text-white'
+              }`}>
+                {system?.displayState || 'Bình thường'}
+              </span>
+            </div>
+
             {/* Trạng thái kết nối */}
             <div className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-red-600 dark:bg-rose-400'}`} />
