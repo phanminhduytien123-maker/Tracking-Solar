@@ -160,7 +160,24 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          let changed = false;
+          parsed.forEach((item) => {
+            if (item && item.date === '03/11' && item.trackingWh > 100) {
+              item.trackingWh = parseFloat((item.trackingWh / 10).toFixed(1));
+              item.staticWh = parseFloat((item.staticWh / 10).toFixed(1));
+              item.trackingKwh = parseFloat((item.trackingWh / 1000).toFixed(3));
+              item.staticKwh = parseFloat((item.staticWh / 1000).toFixed(3));
+              item.diffWh = parseFloat((item.trackingWh - item.staticWh).toFixed(1));
+              item.diffKwh = parseFloat(((item.trackingWh - item.staticWh) / 1000).toFixed(3));
+              changed = true;
+            }
+          });
+          if (changed) {
+            localStorage.setItem('solar_custom_history_30d', JSON.stringify(parsed));
+          }
+          return parsed;
+        }
       } catch (e) { }
     }
     return generate30DaysHistory();
@@ -171,6 +188,9 @@ export default function App() {
     setHistory30Days((prev) => {
       const next = prev.map((item) => (item.date === updatedRecord.date ? updatedRecord : item));
       localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      if (firebaseServiceRef.current && firebaseServiceRef.current.saveCustomHistory30d) {
+        firebaseServiceRef.current.saveCustomHistory30d(next);
+      }
       return next;
     });
   };
@@ -179,6 +199,9 @@ export default function App() {
     setHistory30Days((prev) => {
       const next = prev.filter((item) => item.date !== dateStr);
       localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      if (firebaseServiceRef.current && firebaseServiceRef.current.saveCustomHistory30d) {
+        firebaseServiceRef.current.saveCustomHistory30d(next);
+      }
       return next;
     });
   };
@@ -187,18 +210,27 @@ export default function App() {
     setHistory30Days((prev) => {
       const next = [...prev, newRecord];
       localStorage.setItem('solar_custom_history_30d', JSON.stringify(next));
+      if (firebaseServiceRef.current && firebaseServiceRef.current.saveCustomHistory30d) {
+        firebaseServiceRef.current.saveCustomHistory30d(next);
+      }
       return next;
     });
   };
 
   const handleResetHistoryData = () => {
     localStorage.removeItem('solar_custom_history_30d');
+    if (firebaseServiceRef.current && firebaseServiceRef.current.removeCustomHistory30d) {
+      firebaseServiceRef.current.removeCustomHistory30d();
+    }
     setHistory30Days(generate30DaysHistory());
   };
 
   const handleLoadRealisticDataset = () => {
     const dataset = generateRealistic30DaysDataset();
     localStorage.setItem('solar_custom_history_30d', JSON.stringify(dataset));
+    if (firebaseServiceRef.current && firebaseServiceRef.current.saveCustomHistory30d) {
+      firebaseServiceRef.current.saveCustomHistory30d(dataset);
+    }
     setHistory30Days(dataset);
   };
 
@@ -398,7 +430,36 @@ export default function App() {
           onHistory: (historyList, allProfiles, dates) => {
             if (historyList && historyList.length > 0) {
               setHistory30Days((prev) => {
-                const merged = [...historyList];
+                let customMap = new Map();
+                try {
+                  const saved = localStorage.getItem('solar_custom_history_30d');
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) {
+                      parsed.forEach((c) => {
+                        if (c && c.date) {
+                          if (c.date === '03/11' && c.trackingWh > 100) {
+                            c.trackingWh = parseFloat((c.trackingWh / 10).toFixed(1));
+                            c.staticWh = parseFloat((c.staticWh / 10).toFixed(1));
+                            c.trackingKwh = parseFloat((c.trackingWh / 1000).toFixed(3));
+                            c.staticKwh = parseFloat((c.staticWh / 1000).toFixed(3));
+                            c.diffWh = parseFloat((c.trackingWh - c.staticWh).toFixed(1));
+                            c.diffKwh = parseFloat(((c.trackingWh - c.staticWh) / 1000).toFixed(3));
+                          }
+                          customMap.set(c.date, c);
+                        }
+                      });
+                    }
+                  }
+                } catch (e) {}
+
+                const merged = historyList.map((item) => {
+                  if (customMap.has(item.date)) {
+                    return { ...item, ...customMap.get(item.date) };
+                  }
+                  return item;
+                });
+
                 const lastIdx = merged.length - 1;
                 if (prev && prev.length > 0 && prev[prev.length - 1].trackingWh > merged[lastIdx].trackingWh) {
                   merged[lastIdx] = { ...prev[prev.length - 1] };
