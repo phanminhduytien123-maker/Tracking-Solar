@@ -5,8 +5,8 @@ import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/da
 import { generate30DaysHistory, generateIntradayProfile } from './mockDataService';
 
 export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
-export const STALE_THRESHOLD_MS = 6000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
-export const DISCONNECT_THRESHOLD_MS = 15000; // 15 giây không có gói tin mới -> MẤT KẾT NỐI
+export const STALE_THRESHOLD_MS = 12000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
+export const DISCONNECT_THRESHOLD_MS = 35000; // 15 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
  * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.

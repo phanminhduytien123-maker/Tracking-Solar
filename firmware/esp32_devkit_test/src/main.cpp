@@ -1947,10 +1947,7 @@ void pushTelemetryToFirebase() {
     trk.set("rtcTemp", tC);
   }
 
-  // 1. Đẩy Telemetry Tấm Tracker lên /solar/tracking
-  Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trk);
-
-  // 2. Đẩy Telemetry Tấm Cố Định lên /solar/static (A12: đọc từ ParamRegistry)
+  // 1. Du lieu Tam Co Dinh (A12: doc tu ParamRegistry)
   FirebaseJson sta;
   sta.set("voltage", voltStaLive);
   sta.set("current", currStaLive);
@@ -1973,9 +1970,8 @@ void pushTelemetryToFirebase() {
   sta.set("tz", "UTC+7");
   sta.set("online", true);
   sta.set("source", "device");
-  Firebase.RTDB.updateNode(&fbdo, "/solar/static", &sta);
 
-  // 3. Đẩy thông số thích nghi Fuzzy-PID & PSO cho Dashboard hiển thị
+  // 2. Du lieu thong so thich nghi Fuzzy-PID & PSO cho Dashboard hien thi
   FirebaseJson algoJson;
   algoJson.set("algo_state", "CONVERGED");
   algoJson.set("name", "PSO_FUZZY_PID");
@@ -2006,7 +2002,13 @@ void pushTelemetryToFirebase() {
   algoJson.set("delta_kd_el", fzEl.deltaKd);
   algoJson.set("active_rule_el", fzEl.activeRule);
 
-  Firebase.RTDB.updateNode(&fbdo, "/solar/algorithm", &algoJson);
+  // 3. Dong goi CA 3 VAO 1 BAN TIN ATOMIC DUY NHAT day len /solar
+  // Giam 3 lan so lan ket noi HTTPS, chong nghen socket va dam bao dong bo hoan hao!
+  FirebaseJson root;
+  root.set("tracking", trk);
+  root.set("static", sta);
+  root.set("algorithm", algoJson);
+  Firebase.RTDB.updateNode(&fbdo, "/solar", &root);
 }
 
 // Kiểm tra lệnh điều khiển từ xa từ Web Dashboard (/solar/control)
