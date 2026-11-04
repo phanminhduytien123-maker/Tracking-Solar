@@ -2169,6 +2169,11 @@ void pushTelemetryToFirebase() {
   } else if (isDeviceSleeping) {
     trk.set("displayState", "NGỦ ĐÔNG (04:00)");
     trk.set("holdRemainSec", 0);
+  } else if (isMaxAzimuthReached) {
+    char maxBuf[32];
+    snprintf(maxBuf, sizeof(maxBuf), "GÓC MAX (GIỮ ĐẾN %02dH)", NIGHT_SLEEP_START_HOUR);
+    trk.set("displayState", maxBuf);
+    trk.set("holdRemainSec", 0);
   } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
     unsigned long holdDuration =
         (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f);
@@ -5202,8 +5207,8 @@ void loop() {
                   isMaxAzimuthReached = true;
                   Serial.printf("\n>> [MAX ANGLE REACHED] Gian pin da dat goc "
                                 "toi da cho phep (Phi=%+.1f° >= %+.1f°). DUNG "
-                                "IM GIU BUOC DEN 19:00!\n",
-                                getAngleDeg1(), maxAzLimit);
+                                "IM GIU BUOC DEN %02d:00!\n",
+                                getAngleDeg1(), maxAzLimit, NIGHT_SLEEP_START_HOUR);
                 } else {
                   trackCyclePhase = TRACK_CYCLE_HOLD;
                   trackHoldStartTimeMs = millis();
