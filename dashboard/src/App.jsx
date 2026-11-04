@@ -107,7 +107,18 @@ export default function App() {
   const [selectedLocation, setSelectedLocation] = useState(() => {
     const saved = localStorage.getItem('solar_custom_location');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { }
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.lat === 'number' && !isNaN(parsed.lat) && typeof parsed.lon === 'number' && !isNaN(parsed.lon)) {
+          // Tự động nâng cấp tọa độ cũ 10.7831 / 106.6721 lên 10.78816 / 106.66617
+          if (Math.abs(parsed.lat - 10.7831) < 0.0005 && Math.abs(parsed.lon - 106.6721) < 0.0005) {
+            parsed.lat = HCMC_COORDINATES.lat;
+            parsed.lon = HCMC_COORDINATES.lon;
+            localStorage.setItem('solar_custom_location', JSON.stringify(parsed));
+          }
+          return parsed;
+        }
+      } catch (e) { }
     }
     return HCMC_COORDINATES;
   });
@@ -295,17 +306,21 @@ export default function App() {
     if (dataSource === 'firebase' && firebaseServiceRef.current && firebaseConnected) {
       const unsub = firebaseServiceRef.current.listenSiteConfig((siteData) => {
         if (siteData && siteData.lat_deg && siteData.lon_deg) {
-          const currentRev = Number(localStorage.getItem('solar_site_rev') || 0);
-          if (siteData.rev > currentRev) {
-            localStorage.setItem('solar_site_rev', siteData.rev.toString());
-            const newLoc = {
-              lat: Number(Number(siteData.lat_deg).toFixed(5)),
-              lon: Number(Number(siteData.lon_deg).toFixed(5)),
-              locationName: siteData.location_name || 'Tọa độ từ Firebase',
-              ward: siteData.location_name || ''
-            };
-            setSelectedLocation(newLoc);
-            localStorage.setItem('solar_custom_location', JSON.stringify(newLoc));
+          const lat = parseFloat(String(siteData.lat_deg).replace(',', '.'));
+          const lon = parseFloat(String(siteData.lon_deg).replace(',', '.'));
+          if (!isNaN(lat) && !isNaN(lon)) {
+            const currentRev = Number(localStorage.getItem('solar_site_rev') || 0);
+            if ((siteData.rev || 0) >= currentRev) {
+              localStorage.setItem('solar_site_rev', String(siteData.rev || 1));
+              const newLoc = {
+                lat: Number(lat.toFixed(5)),
+                lon: Number(lon.toFixed(5)),
+                locationName: siteData.location_name || 'Tọa độ từ Firebase',
+                ward: siteData.location_name || ''
+              };
+              setSelectedLocation(newLoc);
+              localStorage.setItem('solar_custom_location', JSON.stringify(newLoc));
+            }
           }
         }
       });

@@ -345,8 +345,8 @@ export default function MapLocationModal({
             <div className="sm:col-span-3 space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Vĩ độ (Lat):</label>
               <input
-                type="number"
-                step="0.0001"
+                type="text"
+                inputMode="decimal"
                 value={selectedLat}
                 onChange={(e) => updateCoordinates(e.target.value, selectedLon)}
                 className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-amber-400"
@@ -357,8 +357,8 @@ export default function MapLocationModal({
             <div className="sm:col-span-3 space-y-1">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">Kinh độ (Lon):</label>
               <input
-                type="number"
-                step="0.0001"
+                type="text"
+                inputMode="decimal"
                 value={selectedLon}
                 onChange={(e) => updateCoordinates(selectedLat, e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-[#0a0c12] border border-zinc-700 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-amber-400"

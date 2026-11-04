@@ -5,8 +5,8 @@
  */
 
 export const HCMC_COORDINATES = {
-  lat: 10.7831,
-  lon: 106.6721,
+  lat: 10.78816,
+  lon: 106.66617,
   locationName: 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
   ward: 'Phường Nhiêu Lộc, TP.HCM',
   timezone: 'Asia/Ho_Chi_Minh',
@@ -17,8 +17,8 @@ export const DEFAULT_PRESET_LOCATIONS = [
     id: 'nhieu_loc',
     name: 'Phường Nhiêu Lộc, TP. Hồ Chí Minh',
     ward: 'Phường Nhiêu Lộc, TP.HCM',
-    lat: 10.7831,
-    lon: 106.6721,
+    lat: 10.78816,
+    lon: 106.66617,
     description: 'Vị trí lắp đặt hệ thống Solar Tracking'
   },
   {
