@@ -371,7 +371,7 @@ const uint32_t HOME_CREEP_SPEED_HZ = 200;  // Giai đoạn 3: Rà chậm tiếp 
 const int32_t  HOME_RETRACT_STEPS  = 300;  // Giai đoạn 2: Lùi nhả switch (~1.5 vòng vi bước)
 
 // Cấu hình khung giờ ngủ đêm và thức dậy (22:00 tối đến 04:00 sáng)
-const int NIGHT_SLEEP_START_HOUR   = 19;   // 19:00 (7:00 PM) - Người dùng cài đặt ngủ lúc 7h tối
+const int NIGHT_SLEEP_START_HOUR   = 18;   // 18:00 (6:00 PM) - Cài đặt ngủ lúc 18h tối (6h tối)
 const int NIGHT_SLEEP_END_HOUR     = 4;    // 04:00 (4:00 AM)
 
 // -------------------------------------------------------------------------
@@ -886,7 +886,7 @@ void enterNightSleepUntil4AM() {
   }
 
   Serial.println("\n=======================================================");
-  Serial.println(">> [NIGHT STANDBY 19:00] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
+  Serial.println(">> [NIGHT STANDBY 18:00] BAT DAU QUY TRINH NGU DEM TOI 04:00 SANG!");
   Serial.println("   1. Auto Homing 2 truc ve switch (chot goc 0.0°)");
   Serial.println("   2. Truc 1 giu moc Home (0.0°), Truc 2 quay ve goc MAX (tua co cau an toan)");
   Serial.println("   3. Driver DM556 tu ngat xung -> Chuyen Half-Current giu buoc 50%");
@@ -3717,7 +3717,7 @@ void loop() {
           Serial.println("   - Track theo thien van NOAA + Hieu chinh tinh bang TEMT6000.");
           Serial.println("   - Khi on dinh: Dung im giu buoc trong 15 phut roi moi quay tiep.");
           Serial.println("   - Khi cham goc max: Khoa goc dung im giu buoc den 19:00.");
-          Serial.println("   - 19:00 toi: Park ve 0°/90° va Light Sleep den 04:00 sang.");
+          Serial.println("   - 18:00 toi: Park ve 0°/90° va Light Sleep den 04:00 sang.");
           Serial.println("=======================================================\n");
         }
         break;

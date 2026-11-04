@@ -78,7 +78,7 @@ export default function EmergencyModal({
                 <Check className="w-4 h-4" /> Khôi phục vận hành tự động
               </p>
               <p className="text-xs">
-                Khi xác nhận mở khóa, giàn pin sẽ tự động chạy Homing lại cả 2 trục về Switch để chốt mốc tuyệt đối, sau đó khôi phục lại chu trình <strong>Hybrid Tracking</strong> (hoặc về tư thế ngủ đêm nếu quá 19:00).
+                Khi xác nhận mở khóa, giàn pin sẽ tự động chạy Homing lại cả 2 trục về Switch để chốt mốc tuyệt đối, sau đó khôi phục lại chu trình <strong>Hybrid Tracking</strong> (hoặc về tư thế ngủ đêm nếu vào khung giờ ngủ 18:00 - 04:00).
               </p>
             </div>
           ) : (
