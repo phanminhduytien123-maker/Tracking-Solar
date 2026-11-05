@@ -377,7 +377,7 @@ export default function ManualControlModal({
 
             {isSleeping && (
               <div className="text-[11px] text-indigo-700 bg-indigo-50/80 border border-indigo-200 px-2.5 py-1 rounded-xs font-medium flex items-center gap-1.5">
-                <span>🌙</span>
+                <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>Hệ thống đang ở trạng thái ngủ đông. Nút <b>[Test Wake Up]</b> đã sẵn sàng để thử nghiệm thức dậy!</span>
               </div>
             )}

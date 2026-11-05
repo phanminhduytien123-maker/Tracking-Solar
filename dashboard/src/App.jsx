@@ -136,16 +136,18 @@ export default function App() {
   };
 
   // Theme Mode (Light / Dark)
-  const [themeMode, setThemeMode] = useState(() => {
-    const manualOverride = sessionStorage.getItem('solar_theme_manual_override');
-    if (manualOverride === 'dark' || manualOverride === 'light') {
-      return manualOverride;
-    }
-    return getAutoThemeByTime();
-  });
+  // Mỗi khi mở trang hoặc reload, LUÔN tính toán lại theo mốc giờ thực tế hiện tại
+  const [themeMode, setThemeMode] = useState(() => getAutoThemeByTime());
+
+  // Xóa sạch cache cũ để mỗi lần reload trang luôn tính theo mốc giờ
+  useEffect(() => {
+    try {
+      localStorage.removeItem('solar_theme_mode');
+      sessionStorage.removeItem('solar_theme_manual_override');
+    } catch (e) { }
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('solar_theme_mode', themeMode);
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -153,24 +155,17 @@ export default function App() {
     }
   }, [themeMode]);
 
-  // Kiểm tra định kỳ mỗi 30s để tự động chuyển giao diện nếu đến mốc 18:00 hoặc 04:00
+  // Kiểm tra định kỳ mỗi 30s để tự động chuyển giao diện nếu qua mốc 18:00 hoặc 04:00
   useEffect(() => {
     const timer = setInterval(() => {
-      const manualOverride = sessionStorage.getItem('solar_theme_manual_override');
-      if (!manualOverride) {
-        const expected = getAutoThemeByTime();
-        setThemeMode((prev) => (prev !== expected ? expected : prev));
-      }
+      const expected = getAutoThemeByTime();
+      setThemeMode((prev) => (prev !== expected ? expected : prev));
     }, 30000);
     return () => clearInterval(timer);
   }, []);
 
   const toggleTheme = () => {
-    setThemeMode((prev) => {
-      const next = (prev === 'dark' ? 'light' : 'dark');
-      sessionStorage.setItem('solar_theme_manual_override', next);
-      return next;
-    });
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
   // Engine instances
