@@ -2146,15 +2146,7 @@ void parkPanels() {
   stepPositionControl(2, 90.0f, 1500);
   stepPositionControl(1, 0.0f, 1500);
 
-  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
-    FirebaseJson parkJson;
-    parkJson.set("state", "PARK");
-    parkJson.set("status", "PARKED");
-    parkJson.set("target_az", 0.0f);
-    parkJson.set("target_el", 90.0f);
-    parkJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &parkJson);
-  }
+  telemetryDirty = true;
 }
 
 // -------------------------------------------------------------------------
