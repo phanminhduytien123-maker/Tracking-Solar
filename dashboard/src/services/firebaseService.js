@@ -631,9 +631,10 @@ export class FirebaseSolarService {
       displayState = 'DỮ LIỆU CŨ';
       rawState = 'STALE';
     } else if (isSleeping) {
+      const cleanWake = wakeAt ? `NGỦ ĐÔNG (${wakeAt})` : 'NGỦ ĐÔNG';
       displayState = (tracking.displayState && (tracking.displayState.includes('NGỦ') || tracking.displayState.includes('04:00')))
-        ? tracking.displayState
-        : (wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG');
+        ? tracking.displayState.replace(/🌙\s*/g, '').trim()
+        : cleanWake;
       rawState = 'DEEP_SLEEP';
     } else if (tracking.state === 'MAX_HOLD' || tracking.status === 'MAX_HOLD') {
       displayState = (tracking.displayState && tracking.displayState.includes('GÓC MAX')) ? tracking.displayState.replace(/19H/gi, '18H') : 'GÓC MAX (GIỮ ĐẾN 18H)';
@@ -671,7 +672,11 @@ export class FirebaseSolarService {
     }
 
     if (typeof displayState === 'string') {
-      displayState = displayState.replace(/19H/gi, '18H').replace(/19:00/g, '18:00');
+      displayState = displayState
+        .replace(/🌙\s*/g, '')
+        .replace(/19H/gi, '18H')
+        .replace(/19:00/g, '18:00')
+        .trim();
     }
 
     // 4. ĐO LƯỜNG ĐIỆN NĂNG INA226
