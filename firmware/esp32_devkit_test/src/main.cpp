@@ -102,6 +102,7 @@ void saveLastHandledCmdId(const String &cmdId, uint64_t emgTs = 0) {
 }
 void parkPanels();
 
+bool readDS3231(int &y, int &m, int &d, int &hh, int &mm, int &ss, float &tC);
 void requestTelemetryPrint() { telemetryDirty = true; }
 
 // Khai báo trước hàm điều khiển vị trí góc & Homing cả 2 trục
@@ -447,6 +448,29 @@ bool homedAz = false;
 bool homedEl = false;
 bool systemHomed = false;
 bool homingFault = false;
+
+// Theo doi so lan Homing va ly do trong ngay (Yeu cau 2)
+uint32_t dailyHomingCount = 0;
+char lastHomingReason[24] = "boot";
+int lastHomingDay = -1;
+
+void recordHomingEvent(const char* reason) {
+  int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+  float curT = 0.0f;
+  if (readDS3231(curY, curM, curD, curH, curMin, curS, curT)) {
+    if (lastHomingDay != curD) {
+      lastHomingDay = curD;
+      dailyHomingCount = 0;
+    }
+  }
+  dailyHomingCount++;
+  if (reason) {
+    strncpy(lastHomingReason, reason, sizeof(lastHomingReason) - 1);
+    lastHomingReason[sizeof(lastHomingReason) - 1] = '\0';
+  }
+  Serial.printf(">> [HOMING EVENT] Ly do: %s | So lan homing trong ngay: %lu\n",
+                lastHomingReason, (unsigned long)dailyHomingCount);
+}
 
 // Tốc độ (Hz = steps/s) và Gia tốc (steps/s^2) phần cứng FastAccelStepper (Mặc
 // định êm ái, an toàn, mô-men xoắn cao)
@@ -1129,22 +1153,23 @@ void wakeUpAtDawn() {
       ">> =======================================================\n");
 
   systemFsmState = FSM_STATE_HOMING;
+  telemetryDirty = true;
 
-  // 1. Cập nhật ngay Firebase vì WiFi đang online sẵn
-  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
-    FirebaseJson wakeJson;
-    wakeJson.set("isSleeping", false);
-    wakeJson.set("wake_at", "AWAKE");
-    wakeJson.set("state", "HOMING");
-    wakeJson.set("status", "WAKEUP_DAWN");
-    wakeJson.set("displayState", "Thuc day don binh minh");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &wakeJson);
+  // 2. Kiem tra HOME_ON_WAKE (Yeu cau 4: bo homing va seek-default neu toa do HOME hop le)
+  bool homeOnWake = (ParamRegistry.getInt("HOME_ON_WAKE", 0) == 1);
+  bool needHoming = homeOnWake || !systemHomed || !homedAz || !homedEl;
+
+  if (needHoming) {
+    Serial.println(">> [DAWN HOMING] Tu dong Dual Auto Homing ca 2 truc sau khi thuc day...");
+    recordHomingEvent("04:00");
+    if (!runDualHomingToSwitches()) {
+      Serial.println(">> [LOI DAWN] Homing thuc day that bai! Set FAULT.");
+      systemFsmState = FSM_STATE_FAULT;
+      return;
+    }
+  } else {
+    Serial.println(">> [DAWN WAKE] He thong da o toa do HOME hop le (HOME_ON_WAKE=0) -> Bo qua Homing va Seek Default thua!");
   }
-
-  // 2. Homing lại cả 2 trục và đưa về vị trí mặc định đón ngày mới
-  Serial.println(">> [DAWN HOMING] Tu dong Dual Auto Homing ca 2 truc sau khi "
-                 "thuc day...");
-  runDualAutoHoming();
 
   // 3. Trục 1: Tính toán góc phương vị mặt trời mọc hôm nay theo NOAA và quay
   // đón sẵn
