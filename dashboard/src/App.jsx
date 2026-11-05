@@ -740,6 +740,27 @@ export default function App() {
     alert('Đã phát xung Test DIR tốc độ chậm, dòng thấp để kiểm tra cực tính quay an toàn!');
   };
 
+  const handleTestSleep = () => {
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.testSleep();
+    }
+    alert('Đã gửi lệnh [Test Ngủ]: Hệ thống sẽ Homing 2 trục rồi chuyển sang tư thế ngủ an toàn ngay lập tức (không ảnh hưởng giờ RTC).');
+  };
+
+  const handleTestWake = () => {
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.testWake();
+    }
+    alert('Đã gửi lệnh [Test Wake Up]: Hệ thống sẽ Homing 2 trục rồi quay sang tư thế đón bình minh.');
+  };
+
+  const handleResumeReal = () => {
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.resumeReal();
+    }
+    alert('Đã gửi lệnh [Quay về trạng thái thật]: Hệ thống sẽ Homing 2 trục rồi bám mặt trời thực tế theo giờ RTC.');
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -956,6 +977,9 @@ export default function App() {
         onReHome={handleReHome}
         onResetFault={handleResetFault}
         onTestDir={handleTestDir}
+        onTestSleep={handleTestSleep}
+        onTestWake={handleTestWake}
+        onResumeReal={handleResumeReal}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
       />
