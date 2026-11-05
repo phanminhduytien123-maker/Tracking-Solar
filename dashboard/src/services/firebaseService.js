@@ -618,7 +618,7 @@ export class FirebaseSolarService {
     const isSystemOnline = (trkConnStatus !== 'DISCONNECTED' || staConnStatus !== 'DISCONNECTED');
 
     // 3. THỐNG NHẤT TRẠNG THÁI HỆ THỐNG GIỮA THẺ NGOÀI VÀ MODAL
-    const isSleeping = (tracking.state === 'DEEP_SLEEP' || tracking.isSleeping === true) && tracking.state !== 'TRACKING' && tracking.state !== 'HOLD_15M' && tracking.state !== 'MOVE' && tracking.status !== 'TRACKING_ACTIVE';
+    const isSleeping = (tracking.state === 'DEEP_SLEEP' || tracking.state === 'SLEEP' || tracking.isSleeping === true || tracking.status === 'SLEEP') && !tracking.emergencyActive;
     const wakeAt = tracking.wake_at || tracking.wakeAt || null;
 
     let displayState = 'MẤT KẾT NỐI';
@@ -631,7 +631,9 @@ export class FirebaseSolarService {
       displayState = 'DỮ LIỆU CŨ';
       rawState = 'STALE';
     } else if (isSleeping) {
-      displayState = wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG';
+      displayState = (tracking.displayState && (tracking.displayState.includes('NGỦ') || tracking.displayState.includes('04:00')))
+        ? tracking.displayState
+        : (wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG');
       rawState = 'DEEP_SLEEP';
     } else if (tracking.state === 'MAX_HOLD' || tracking.status === 'MAX_HOLD') {
       displayState = (tracking.displayState && tracking.displayState.includes('GÓC MAX')) ? tracking.displayState.replace(/19H/gi, '18H') : 'GÓC MAX (GIỮ ĐẾN 18H)';

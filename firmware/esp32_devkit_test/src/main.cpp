@@ -2398,18 +2398,22 @@ void pushTelemetryToFirebase() {
   } else if (currentTrackSource != TRACK_SRC_OFF) {
     stStr = "TRACKING";
   }
-  trk.set("state", stStr);
-  trk.set("status", isEmergencyCoverActive
-                        ? "EMERGENCY_STOP"
-                        : (isMoving ? "MOVE"
-                                    : ((currentTrackSource != TRACK_SRC_OFF)
-                                           ? "TRACKING_ACTIVE"
-                                           : "STABLE")));
-  trk.set("emergencyActive", (bool)isEmergencyCoverActive);
   bool isDeviceSleeping = (systemFsmState == FSM_STATE_PREP_SLEEP ||
                            systemFsmState == FSM_STATE_LIGHT_SLEEP);
   trk.set("isSleeping", isDeviceSleeping);
   trk.set("isTestSleep", (bool)isTestSleepMode);
+
+  trk.set("state", stStr);
+  trk.set("status", isEmergencyCoverActive
+                        ? "EMERGENCY_STOP"
+                        : (isDeviceSleeping
+                               ? "SLEEP"
+                               : (isMoving ? "MOVE"
+                                           : ((currentTrackSource != TRACK_SRC_OFF)
+                                                  ? "TRACKING_ACTIVE"
+                                                  : "STABLE"))));
+  trk.set("emergencyActive", (bool)isEmergencyCoverActive);
+
   if (isTestSleepMode) {
     trk.set("wake_at", "TEST_SLEEP");
     trk.set("displayState", "🌙 TEST NGỦ ĐÔNG (CHỜ WAKE/RESET)");
@@ -2420,37 +2424,37 @@ void pushTelemetryToFirebase() {
     trk.set("holdRemainSec", 0);
   } else {
     trk.set("wake_at", "AWAKE");
-  }
-  if (homingFault || systemFsmState == FSM_STATE_FAULT) {
-    trk.set("displayState", "LOI HOMING (CAN KIEM TRA)");
-  } else if (isEmergencyCoverActive) {
-    trk.set("displayState", "KHẨN CẤP (Góc Max phủ bạt)");
-    trk.set("holdRemainSec", 0);
-  } else if (isMaxAzimuthReached) {
-    char maxBuf[32];
-    snprintf(maxBuf, sizeof(maxBuf), "GÓC MAX (GIỮ ĐẾN %02dH)", NIGHT_SLEEP_START_HOUR);
-    trk.set("displayState", maxBuf);
-    trk.set("holdRemainSec", 0);
-  } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
-    unsigned long holdDuration =
-        (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f);
-    if (holdDuration < 60000UL)
-      holdDuration = 900000UL;
-    unsigned long elapsedHold = millis() - trackHoldStartTimeMs;
-    unsigned long remainSec = (holdDuration > elapsedHold)
-                                  ? ((holdDuration - elapsedHold) / 1000UL)
-                                  : 0;
-    char holdBuf[32];
-    snprintf(holdBuf, sizeof(holdBuf), "GIỮ BƯỚC (%02lu:%02lu)", remainSec / 60,
-             remainSec % 60);
-    trk.set("displayState", holdBuf);
-    trk.set("holdRemainSec", (int)remainSec);
-  } else if (trackCyclePhase == TRACK_CYCLE_ADJUSTING) {
-    trk.set("displayState", "ĐANG ĐIỀU CHỈNH");
-    trk.set("holdRemainSec", 0);
-  } else {
-    trk.set("displayState", stStr);
-    trk.set("holdRemainSec", 0);
+    if (homingFault || systemFsmState == FSM_STATE_FAULT) {
+      trk.set("displayState", "LOI HOMING (CAN KIEM TRA)");
+    } else if (isEmergencyCoverActive) {
+      trk.set("displayState", "KHẨN CẤP (Góc Max phủ bạt)");
+      trk.set("holdRemainSec", 0);
+    } else if (isMaxAzimuthReached) {
+      char maxBuf[32];
+      snprintf(maxBuf, sizeof(maxBuf), "GÓC MAX (GIỮ ĐẾN %02dH)", NIGHT_SLEEP_START_HOUR);
+      trk.set("displayState", maxBuf);
+      trk.set("holdRemainSec", 0);
+    } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
+      unsigned long holdDuration =
+          (unsigned long)ParamRegistry.get("TRACK_INTERVAL_MS", 900000.0f);
+      if (holdDuration < 60000UL)
+        holdDuration = 900000UL;
+      unsigned long elapsedHold = millis() - trackHoldStartTimeMs;
+      unsigned long remainSec = (holdDuration > elapsedHold)
+                                    ? ((holdDuration - elapsedHold) / 1000UL)
+                                    : 0;
+      char holdBuf[32];
+      snprintf(holdBuf, sizeof(holdBuf), "GIỮ BƯỚC (%02lu:%02lu)", remainSec / 60,
+               remainSec % 60);
+      trk.set("displayState", holdBuf);
+      trk.set("holdRemainSec", (int)remainSec);
+    } else if (trackCyclePhase == TRACK_CYCLE_ADJUSTING) {
+      trk.set("displayState", "ĐANG ĐIỀU CHỈNH");
+      trk.set("holdRemainSec", 0);
+    } else {
+      trk.set("displayState", stStr);
+      trk.set("holdRemainSec", 0);
+    }
   }
 
   // Nguồn thuật toán bám (Mục 4 & 5): EPHEMERIS_ONLY, SENSOR_ONLY, HYBRID, NONE
