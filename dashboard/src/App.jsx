@@ -127,9 +127,21 @@ export default function App() {
   const [showWeatherSwitcher, setShowWeatherSwitcher] = useState(false);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
 
+  // Tự động xác định chế độ giao diện theo mốc thời gian:
+  // - Sau 18:00 (6h tối) hoặc trước 04:00 sáng: Mặc định chế độ tối ('dark')
+  // - Sau 04:00 sáng đến trước 18:00 tối: Mặc định chế độ sáng ('light')
+  const getAutoThemeByTime = () => {
+    const curHour = new Date().getHours();
+    return (curHour >= 18 || curHour < 4) ? 'dark' : 'light';
+  };
+
   // Theme Mode (Light / Dark)
   const [themeMode, setThemeMode] = useState(() => {
-    return localStorage.getItem('solar_theme_mode') || 'light';
+    const manualOverride = sessionStorage.getItem('solar_theme_manual_override');
+    if (manualOverride === 'dark' || manualOverride === 'light') {
+      return manualOverride;
+    }
+    return getAutoThemeByTime();
   });
 
   useEffect(() => {
@@ -141,8 +153,24 @@ export default function App() {
     }
   }, [themeMode]);
 
+  // Kiểm tra định kỳ mỗi 30s để tự động chuyển giao diện nếu đến mốc 18:00 hoặc 04:00
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const manualOverride = sessionStorage.getItem('solar_theme_manual_override');
+      if (!manualOverride) {
+        const expected = getAutoThemeByTime();
+        setThemeMode((prev) => (prev !== expected ? expected : prev));
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   const toggleTheme = () => {
-    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    setThemeMode((prev) => {
+      const next = (prev === 'dark' ? 'light' : 'dark');
+      sessionStorage.setItem('solar_theme_manual_override', next);
+      return next;
+    });
   };
 
   // Engine instances
