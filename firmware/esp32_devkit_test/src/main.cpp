@@ -449,6 +449,10 @@ bool homedEl = false;
 bool systemHomed = false;
 bool homingFault = false;
 
+// Do sai so vi tri Homing lan cham 1 (Yeu cau 5)
+float homeErrorDeg1 = 0.0f;
+float homeErrorDeg2 = 0.0f;
+
 // Theo doi so lan Homing va ly do trong ngay (Yeu cau 2)
 uint32_t dailyHomingCount = 0;
 char lastHomingReason[24] = "boot";
@@ -2347,6 +2351,10 @@ void pushTelemetryToFirebase() {
   trk.set("homedAz", homedAz);
   trk.set("homedEl", homedEl);
   trk.set("homingFault", homingFault);
+  trk.set("daily_homing_count", (int)dailyHomingCount);
+  trk.set("last_homing_reason", lastHomingReason);
+  trk.set("home_error_deg_az", homeErrorDeg1);
+  trk.set("home_error_deg_el", homeErrorDeg2);
 
   // Thong so co hoc & Gioi han mem (Bao ve phan cung va hien thi chuan)
   trk.set("k_enc_deg_per_pulse", getDegPerCount());
@@ -3167,9 +3175,11 @@ bool homeAxisToSwitch(int axis) {
   // =========================================================================
 
   // --- LẦN 1: TIẾP CẬN NHANH (Fast Approach 1200 Hz) ---
+  // Timeout tinh theo hanh trinh (>= 60s cho Azimuth hanh trinh 147° - Yeu cau 5)
+  uint32_t timeoutTouch1 = (axis == 1) ? 65000 : 35000;
   Serial.printf(
-      ">> [%s HOMING 1/3] Dang chay nhanh tiep can Home (1200 Hz)...\n",
-      axisName);
+      ">> [%s HOMING 1/3] Dang chay nhanh tiep can Home (1200 Hz, Timeout: %lu s)...\n",
+      axisName, (unsigned long)(timeoutTouch1 / 1000));
   s->setSpeedInHz(HOME_FAST_SPEED_HZ);
   s->setAcceleration(stepperAccel);
   s->runBackward();
@@ -3177,22 +3187,29 @@ bool homeAxisToSwitch(int axis) {
   while (!isTriggered()) {
     if (checkCancel())
       return false;
-    if (millis() - tStart > 35000) {
+    if (millis() - tStart > timeoutTouch1) {
       s->stopMove();
       stateM1 = STATE_IDLE;
       stateM2 = STATE_IDLE;
       Serial.printf(
-          "\n>> [CANH BAO AN TOAN %s] Timeout 35s o lan cham 1! Da dung.\n",
-          axisName);
+          "\n>> [CANH BAO AN TOAN %s] Timeout %lu s o lan cham 1! Da dung.\n",
+          axisName, (unsigned long)(timeoutTouch1 / 1000));
       requestTelemetryPrint();
       return false;
     }
     delay(1);
   }
+
+  // Ghi nhan home_error_deg: vi tri xung luc cham lan 1 so voi 0 (Yeu cau 5)
+  int32_t touch1Enc = (axis == 1) ? getEncoderCount1() : getEncoderCount2();
+  float errDeg1 = (float)touch1Enc * getDegPerCount();
+  if (axis == 1) homeErrorDeg1 = errDeg1;
+  else homeErrorDeg2 = errDeg1;
+
   s->forceStopAndNewPosition(0);
   Serial.printf(
-      ">> [%s HOMING 1/3 OK] Da cham switch lan 1! Dung ngay lap tuc.\n",
-      axisName);
+      ">> [%s HOMING 1/3 OK] Da cham switch lan 1! home_error_deg = %+.3f° (%ld counts)\n",
+      axisName, errDeg1, (long)touch1Enc);
   delay(250); // Nghỉ 0.25s triệt tiêu quán tính
 
   // --- LÙI NHẢ SWITCH LẦN 1 (Bắt buộc lùi cơ khí kéo dài >= 0.5s chống nhiễu
@@ -3329,7 +3346,20 @@ bool homeAxisToSwitch(int axis) {
     }
     delay(1);
   }
+  // Kiem chung lan cham 3 so voi lan cham 2 (Yeu cau 5)
+  int32_t touch3StepPos = s->getCurrentPosition();
   s->forceStopAndNewPosition(0);
+
+  int32_t diffSteps23 = abs(touch3StepPos);
+  float diffDeg23 = (float)diffSteps23 / getPulsesPerCount() * getDegPerCount();
+  Serial.printf(">> [%s KIEM CHUNG 3 vs 2] Sai lech vi tri cham: %ld buoc (%+.3f°)\n",
+                axisName, (long)diffSteps23, diffDeg23);
+
+  // Nguong sai lech cho phep giua 2 lan cham tinh: 30 buoc (~0.14°)
+  if (diffSteps23 > 30) {
+    Serial.printf(">> [CANH BAO HOMING] Sai lech giua lan 3 va 2 vuot nguong (%ld buoc > 30 buoc)!\n",
+                  (long)diffSteps23);
+  }
 
   // Đo độ lặp lại cơ học Homing (Repeatability Metric)
   int32_t touchCnt = (axis == 1) ? getEncoderCount1() : getEncoderCount2();
