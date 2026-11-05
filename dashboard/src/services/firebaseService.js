@@ -634,7 +634,7 @@ export class FirebaseSolarService {
       displayState = wakeAt ? `🌙 NGỦ ĐÔNG (${wakeAt})` : '🌙 NGỦ ĐÔNG';
       rawState = 'DEEP_SLEEP';
     } else if (tracking.state === 'MAX_HOLD' || tracking.status === 'MAX_HOLD') {
-      displayState = (tracking.displayState && tracking.displayState.includes('GÓC MAX')) ? tracking.displayState : 'GÓC MAX (GIỮ ĐẾN 18H)';
+      displayState = (tracking.displayState && tracking.displayState.includes('GÓC MAX')) ? tracking.displayState.replace(/19H/gi, '18H') : 'GÓC MAX (GIỮ ĐẾN 18H)';
       rawState = 'MAX_HOLD';
     } else if (tracking.state === 'HOLD_15M' || tracking.status === 'HOLD_15M' || (tracking.displayState && tracking.displayState.includes('GIỮ BƯỚC'))) {
       rawState = 'HOLD_15M';

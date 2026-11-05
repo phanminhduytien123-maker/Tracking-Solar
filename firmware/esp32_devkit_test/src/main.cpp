@@ -1171,12 +1171,14 @@ void checkStallProtection() {
 
       if (deltaSteps > (int32_t)(stallThreshCounts * pulsesPerCount) &&
           deltaEnc < 2) {
-        stepper1->stopMove();
+        stepper1->forceStop();
         stateM1 = STATE_IDLE;
+        currentTrackSource = TRACK_SRC_OFF;
         autoOpticalTracking = false;
+        systemFsmState = FSM_STATE_FAULT;
         Serial.printf(
             "\n>> [STALL / NO_MOTION M1] PHAT HIEN KET TRUC 1 HOAC MAT NGUON "
-            "24V! (Phat: %ld xung, Encoder chi nhich: %ld count)\n",
+            "24V! NGAT TRACKING & CHUYEN FAULT! (Phat: %ld xung, Encoder chi nhich: %ld count)\n",
             (long)deltaSteps, (long)deltaEnc);
         m1WasRunning = false;
       }
@@ -1205,12 +1207,14 @@ void checkStallProtection() {
 
       if (deltaSteps > (int32_t)(stallThreshCounts * pulsesPerCount) &&
           deltaEnc < 2) {
-        stepper2->stopMove();
+        stepper2->forceStop();
         stateM2 = STATE_IDLE;
+        currentTrackSource = TRACK_SRC_OFF;
         autoOpticalTracking = false;
+        systemFsmState = FSM_STATE_FAULT;
         Serial.printf(
             "\n>> [STALL / NO_MOTION M2] PHAT HIEN KET TRUC 2 HOAC MAT NGUON "
-            "24V! (Phat: %ld xung, Encoder chi nhich: %ld count)\n",
+            "24V! NGAT TRACKING & CHUYEN FAULT! (Phat: %ld xung, Encoder chi nhich: %ld count)\n",
             (long)deltaSteps, (long)deltaEnc);
         m2WasRunning = false;
       }
@@ -1759,8 +1763,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
   float pulsesPerCount = getPulsesPerCount();
 
   if (axis == 1) {
-    // Trục 1: Azimuth (Phi). Home = 0.0°, Giới hạn mềm =
-    // CFG_I_AZ_MAX_SOFT_LIMIT_DEG
+    // Trục 1: Azimuth (Phi). Home = 0.0°, Giới hạn mềm = CFG_I_AZ_MAX_SOFT_LIMIT_DEG
     float maxLimit = CFG_I_AZ_MAX_SOFT_LIMIT_DEG;
     float safeMax = maxLimit - 0.2f;
     targetDeg = clampVal(targetDeg, 0.0f, safeMax);
@@ -1782,8 +1785,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         (targetDeg >= safeMax - 0.3f && curDeg >= safeMax - deadbandDeg)) {
       if (s->isRunning())
         s->stopMove();
-      return true; // Đã đạt vị trí cân bằng trong dải chết hoặc đã chạm góc max
-                   // an toàn
+      return true; // Đã đạt vị trí cân bằng trong dải chết hoặc đã chạm góc max an toàn
     }
 
     if (errDeg > 0.0f) {
@@ -1791,32 +1793,37 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
       if (curDeg >= safeMax || !checkMotionAllowed(1, 1)) {
         if (s->isRunning())
           s->stopMove();
-        return true; // Đã chạm giới hạn mềm max, không quay tiếp và coi như cân
-                     // bằng
-      }
-      int32_t steps = (int32_t)((errDeg / degPerCount) * getPulsesPerCount());
-      if (steps > 0) {
-        s->setSpeedInHz(speedHz);
-        s->setAcceleration(stepperAccel);
-        s->move(steps);
+        return true;
       }
     } else {
       // Cần giảm góc -> Quay về phía Home (DIR_TOWARD_HOME)
-      if (isHome1Triggered() || !checkMotionAllowed(1, -1)) {
+      if (isHome1Triggered() || curDeg <= 0.0f || !checkMotionAllowed(1, -1)) {
         if (s->isRunning())
           s->stopMove();
         return false;
       }
-      int32_t steps = (int32_t)((-errDeg / degPerCount) * getPulsesPerCount());
-      if (steps > 0) {
-        s->setSpeedInHz(speedHz);
-        s->setAcceleration(stepperAccel);
-        s->move(-steps);
+    }
+
+    // ĐIỀU KHIỂN VỊ TRÍ TUYỆT ĐỐI (ABSOLUTE POSITIONING):
+    // Tuyệt đối không dùng relative move(steps) định kỳ để tránh tích lũy xung phi mã
+    if (!s->isRunning()) {
+      int32_t encStepPos = (int32_t)((float)getEncoderCount1() * pulsesPerCount);
+      if (abs(s->getCurrentPosition() - encStepPos) > 10) {
+        s->forceStopAndNewPosition(encStepPos);
       }
     }
+
+    int32_t targetSteps = (int32_t)((targetDeg / degPerCount) * pulsesPerCount);
+    int32_t maxSteps = (int32_t)((safeMax / degPerCount) * pulsesPerCount);
+    if (targetSteps < 0) targetSteps = 0;
+    if (targetSteps > maxSteps) targetSteps = maxSteps;
+
+    s->setSpeedInHz(speedHz);
+    s->setAcceleration(stepperAccel);
+    s->moveTo(targetSteps);
+    return true;
   } else {
-    // Trục 2: Elevation (Epsilon). Home = 90.0° (ngửa đỉnh trời), Giới hạn hạ =
-    // CFG_L_EL_MIN_SOFT_LIMIT_DEG (25.0°)
+    // Trục 2: Elevation (Epsilon). Home = 90.0° (ngửa đỉnh trời), Giới hạn hạ = CFG_L_EL_MIN_SOFT_LIMIT_DEG (25.0°)
     float minLimit = CFG_L_EL_MIN_SOFT_LIMIT_DEG + 0.2f;
     float maxLimit = CFG_J_EL_MAX_SOFT_LIMIT_DEG - 0.2f;
     targetDeg = clampVal(targetDeg, minLimit, maxLimit);
@@ -1839,42 +1846,44 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
         (targetDeg >= maxLimit - 0.3f && curDeg >= maxLimit - deadbandDeg)) {
       if (s->isRunning())
         s->stopMove();
-      return true; // Đã đạt vị trí cân bằng trong dải chết hoặc chạm giới hạn
-                   // góc
+      return true; // Đã đạt vị trí cân bằng trong dải chết hoặc chạm giới hạn góc
     }
 
     if (errDeg > 0.0f) {
-      // Cần tăng góc nâng (ngửa lên) -> Quay về phía Home (DIR_TOWARD_HOME,
-      // xung âm)
-      if (isHome2Triggered() || curDeg >= maxLimit ||
-          !checkMotionAllowed(2, -1)) {
+      // Cần tăng góc nâng (ngửa lên) -> Quay về phía Home (DIR_TOWARD_HOME)
+      if (isHome2Triggered() || curDeg >= maxLimit || !checkMotionAllowed(2, -1)) {
         if (s->isRunning())
           s->stopMove();
-        return true; // Đã chạm giới hạn ngửa tối đa
-      }
-      int32_t steps = (int32_t)((errDeg / degPerCount) * getPulsesPerCount());
-      if (steps > 0) {
-        s->setSpeedInHz(speedHz);
-        s->setAcceleration(stepperAccel);
-        s->move(-steps);
+        return true;
       }
     } else {
-      // Cần giảm góc nâng (hạ thấp) -> Quay ra xa Home (DIR_AWAY_HOME, xung
-      // dương)
+      // Cần giảm góc nâng (hạ thấp) -> Quay ra xa Home (DIR_AWAY_HOME)
       if (curDeg <= minLimit || !checkMotionAllowed(2, 1)) {
         if (s->isRunning())
           s->stopMove();
-        return true; // Đã chạm giới hạn hạ thấp tối đa
-      }
-      int32_t steps = (int32_t)((-errDeg / degPerCount) * getPulsesPerCount());
-      if (steps > 0) {
-        s->setSpeedInHz(speedHz);
-        s->setAcceleration(stepperAccel);
-        s->move(steps);
+        return true;
       }
     }
+
+    // ĐIỀU KHIỂN VỊ TRÍ TUYỆT ĐỐI (ABSOLUTE POSITIONING):
+    if (!s->isRunning()) {
+      int32_t encStepPos = (int32_t)((float)getEncoderCount2() * pulsesPerCount);
+      if (abs(s->getCurrentPosition() - encStepPos) > 10) {
+        s->forceStopAndNewPosition(encStepPos);
+      }
+    }
+
+    int32_t targetSteps = (int32_t)(((CFG_J_EL_HOME_SW_DEG - targetDeg) / degPerCount) * pulsesPerCount);
+    int32_t minSteps = (int32_t)(((CFG_J_EL_HOME_SW_DEG - maxLimit) / degPerCount) * pulsesPerCount);
+    int32_t maxSteps = (int32_t)(((CFG_J_EL_HOME_SW_DEG - minLimit) / degPerCount) * pulsesPerCount);
+    if (targetSteps < minSteps) targetSteps = minSteps;
+    if (targetSteps > maxSteps) targetSteps = maxSteps;
+
+    s->setSpeedInHz(speedHz);
+    s->setAcceleration(stepperAccel);
+    s->moveTo(targetSteps);
+    return true;
   }
-  return true;
 }
 
 // Tính toán góc mục tiêu từ thiên văn NOAA & Hợp nhất Hybrid (Mục 4 & 5)
@@ -5156,8 +5165,8 @@ void loop() {
                   lastSunsetLogMs = millis();
                   Serial.printf("\n>> [SUNSET HOLD] Mat troi da lan (El=%+.1f° "
                                 "< 0°). Gian pin DUNG IM GIU BUOC tai vi tri "
-                                "chieu den 22:00 toi!\n",
-                                elSun);
+                                "chieu den %02d:00 toi!\n",
+                                elSun, NIGHT_SLEEP_START_HOUR);
                 }
               } else {
                 // Buổi sáng sớm trước bình minh (04:00 - 05:45): ĐỨNG Ở TƯ THẾ
@@ -5188,12 +5197,11 @@ void loop() {
               }
 
               // Phát lệnh điều khiển vị trí
-              bool m1Done = stepPositionControl(1, targetAz);
-              bool m2Done = stepPositionControl(2, targetEl);
+              stepPositionControl(1, targetAz);
+              stepPositionControl(2, targetEl);
 
               // Nếu đã chạm góc max thì Trục 1 xem như đã hoàn thành
               if (azHitMax) {
-                m1Done = true;
                 if (stepper1 && stepper1->isRunning())
                   stepper1->stopMove();
               }
@@ -5201,8 +5209,11 @@ void loop() {
               bool motorsStopped = (!stepper1 || !stepper1->isRunning()) &&
                                    (!stepper2 || !stepper2->isRunning());
 
+              bool m1Reached = (fabs(targetAz - getAngleDeg1()) <= deadbandDeg) || azHitMax;
+              bool m2Reached = (fabs(targetEl - getElevationEpsilon()) <= deadbandDeg);
+
               // ĐÁNH GIÁ ĐIỀU KIỆN ỔN ĐỊNH CÂN BẰNG:
-              if (m1Done && m2Done && motorsStopped) {
+              if (m1Reached && m2Reached && motorsStopped) {
                 if (azHitMax) {
                   isMaxAzimuthReached = true;
                   Serial.printf("\n>> [MAX ANGLE REACHED] Gian pin da dat goc "
@@ -5242,26 +5253,32 @@ void loop() {
   // (NON-BLOCKING)
   if (stepper1) {
     if (isHome1Triggered()) {
-      if (stateM1 == STATE_MANUAL_TOWARD_HOME ||
-          (stepper1->isRunning() &&
-           (stepper1->rampState() & RAMP_DIRECTION_COUNT_DOWN))) {
+      if (stateM1 != STATE_AUTO_HOMING) {
+        if (stepper1->isRunning()) {
+          stepper1->forceStopAndNewPosition(0);
+          resetEncoder1(0);
+          stateM1 = STATE_IDLE;
+          Serial.println("\n>> [HOME TRIGGER TRUC 1] Da cham CTHT 1 -> DUNG KHAN CAP & SET GOC 0.0°!");
+        }
+      }
+    }
+    // Giám sát giới hạn mềm cận trên trục 1 (phi >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG)
+    if (getAngleDeg1() >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG) {
+      if (stepper1->isRunning()) {
+        stepper1->forceStop();
+        stateM1 = STATE_IDLE;
+        Serial.printf("\n>> [GIOI HAN MEM TRUC 1] Phi = %+.1f° >= %+.1f° -> DUNG KHAN CAP CHONG QUA GOC!\n",
+                      getAngleDeg1(), CFG_I_AZ_MAX_SOFT_LIMIT_DEG);
+      }
+    }
+    // Giám sát góc âm trục 1 (phi < -0.5°)
+    if (getAngleDeg1() <= -0.5f) {
+      if (stepper1->isRunning()) {
         stepper1->forceStopAndNewPosition(0);
         resetEncoder1(0);
         stateM1 = STATE_IDLE;
-        Serial.println("\n>> [HOME TRIGGER TRUC 1] Da cham CTHT 1 -> DUNG & "
-                       "SET GOC 0.0°!");
-      }
-    }
-    // Giám sát giới hạn mềm cận trên trục 1 (phi >= 270.0°)
-    if (getAngleDeg1() >= CFG_I_AZ_MAX_SOFT_LIMIT_DEG) {
-      if (stateM1 == STATE_MANUAL_AWAY_HOME ||
-          (stepper1->isRunning() &&
-           (stepper1->rampState() & RAMP_DIRECTION_COUNT_UP))) {
-        stepper1->stopMove();
-        stateM1 = STATE_IDLE;
-        Serial.printf("\n>> [GIOI HAN MEM TRUC 1] Phi = %+.1f° >= %+.1f° -> "
-                      "DUNG DE CHONG XOAN CAP!\n",
-                      getAngleDeg1(), CFG_I_AZ_MAX_SOFT_LIMIT_DEG);
+        Serial.printf("\n>> [GIOI HAN MEM AM TRUC 1] Phi = %+.1f° < 0° -> DUNG KHAN CAP & RESET 0.0°!\n",
+                      getAngleDeg1());
       }
     }
     if (stateM1 != STATE_IDLE && stateM1 != STATE_AUTO_HOMING &&
@@ -5273,38 +5290,30 @@ void loop() {
 
   if (stepper2) {
     if (isHome2Triggered()) {
-      if (stateM2 == STATE_MANUAL_TOWARD_HOME ||
-          (stepper2->isRunning() &&
-           (stepper2->rampState() & RAMP_DIRECTION_COUNT_DOWN))) {
-        stepper2->forceStopAndNewPosition(0);
-        resetEncoder2(0);
-        stateM2 = STATE_IDLE;
-        Serial.println("\n>> [HOME TRIGGER TRUC 2] Da cham CTHT 2 -> DUNG & "
-                       "SET EPSILON = 90.0°!");
+      if (stateM2 != STATE_AUTO_HOMING) {
+        if (stepper2->isRunning()) {
+          stepper2->forceStopAndNewPosition(0);
+          resetEncoder2(0);
+          stateM2 = STATE_IDLE;
+          Serial.println("\n>> [HOME TRIGGER TRUC 2] Da cham CTHT 2 -> DUNG KHAN CAP & SET EPSILON = 90.0°!");
+        }
       }
     }
-    // Giám sát giới hạn mềm cận trên trục 2 (epsilon >= SOFT_MAX_EL, ngửa lên
-    // về Home)
+    // Giám sát giới hạn mềm cận trên trục 2 (epsilon >= SOFT_MAX_EL, ngửa lên về Home)
     if (getElevationEpsilon() >= CFG_J_EL_MAX_SOFT_LIMIT_DEG) {
-      if (stateM2 == STATE_MANUAL_TOWARD_HOME ||
-          (stepper2->isRunning() &&
-           (stepper2->rampState() & RAMP_DIRECTION_COUNT_DOWN))) {
-        stepper2->stopMove();
+      if (stepper2->isRunning()) {
+        stepper2->forceStop();
         stateM2 = STATE_IDLE;
-        Serial.printf("\n>> [GIOI HAN MEM TRUC 2] Epsilon = %+.1f° >= %+.1f° "
-                      "-> DUNG DE CHONG QUA GOC!\n",
+        Serial.printf("\n>> [GIOI HAN MEM TRUC 2] Epsilon = %+.1f° >= %+.1f° -> DUNG KHAN CAP!\n",
                       getElevationEpsilon(), CFG_J_EL_MAX_SOFT_LIMIT_DEG);
       }
     }
     // Giám sát giới hạn mềm cận dưới trục 2 (epsilon <= 25.0°)
     if (getElevationEpsilon() <= CFG_L_EL_MIN_SOFT_LIMIT_DEG) {
-      if (stateM2 == STATE_MANUAL_AWAY_HOME ||
-          (stepper2->isRunning() &&
-           (stepper2->rampState() & RAMP_DIRECTION_COUNT_UP))) {
-        stepper2->stopMove();
+      if (stepper2->isRunning()) {
+        stepper2->forceStop();
         stateM2 = STATE_IDLE;
-        Serial.printf("\n>> [GIOI HAN MEM TRUC 2] Epsilon = %+.1f° <= %+.1f° "
-                      "-> DUNG DE CHONG CAN TRUC Z!\n",
+        Serial.printf("\n>> [GIOI HAN MEM TRUC 2] Epsilon = %+.1f° <= %+.1f° -> DUNG KHAN CAP!\n",
                       getElevationEpsilon(), CFG_L_EL_MIN_SOFT_LIMIT_DEG);
       }
     }
