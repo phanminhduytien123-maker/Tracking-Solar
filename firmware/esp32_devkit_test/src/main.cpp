@@ -2037,12 +2037,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
 
     // ĐIỀU KHIỂN VỊ TRÍ TUYỆT ĐỐI (ABSOLUTE POSITIONING):
     // Tuyệt đối không dùng relative move(steps) định kỳ để tránh tích lũy xung phi mã
-    if (!s->isRunning()) {
-      int32_t encStepPos = (int32_t)((float)getEncoderCount1() * pulsesPerCount);
-      if (abs(s->getCurrentPosition() - encStepPos) > 10) {
-        s->forceStopAndNewPosition(encStepPos);
-      }
-    }
+    // (Yêu cầu 6: Bỏ forceStopAndNewPosition để giữ trọn vẹn độ phân giải vi bước)
 
     int32_t targetSteps = (int32_t)((targetDeg / degPerCount) * pulsesPerCount);
     int32_t maxSteps = (int32_t)((safeMax / degPerCount) * pulsesPerCount);
@@ -2355,6 +2350,7 @@ void pushTelemetryToFirebase() {
   trk.set("last_homing_reason", lastHomingReason);
   trk.set("home_error_deg_az", homeErrorDeg1);
   trk.set("home_error_deg_el", homeErrorDeg2);
+  trk.set("az_feedback", "OPEN_LOOP");
 
   // Thong so co hoc & Gioi han mem (Bao ve phan cung va hien thi chuan)
   trk.set("k_enc_deg_per_pulse", getDegPerCount());
