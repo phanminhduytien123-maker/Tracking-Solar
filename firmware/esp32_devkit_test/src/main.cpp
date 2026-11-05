@@ -103,6 +103,7 @@ void saveLastHandledCmdId(const String &cmdId, uint64_t emgTs = 0) {
 void parkPanels();
 
 bool readDS3231(int &y, int &m, int &d, int &hh, int &mm, int &ss, float &tC);
+OpticalData getLatestOpticalData();
 void requestTelemetryPrint() { telemetryDirty = true; }
 
 // Khai báo trước hàm điều khiển vị trí góc & Homing cả 2 trục
@@ -1673,6 +1674,14 @@ void printRTCStatus() {
 // (Cấu trúc OpticalData đã được định nghĩa chuẩn trong config.h)
 
 OpticalData latestOpticalData = {};
+static portMUX_TYPE optMux = portMUX_INITIALIZER_UNLOCKED;
+
+OpticalData getLatestOpticalData() {
+  portENTER_CRITICAL(&optMux);
+  OpticalData d = latestOpticalData;
+  portEXIT_CRITICAL(&optMux);
+  return d;
+}
 
 // Bộ nhớ đệm cho bộ lọc EMA (Exponential Moving Average)
 static float emaTop = 0.0f;
@@ -1764,12 +1773,14 @@ OpticalData readOpticalSensors() {
   if (data.timestamp == 0)
     data.timestamp = (uint32_t)(millis() / 1000);
 
+  portENTER_CRITICAL(&optMux);
   latestOpticalData = data;
+  portEXIT_CRITICAL(&optMux);
   return data;
 }
 
 void printOpticalSensors() {
-  OpticalData opt = readOpticalSensors();
+  OpticalData opt = getLatestOpticalData();
   Serial.printf(">> [TEMT6000 FILTERED] TOP: %4d | BOT: %4d | LFT: %4d | RGT: "
                 "%4d | AVG: %4d\n",
                 opt.top, opt.bot, opt.lft, opt.rgt, opt.avg);
@@ -2143,7 +2154,7 @@ bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun,
   solar::SolarGeometry::computeAxisTargets(
       pos, outAz, outEl, CFG_G_AZ_HOME_SW_DEG, getElevationZenith());
 
-  OpticalData opt = readOpticalSensors();
+  OpticalData opt = getLatestOpticalData();
   // Tính trọng số quang ws: mây mù/tối ngắt quang ws=0; trời nắng ws=1
   if (opt.avg < OPTICAL_NIGHT_THRESHOLD) {
     ws = 0.0f;
@@ -2299,10 +2310,7 @@ void pushTelemetryToFirebase() {
   if (!Firebase.ready())
     return;
 
-  OpticalData opt = latestOpticalData;
-  if (opt.avg == 0) {
-    opt = readOpticalSensors();
-  }
+  OpticalData opt = getLatestOpticalData();
 
   float curPhi = getAngleDeg1();
   float curEpsilon = getElevationEpsilon();
@@ -5230,7 +5238,7 @@ void loop() {
         currentTrackSource == TRACK_SRC_OFF) {
       if (millis() - lastOpticalTrackTime >= 100) { // Chu kỳ bám 100ms
         lastOpticalTrackTime = millis();
-        OpticalData opt = readOpticalSensors();
+        OpticalData opt = getLatestOpticalData();
 
         if (opt.avg < OPTICAL_NIGHT_THRESHOLD) {
           // Quá tối, không quay lung tung
