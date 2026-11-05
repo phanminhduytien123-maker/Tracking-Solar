@@ -12,7 +12,7 @@ import time
 
 FIRMWARE_BIN = r"C:\tmp_pio_build\root\esp32_devkit_test\firmware.bin"
 ESPOTA_PY = os.path.expanduser(r"~\.platformio\packages\framework-arduinoespressif32\tools\espota.py")
-DEFAULT_HOST = "192.168.1.9"
+DEFAULT_HOST = "192.168.0.102"
 MDNS_HOST = "esp32-solar-tracker.local"
 OTA_PORT = "3232"
 OTA_AUTH = "solar2026"
