@@ -2589,7 +2589,7 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
   otaStatus.set("current_version", CURRENT_FIRMWARE_VERSION);
   otaStatus.set("url", fotaUrl);
   otaStatus.set("error", "");
-  Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+  Firebase.RTDB.setJSON(&cmdFbdo, "/solar/ota", &otaStatus);
 
   // 3. Cau hinh HTTPUpdate
   httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -2602,7 +2602,7 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
       if (millis() - lastProgressPrint >= 1500 || pct == 100) {
         lastProgressPrint = millis();
         Serial.printf(">> [FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n", pct, (unsigned)current, (unsigned)total);
-        Firebase.RTDB.setInt(&cmdFbdo, "/system/ota/progress", pct);
+        Firebase.RTDB.setInt(&cmdFbdo, "/solar/ota/progress", pct);
       }
     }
   });
@@ -2622,14 +2622,14 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     otaStatus.set("status", "SUCCESS");
     otaStatus.set("progress", 100);
     otaStatus.set("current_version", targetVersion.length() > 0 ? targetVersion : "NEW_VERSION");
-    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    Firebase.RTDB.setJSON(&cmdFbdo, "/solar/ota", &otaStatus);
     delay(1000);
     Serial.println(">> [FOTA] Khoi dong lai ESP32 de chay firmware moi...");
     ESP.restart();
   } else if (ret == HTTP_UPDATE_NO_UPDATES) {
     Serial.println(">> [FOTA] Khong co ban cap nhat moi.");
     otaStatus.set("status", "NO_UPDATES");
-    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    Firebase.RTDB.setJSON(&cmdFbdo, "/solar/ota", &otaStatus);
     if (stepper1) stepper1->enableOutputs();
     if (stepper2) stepper2->enableOutputs();
   } else {
@@ -2638,15 +2638,15 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     Serial.printf(">> [FOTA ERROR] Loi (%d): %s\n", errCode, err.c_str());
     otaStatus.set("status", "FAILED");
     otaStatus.set("error", err);
-    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    Firebase.RTDB.setJSON(&cmdFbdo, "/solar/ota", &otaStatus);
     if (stepper1) stepper1->enableOutputs();
     if (stepper2) stepper2->enableOutputs();
   }
 }
 
-// Kiem tra co kich hoat OTA tu xa tai /system/ota/trigger
+// Kiem tra co kich hoat OTA tu xa tai /solar/ota/trigger
 void checkSystemOtaTrigger() {
-  if (Firebase.RTDB.getJSON(&cmdFbdo, "/system/ota")) {
+  if (Firebase.RTDB.getJSON(&cmdFbdo, "/solar/ota")) {
     FirebaseJson &json = cmdFbdo.jsonObject();
     FirebaseJsonData jsonData;
     bool trigger = false;
@@ -2663,7 +2663,7 @@ void checkSystemOtaTrigger() {
       if (jsonData.success) targetVer = jsonData.stringValue;
 
       if (url.length() > 0) {
-        Firebase.RTDB.setBool(&cmdFbdo, "/system/ota/trigger", false);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/ota/trigger", false);
         executeCloudFOTA(url, targetVer);
       }
     }
@@ -2994,7 +2994,7 @@ void telemetryTask(void *pvParameters) {
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /system/ota mỗi 5s
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 5s
     static unsigned long lastFotaCheck = 0;
     if (now - lastFotaCheck >= 5000) {
       lastFotaCheck = now;
