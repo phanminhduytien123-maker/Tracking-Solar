@@ -1830,8 +1830,9 @@ const float PSO_C2_SOC = 1.494f;
 
 PsoParams gBestAz = {2.40f, 0.08f, 0.65f, 0.0384f};
 PsoParams gBestEl = {2.80f, 0.10f, 0.75f, 0.0421f};
-uint32_t psoRunTimeMs = 45;
-int psoCurrentIter = 20;
+uint32_t psoRunTimeMs = 0;
+int psoCurrentIter = 0;
+bool psoHasConverged = false;
 
 float evaluateFitness(float kp, float ki, float kd) {
   float simError = 1.0f;
@@ -1926,6 +1927,7 @@ void runPsoOptimization() {
 
   psoRunTimeMs = millis() - startT;
   psoCurrentIter = PSO_MAX_ITER;
+  psoHasConverged = true;
 
   Serial.printf(">>> [PSO COMPLETE in %u ms] Hoi tu: Cost J = %.4f\n",
                 psoRunTimeMs, gBestAz.cost);
@@ -2449,8 +2451,10 @@ void pushTelemetryToFirebase() {
       : (currentTrackSource == TRACK_SRC_SENSOR)  ? "SENSOR_ONLY"
       : (currentTrackSource == TRACK_SRC_HYBRID)  ? "HYBRID"
                                                   : "NONE";
+  const char *algoStateStr = psoHasConverged ? "CONVERGED" : "NONE";
+  const char *psoSourceStr = psoHasConverged ? "ONLINE_RAM" : "NONE";
   trk.set("activeAlgorithm", algStr);
-  trk.set("algo_state", "CONVERGED");
+  trk.set("algo_state", algoStateStr);
 
   // Timestamp là Unix epoch UTC+7 từ RTC DS3231 (A5: bỏ millis())
   uint32_t epochNow = getRtcEpochUTC7();
@@ -2509,15 +2513,15 @@ void pushTelemetryToFirebase() {
 
   // 2. Du lieu thong so thich nghi Fuzzy-PID & PSO cho Dashboard hien thi
   FirebaseJson algoJson;
-  algoJson.set("algo_state", "CONVERGED");
+  algoJson.set("algo_state", algoStateStr);
   algoJson.set("name", "PSO_FUZZY_PID");
-  algoJson.set("psoSource", "ONLINE_RAM");
-  algoJson.set("cost_j", gBestAz.cost);
+  algoJson.set("psoSource", psoSourceStr);
+  algoJson.set("cost_j", psoHasConverged ? gBestAz.cost : 0.0f);
   algoJson.set("run_time_ms", psoRunTimeMs);
   algoJson.set("swarm_size", PSO_SWARM_SIZE);
   algoJson.set("iteration", psoCurrentIter);
   algoJson.set("max_iterations", PSO_MAX_ITER);
-  algoJson.set("status", "CONVERGED");
+  algoJson.set("status", algoStateStr);
 
   FuzzyOutput fzAz = computeFuzzyAdjustment(opt.normDiffAz, 0.0f);
   FuzzyOutput fzEl = computeFuzzyAdjustment(opt.normDiffEl, 0.0f);
