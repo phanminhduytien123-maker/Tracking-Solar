@@ -10,7 +10,12 @@ import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge, getCom
 export default function VisualPanelsComparison({
   INA226,
   motors,
-  onOpenDetails
+  onOpenDetails,
+  isAdmin = true,
+  system = null,
+  onOpenEmergencyModal,
+  onOpenManualModal,
+  onOpenSettingsModal
 }) {
   const tracking = INA226?.tracking || { voltage: null, current: null, power: null, energyWh: null };
   const stat = INA226?.static || { voltage: null, current: null, power: null, energyWh: null, fixedAzimuth: 180, fixedTiltBeta: 15, fixedElevationEps: 75 };
@@ -57,12 +62,54 @@ export default function VisualPanelsComparison({
             Đối chiếu số đo thời gian thực giữa hệ thống quay hai trục và tấm cố định chuẩn
           </p>
         </div>
-        <button
-          onClick={onOpenDetails}
-          className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
-        >
-          Xem thông số chi tiết
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto mt-1 sm:mt-0 justify-start sm:justify-end">
+          {/* 3 nút thao tác dành riêng cho giao diện điện thoại (sm:hidden) do Header ẩn trên mobile */}
+          {isAdmin && (
+            <>
+              {/* Nút Dừng Khẩn Cấp / Phủ Bạt hoặc Mở Khóa */}
+              <button
+                id="btn-mobile-emergency-cover"
+                onClick={onOpenEmergencyModal}
+                className={`sm:hidden px-2.5 py-1.5 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1 shadow-xs ${
+                  system?.emergencyActive
+                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse border border-amber-300'
+                    : 'bg-red-700 hover:bg-red-800 text-white font-bold'
+                }`}
+                title={system?.emergencyActive ? "Nhấn để nhập mật khẩu mở khóa hệ thống" : "Nhấn để dừng khẩn cấp & hạ góc Max phủ bạt"}
+              >
+                {system?.emergencyActive ? 'MỞ KHÓA' : 'DỪNG KHẨN CẤP'}
+              </button>
+
+              {/* Nút Điều khiển thủ công */}
+              <button
+                id="btn-mobile-open-manual-control"
+                onClick={onOpenManualModal}
+                className="sm:hidden px-2.5 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors"
+                title="Bảng điều khiển thủ công"
+              >
+                Điều khiển
+              </button>
+
+              {/* Nút Cài đặt */}
+              <button
+                id="btn-mobile-open-settings"
+                onClick={onOpenSettingsModal}
+                className="sm:hidden px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
+                title="Cài đặt hệ thống"
+              >
+                Cài đặt
+              </button>
+            </>
+          )}
+
+          {/* Nút Xem thông số chi tiết (hiển thị trên cả mobile và desktop) */}
+          <button
+            onClick={onOpenDetails}
+            className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
+          >
+            Xem thông số chi tiết
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">

@@ -926,6 +926,11 @@ export default function App() {
           <VisualPanelsComparison
             INA226={telemetry.INA226}
             motors={telemetry.motors}
+            system={telemetry.system}
+            isAdmin={authSession?.role === 'admin'}
+            onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+            onOpenManualModal={() => setIsManualModalOpen(true)}
+            onOpenSettingsModal={() => openSettingsTab('config')}
             onOpenDetails={() => setIsDetailsModalOpen(true)}
           />
         </section>
