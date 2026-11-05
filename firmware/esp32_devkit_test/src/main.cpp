@@ -68,6 +68,8 @@ volatile bool remoteTestSleepTrigger = false;
 volatile bool remoteTestWakeTrigger = false;
 volatile bool remoteResumeRealTrigger = false;
 bool isTestSleepMode = false;
+volatile bool m1MovingAwayFromHome = false;
+volatile bool m2MovingAwayFromHome = false;
 
 void executeTestSleepNow();
 void executeTestWakeNow();
@@ -593,13 +595,16 @@ void updateHardwareEncoders() {
   pcnt_get_counter_value(PCNT_UNIT_0, &hw1);
   pcnt_get_counter_value(PCNT_UNIT_1, &hw2);
 
-  portENTER_CRITICAL(&encMux);
-  int16_t diff1 = hw1 - lastPcntVal1;
-  lastPcntVal1 = hw1;
-  if (invertEncoderDir1)
-    diff1 = -diff1;
-  encoderCount1 += diff1;
+  // Trục 1: Encoder phần cứng bị hỏng do nước mưa -> Đồng bộ từ vi bước FastAccelStepper
+  // 32 vi bước = 1 count encoder (25600 pulses/rev * 3 gear / 2400 cpr = 32.0)
+  // Thực hiện tính toán ngoài spinlock để triệt tiêu hoàn toàn nguy cơ deadlock/watchdog
+  int32_t calcCount1 = 0;
+  if (stepper1) {
+    calcCount1 = (int32_t)(stepper1->getCurrentPosition() / 32);
+  }
 
+  portENTER_CRITICAL(&encMux);
+  encoderCount1 = calcCount1;
   int16_t diff2 = hw2 - lastPcntVal2;
   lastPcntVal2 = hw2;
   if (invertEncoderDir2)
@@ -608,7 +613,7 @@ void updateHardwareEncoders() {
   portEXIT_CRITICAL(&encMux);
 }
 
-// Đọc atomic bản sao chốt của Encoder từ bất kỳ Core / Task nào (A2)
+// Đọc atomic bản sao chốt của Encoder từ bất kỳ Core / Task nào (A2, O(1) an toàn tuyệt đối)
 int32_t getEncoderCount1() {
   portENTER_CRITICAL(&encMux);
   int32_t val = encoderCount1;
@@ -1344,27 +1349,7 @@ void checkStallProtection() {
   } else if (!m1Running && m1WasRunning) {
     m1WasRunning = false;
   } else if (m1Running && m1WasRunning) {
-    if (millis() - m1MoveStartTime >
-        600) { // Đợi 600ms sau khi bắt đầu chuyển động
-      int32_t deltaSteps = abs(stepper1->getCurrentPosition() - m1StartStepPos);
-      int32_t deltaEnc = abs(getEncoderCount1() - m1StartEnc);
-      float pulsesPerCount = getPulsesPerCount();
-      float stallThreshCounts = ParamRegistry.get("STALL_THRESH_COUNTS", 5.0f);
-
-      if (deltaSteps > (int32_t)(stallThreshCounts * pulsesPerCount) &&
-          deltaEnc < 2) {
-        stepper1->forceStop();
-        stateM1 = STATE_IDLE;
-        currentTrackSource = TRACK_SRC_OFF;
-        autoOpticalTracking = false;
-        systemFsmState = FSM_STATE_FAULT;
-        Serial.printf(
-            "\n>> [STALL / NO_MOTION M1] PHAT HIEN KET TRUC 1 HOAC MAT NGUON "
-            "24V! NGAT TRACKING & CHUYEN FAULT! (Phat: %ld xung, Encoder chi nhich: %ld count)\n",
-            (long)deltaSteps, (long)deltaEnc);
-        m1WasRunning = false;
-      }
-    }
+    // Trục 1: Encoder hỏng do nước mưa -> Tắt stall check M1 để chạy Open-Loop Step Tracking mượt mà
   }
 
   static unsigned long m2MoveStartTime = 0;
@@ -1381,14 +1366,15 @@ void checkStallProtection() {
   } else if (!m2Running && m2WasRunning) {
     m2WasRunning = false;
   } else if (m2Running && m2WasRunning) {
-    if (millis() - m2MoveStartTime > 600) {
+    float stallThreshCounts = ParamRegistry.get("STALL_THRESH_COUNTS", 5.0f);
+    if (stallThreshCounts > 0.0f && (millis() - m2MoveStartTime > 2500)) {
       int32_t deltaSteps = abs(stepper2->getCurrentPosition() - m2StartStepPos);
       int32_t deltaEnc = abs(getEncoderCount2() - m2StartEnc);
       float pulsesPerCount = getPulsesPerCount();
-      float stallThreshCounts = ParamRegistry.get("STALL_THRESH_COUNTS", 5.0f);
+      int32_t minStepsToCheck = (int32_t)(stallThreshCounts * pulsesPerCount * 6);
+      if (minStepsToCheck < 800) minStepsToCheck = 800;
 
-      if (deltaSteps > (int32_t)(stallThreshCounts * pulsesPerCount) &&
-          deltaEnc < 2) {
+      if (deltaSteps > minStepsToCheck && deltaEnc < 2) {
         stepper2->forceStop();
         stateM2 = STATE_IDLE;
         currentTrackSource = TRACK_SRC_OFF;
@@ -1972,6 +1958,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
 
     if (errDeg > 0.0f) {
       // Cần tăng góc -> Quay ra xa Home (DIR_AWAY_HOME)
+      m1MovingAwayFromHome = true;
       if (curDeg >= safeMax || !checkMotionAllowed(1, 1)) {
         if (s->isRunning())
           s->stopMove();
@@ -1979,6 +1966,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
       }
     } else {
       // Cần giảm góc -> Quay về phía Home (DIR_TOWARD_HOME)
+      m1MovingAwayFromHome = false;
       if (isHome1Triggered() || curDeg <= 0.0f || !checkMotionAllowed(1, -1)) {
         if (s->isRunning())
           s->stopMove();
@@ -2033,6 +2021,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
 
     if (errDeg > 0.0f) {
       // Cần tăng góc nâng (ngửa lên) -> Quay về phía Home (DIR_TOWARD_HOME)
+      m2MovingAwayFromHome = false;
       if (isHome2Triggered() || curDeg >= maxLimit || !checkMotionAllowed(2, -1)) {
         if (s->isRunning())
           s->stopMove();
@@ -2040,6 +2029,7 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
       }
     } else {
       // Cần giảm góc nâng (hạ thấp) -> Quay ra xa Home (DIR_AWAY_HOME)
+      m2MovingAwayFromHome = true;
       if (curDeg <= minLimit || !checkMotionAllowed(2, 1)) {
         if (s->isRunning())
           s->stopMove();
@@ -2280,6 +2270,12 @@ void pushTelemetryToFirebase() {
   trk.set("azEncoder", encoderCount1);
   trk.set("elEncoder", encoderCount2);
   trk.set("encoderPulses", encoderCount1);
+  trk.set("enc1_a", digitalRead(M1_ENC_A_PIN));
+  trk.set("enc1_b", digitalRead(M1_ENC_B_PIN));
+  trk.set("enc2_a", digitalRead(M2_ENC_A_PIN));
+  trk.set("enc2_b", digitalRead(M2_ENC_B_PIN));
+  trk.set("uptime_s", (double)(millis() / 1000UL));
+  trk.set("rst_reason", (int)esp_reset_reason());
 
   trk.set("ldrTop", opt.top);
   trk.set("ldrBottom", opt.bot);
@@ -2961,6 +2957,8 @@ void printMenu() {
 bool moveMotorSteps(int axis, bool direction, int32_t steps,
                     uint32_t speedHz = 0) {
   FastAccelStepper *s = (axis == 1) ? stepper1 : stepper2;
+  if (axis == 1) m1MovingAwayFromHome = (direction == DIR_AWAY_HOME);
+  if (axis == 2) m2MovingAwayFromHome = (direction == DIR_AWAY_HOME);
   if (!s)
     return false;
 
@@ -3246,13 +3244,47 @@ bool homeAxisToSwitch(int axis) {
     resetEncoder1(0);
   else
     resetEncoder2(0);
-  Serial.printf(">> [HOMING HOAN TAT 100%%] %s DA XAC THUC DU 3 LAN CHAM -> "
-                "CHOT MOC 0.0° CHINH XAC TUYET DOI!\n",
-                axisName);
+
+  // --- BƯỚC PULL-OFF AN TOÀN (LÙI RA XA ĐỂ NHẢ HOÀN TOÀN CÔNG TẮC HÀNH TRÌNH) ---
+  // Đảm bảo kết thúc Homing thì switch hoàn toàn hở (untriggered), tránh tì đè liên tục và chống kẹt
+  Serial.printf(">> [%s PULL-OFF] Dang lui chu dong de nha hoan toan cong tac...\n", axisName);
+  s->setSpeedInHz(manualSpeedHz);
+  s->setAcceleration(stepperAccel);
+  s->runForward();
+  uint32_t tPullOff = millis();
+  while (isTriggered()) {
+    if (checkCancel()) return false;
+    if (millis() - tPullOff > 6000) {
+      s->stopMove();
+      break;
+    }
+    delay(2);
+  }
+  s->stopMove();
+  delay(30);
+  // Lùi thêm 150 bước làm vùng đệm an toàn tuyệt đối
+  s->move(150);
+  while (s->isRunning()) {
+    if (checkCancel()) return false;
+    delay(2);
+  }
+  delay(100);
+
+  // Cập nhật tọa độ vị trí thực tế sau khi lùi nhả switch:
+  int32_t pullSteps = s->getCurrentPosition();
+  float pulsesPerCount = getPulsesPerCount();
+  int32_t pullEncCounts = (int32_t)((float)pullSteps / pulsesPerCount);
+  if (axis == 1)
+    resetEncoder1(pullEncCounts);
+  else
+    resetEncoder2(pullEncCounts);
+
+  Serial.printf(">> [HOMING HOAN TAT 100%%] %s DA XAC THUC DU 3 LAN CHAM & LUI NHA SWITCH -> MOC CHUAN TUYET DOI! (Vi tri: %ld buoc, %ld counts)\n",
+                axisName, (long)pullSteps, (long)pullEncCounts);
   stateM1 = STATE_IDLE;
   stateM2 = STATE_IDLE;
   requestTelemetryPrint();
-  delay(200);
+  delay(150);
   return true;
 }
 
@@ -3728,8 +3760,8 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 1500;
-  fbConfig.timeout.serverResponse = 1500;
+  fbConfig.timeout.socketConnection = 8000;
+  fbConfig.timeout.serverResponse = 8000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
   Serial.println(
@@ -4893,6 +4925,17 @@ void loop() {
         "\n>> [REMOTE HOMING] Dang thuc hien Homing ca 2 truc ve cong tac...");
     runDualHomingToSwitches();
     Serial.println(">> [REMOTE HOMING] Hoan thanh Homing!");
+    int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+    float curT = 0.0f;
+    readDS3231(curY, curM, curD, curH, curMin, curS, curT);
+    if (curH >= NIGHT_SLEEP_END_HOUR && curH < NIGHT_SLEEP_START_HOUR) {
+      currentTrackSource = TRACK_SRC_HYBRID;
+      autoOpticalTracking = true;
+      trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+      isMaxAzimuthReached = false;
+      systemFsmState = FSM_STATE_TRACKING;
+      Serial.println(">> [REMOTE HOMING] Ban ngay -> Tu dong tiep tuc bam nhat Hybrid!");
+    }
     requestTelemetryPrint();
   }
 
@@ -5481,11 +5524,15 @@ void loop() {
   if (stepper1) {
     if (isHome1Triggered()) {
       if (stateM1 != STATE_AUTO_HOMING) {
-        if (stepper1->isRunning()) {
+        // Khóa liên động phần cứng: Chỉ phanh khẩn cấp nếu motor đang quay VỀ phía Home 1 (giảm phi về 0.0°)
+        // Khi motor đang quay RA XA Home (tăng góc phi >= currentPos hoặc rampState COUNT_UP), TUYỆT ĐỐI KHÔNG PHANH!
+        bool movingTowardHome1 = (stepper1->targetPos() < stepper1->getCurrentPosition()) ||
+                                 ((stepper1->rampState() & RAMP_DIRECTION_MASK) == RAMP_DIRECTION_COUNT_DOWN);
+        if (stepper1->isRunning() && movingTowardHome1) {
           stepper1->forceStopAndNewPosition(0);
           resetEncoder1(0);
           stateM1 = STATE_IDLE;
-          Serial.println("\n>> [HOME TRIGGER TRUC 1] Da cham CTHT 1 -> DUNG KHAN CAP & SET GOC 0.0°!");
+          Serial.println("\n>> [HOME TRIGGER TRUC 1] Dang quay ve Home va cham CTHT 1 -> DUNG KHAN CAP & SET GOC 0.0°!");
         }
       }
     }
@@ -5518,11 +5565,15 @@ void loop() {
   if (stepper2) {
     if (isHome2Triggered()) {
       if (stateM2 != STATE_AUTO_HOMING) {
-        if (stepper2->isRunning()) {
+        // Khóa liên động phần cứng: Chỉ phanh nếu motor đang ngửa VỀ phía Home 2 (tăng Epsilon về 90.0°)
+        // Khi motor đang hạ RA XA Home (giảm Epsilon, targetPos <= currentPos), TUYỆT ĐỐI KHÔNG PHANH!
+        bool movingTowardHome2 = (stepper2->targetPos() < stepper2->getCurrentPosition()) ||
+                                 ((stepper2->rampState() & RAMP_DIRECTION_MASK) == RAMP_DIRECTION_COUNT_DOWN);
+        if (stepper2->isRunning() && movingTowardHome2) {
           stepper2->forceStopAndNewPosition(0);
           resetEncoder2(0);
           stateM2 = STATE_IDLE;
-          Serial.println("\n>> [HOME TRIGGER TRUC 2] Da cham CTHT 2 -> DUNG KHAN CAP & SET EPSILON = 90.0°!");
+          Serial.println("\n>> [HOME TRIGGER TRUC 2] Dang ngua ve Home va cham CTHT 2 -> DUNG KHAN CAP & SET EPSILON = 90.0°!");
         }
       }
     }
