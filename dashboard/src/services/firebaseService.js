@@ -668,6 +668,10 @@ export class FirebaseSolarService {
       rawState = tracking.state || 'TRACKING';
     }
 
+    if (typeof displayState === 'string') {
+      displayState = displayState.replace(/19H/gi, '18H').replace(/19:00/g, '18:00');
+    }
+
     // 4. ĐO LƯỜNG ĐIỆN NĂNG INA226
     // QUY TẮC: Khi CŨ hoặc MẤT KẾT NỐI -> null (hiện '--', KHÔNG hiện 0, KHÔNG hiện số cũ giả vờ mới)
     const trkVolt = isTrackingLive ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
@@ -1037,6 +1041,18 @@ export class FirebaseSolarService {
 
   async testDir(axis, direction = 1) {
     return this.sendCommand({ cmd: 'test_dir', axis, direction });
+  }
+
+  async testSleep() {
+    return this.sendCommand({ cmd: 'test_sleep' });
+  }
+
+  async testWake() {
+    return this.sendCommand({ cmd: 'test_wake' });
+  }
+
+  async resumeReal() {
+    return this.sendCommand({ cmd: 'resume_real' });
   }
 
   async setEstop(enabled) {
