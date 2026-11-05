@@ -75,6 +75,31 @@ void executeTestSleepNow();
 void executeTestWakeNow();
 void executeResumeRealState();
 String lastHandledCmdId = "";
+uint64_t lastHandledEmergencyTs = 0;
+
+void loadLastHandledCmdId() {
+  Preferences p;
+  if (p.begin("cmd_store", true)) {
+    lastHandledCmdId = p.getString("last_cmd_id", "");
+    lastHandledEmergencyTs = p.getULong64("last_emg_ts", 0);
+    p.end();
+    Serial.printf(">> [NVS CMD STORE] Da khoi phuc lastHandledCmdId: '%s' | emgTs: %llu\n",
+                  lastHandledCmdId.c_str(), (unsigned long long)lastHandledEmergencyTs);
+  }
+}
+
+void saveLastHandledCmdId(const String &cmdId, uint64_t emgTs = 0) {
+  lastHandledCmdId = cmdId;
+  Preferences p;
+  if (p.begin("cmd_store", false)) {
+    p.putString("last_cmd_id", lastHandledCmdId);
+    if (emgTs > 0) {
+      lastHandledEmergencyTs = emgTs;
+      p.putULong64("last_emg_ts", lastHandledEmergencyTs);
+    }
+    p.end();
+  }
+}
 void parkPanels();
 
 void requestTelemetryPrint() { telemetryDirty = true; }
@@ -2508,33 +2533,72 @@ void checkRemoteFirebaseCommands() {
     FirebaseJson &json = cmdFbdo.jsonObject();
     FirebaseJsonData jsonData;
 
-    // Kiểm tra ID lệnh và cờ ack để tránh thực thi lặp lại
+    // 1. Kiểm tra ID lệnh - Bắt buộc phải có ID (Yêu cầu 3: bỏ lệnh thiếu ID)
     String cmdId = "";
     json.get(jsonData, "id");
     if (jsonData.success)
       cmdId = jsonData.stringValue;
 
+    if (cmdId.length() == 0) {
+      return; // Bỏ qua lệnh không có ID
+    }
+
+    // 2. Kiểm tra cờ ack - Bỏ qua nếu lệnh đã ack xong (Yêu cầu 3)
     bool isAck = false;
     json.get(jsonData, "ack");
     if (jsonData.success)
       isAck = jsonData.boolValue;
 
-    if (cmdId.length() > 0 && cmdId == lastHandledCmdId && isAck) {
-      return; // Lệnh này đã được xử lý xong
+    if (isAck) {
+      return; // Lệnh đã được xác nhận hoàn tất trước đó
+    }
+
+    // 3. Kiểm tra ID đã xử lý (đối chiếu bộ nhớ NVS - Yêu cầu 3)
+    if (cmdId == lastHandledCmdId) {
+      return; // ID này đã từng được xử lý rồi, không lặp lại
+    }
+
+    // 4. Kiểm tra thời hạn sống của lệnh (TTL - Time to Live, Yêu cầu 3)
+    uint64_t cmdTimestamp = 0;
+    json.get(jsonData, "timestamp");
+    if (jsonData.success) {
+      cmdTimestamp = (uint64_t)jsonData.doubleValue;
+    }
+
+    uint32_t ttlMs = 60000; // Mặc định 60 giây
+    json.get(jsonData, "ttl");
+    if (jsonData.success && jsonData.intValue > 0) {
+      ttlMs = (uint32_t)jsonData.intValue;
+    }
+
+    uint64_t nowEpochMs = (uint64_t)getRtcEpochUTC7() * 1000ULL;
+    if (cmdTimestamp > 0 && nowEpochMs > 1700000000000ULL) {
+      if (nowEpochMs > (cmdTimestamp + ttlMs)) {
+        Serial.printf(">> [REMOTE CMD TIMEOUT] Lenh '%s' da het han TTL (%lu ms)! Tu choi thuc thi.\n",
+                      cmdId.c_str(), (unsigned long)ttlMs);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/control/ack", true);
+        saveLastHandledCmdId(cmdId, 0);
+        return;
+      }
     }
 
     bool shouldAck = false;
+    uint64_t newEmgTs = 0;
 
-    // 1. Kiểm tra cờ Dừng Khẩn Cấp
+    // 5. Kiểm tra cờ Dừng Khẩn Cấp (Chỉ kích hoạt khi cờ mới hơn lần xử lý trước - Yêu cầu 3)
     json.get(jsonData, "emergency");
     if (jsonData.success) {
       bool emgVal = jsonData.boolValue;
-      if (emgVal && !isEmergencyCoverActive) {
-        remoteEmergencyTrigger = true;
-        shouldAck = true;
-      } else if (!emgVal && isEmergencyCoverActive) {
-        remoteUnlockTrigger = true;
-        shouldAck = true;
+      if (cmdTimestamp > lastHandledEmergencyTs || lastHandledEmergencyTs == 0) {
+        if (emgVal && !isEmergencyCoverActive) {
+          remoteEmergencyTrigger = true;
+          shouldAck = true;
+          newEmgTs = cmdTimestamp;
+        } else if (!emgVal && isEmergencyCoverActive) {
+          remoteUnlockTrigger = true;
+          shouldAck = true;
+          newEmgTs = cmdTimestamp;
+        }
       }
     }
 
@@ -2725,10 +2789,11 @@ void checkRemoteFirebaseCommands() {
       }
     }
 
-    // Xử lý xác nhận lệnh (ack)
+    // Xử lý xác nhận lệnh (ack) và lưu vào NVS (Yêu cầu 3)
     if (shouldAck && cmdId.length() > 0) {
-      lastHandledCmdId = cmdId;
+      saveLastHandledCmdId(cmdId, newEmgTs);
       Firebase.RTDB.setBool(&cmdFbdo, "/solar/control/ack", true);
+      Serial.printf(">> [REMOTE ACK] Da xu ly va ACK lenh '%s' thanh cong! Da luu vao NVS.\n", cmdId.c_str());
     }
   }
 }
@@ -3639,6 +3704,7 @@ void setup() {
   // Khởi tạo Bảng tham số trung tâm (ParamRegistry) & Nạp dữ liệu NVS Flash
   // (CalibrationStore)
   CalibrationStore.begin();
+  loadLastHandledCmdId();
   ParamRegistry.set("L_EL_MIN_SOFT", 10.0f);
   ParamRegistry.set("TRACK_INTERVAL_MS", 900000.0f);
 
