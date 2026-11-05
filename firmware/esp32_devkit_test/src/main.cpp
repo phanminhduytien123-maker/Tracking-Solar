@@ -1451,39 +1451,23 @@ void checkStallProtection() {
 // Cập nhật công suất, tích phân năng lượng độc lập với WiFi/Firebase, và tạo
 // bản ghi 1 phút (Mục 2, A4, A5, Mục 9)
 void updateEnergyAndPower() {
-  // 1. Đọc 2 cảm biến INA226 qua I2C Mutex
+  // 1. Đọc 2 cảm biến INA226 qua I2C Mutex (Yêu cầu 8: bỏ INA_SCALE_FACTOR)
   if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-    float inaScale = ParamRegistry.get("INA_SCALE_FACTOR", 10.0f);
-    if (inaScale <= 0.0f)
-      inaScale = 1.0f;
-
     if (inaTrackerFound) {
       voltTrkLive = inaTracker.getBusVoltage();
-      currTrkLive = (inaTracker.getCurrent_mA() / 1000.0f) / inaScale;
+      currTrkLive = inaTracker.getCurrent_mA() / 1000.0f;
       if (currTrkLive < 0)
         currTrkLive = 0.0f;
       pwrTrkLive = voltTrkLive * currTrkLive;
     }
     if (inaStaticFound) {
       voltStaLive = inaStatic.getBusVoltage();
-      currStaLive = (inaStatic.getCurrent_mA() / 1000.0f) / inaScale;
+      currStaLive = inaStatic.getCurrent_mA() / 1000.0f;
       if (currStaLive < 0)
         currStaLive = 0.0f;
       pwrStaLive = voltStaLive * currStaLive;
     }
     xSemaphoreGive(i2cMutex);
-
-    // Tự động thu nhỏ Wh bị phóng đại 10x trong đợt chạy trước
-    static bool energyScaledOnce = false;
-    if (!energyScaledOnce) {
-      energyScaledOnce = true;
-      if (inaScale > 1.0f) {
-        if (energyWhTracker > 100.0)
-          energyWhTracker /= inaScale;
-        if (energyWhStatic > 100.0)
-          energyWhStatic /= inaScale;
-      }
-    }
   }
 
   // Tích lũy mẫu thống kê cho cửa sổ 1 phút (Mục 9)
@@ -3764,8 +3748,6 @@ void setup() {
   // (CalibrationStore)
   CalibrationStore.begin();
   loadLastHandledCmdId();
-  ParamRegistry.set("L_EL_MIN_SOFT", 10.0f);
-  ParamRegistry.set("TRACK_INTERVAL_MS", 900000.0f);
 
   // Khởi tạo Bench Wizard (16 bước B0-B15 & Operation Gating)
   BenchWizard.begin();
