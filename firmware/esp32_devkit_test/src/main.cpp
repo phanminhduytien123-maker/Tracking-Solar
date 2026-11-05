@@ -418,7 +418,10 @@ int32_t lastHomeTouchCount2 = 0;
 
 // Trạng thái kiểm chuẩn Homing khi khởi động (A3: Boot -> UNCALIBRATED ->
 // Homing)
+bool homedAz = false;
+bool homedEl = false;
 bool systemHomed = false;
+bool homingFault = false;
 
 // Tốc độ (Hz = steps/s) và Gia tốc (steps/s^2) phần cứng FastAccelStepper (Mặc
 // định êm ái, an toàn, mô-men xoắn cao)
@@ -1932,6 +1935,10 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
 
   if (axis == 1) {
     // Trục 1: Azimuth (Phi). Home = 0.0°, Giới hạn mềm = CFG_I_AZ_MAX_SOFT_LIMIT_DEG
+    if (!homedAz) {
+      Serial.println(">> [CHAN AN TOAN] Truc 1 (Azimuth) chua duoc Homing! Tu choi dieu khien.");
+      return false;
+    }
     float maxLimit = CFG_I_AZ_MAX_SOFT_LIMIT_DEG;
     float safeMax = maxLimit - 0.2f;
     targetDeg = clampVal(targetDeg, 0.0f, safeMax);
@@ -1994,6 +2001,10 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
     return true;
   } else {
     // Trục 2: Elevation (Epsilon). Home = 90.0° (ngửa đỉnh trời), Giới hạn hạ = CFG_L_EL_MIN_SOFT_LIMIT_DEG (25.0°)
+    if (!homedEl) {
+      Serial.println(">> [CHAN AN TOAN] Truc 2 (Elevation) chua duoc Homing! Tu choi dieu khien.");
+      return false;
+    }
     float minLimit = CFG_L_EL_MIN_SOFT_LIMIT_DEG + 0.2f;
     float maxLimit = CFG_J_EL_MAX_SOFT_LIMIT_DEG - 0.2f;
     targetDeg = clampVal(targetDeg, minLimit, maxLimit);
@@ -2291,6 +2302,9 @@ void pushTelemetryToFirebase() {
   trk.set("limitHome", h1);
   trk.set("limitHome2", h2);
   trk.set("isHomed", systemHomed);
+  trk.set("homedAz", homedAz);
+  trk.set("homedEl", homedEl);
+  trk.set("homingFault", homingFault);
 
   // Thong so co hoc & Gioi han mem (Bao ve phan cung va hien thi chuan)
   trk.set("k_enc_deg_per_pulse", getDegPerCount());
@@ -2313,7 +2327,9 @@ void pushTelemetryToFirebase() {
   trk.set("mode", (currentTrackSource != TRACK_SRC_OFF) ? "AUTO" : "MANUAL");
 
   const char *stStr = "IDLE";
-  if (isEmergencyCoverActive) {
+  if (homingFault || systemFsmState == FSM_STATE_FAULT) {
+    stStr = "FAULT";
+  } else if (isEmergencyCoverActive) {
     stStr = "EMERGENCY_COVER";
   } else if (stateM1 == STATE_AUTO_HOMING || stateM2 == STATE_AUTO_HOMING) {
     stStr = "HOMING";
@@ -2357,7 +2373,9 @@ void pushTelemetryToFirebase() {
   } else {
     trk.set("wake_at", "AWAKE");
   }
-  if (isEmergencyCoverActive) {
+  if (homingFault || systemFsmState == FSM_STATE_FAULT) {
+    trk.set("displayState", "LOI HOMING (CAN KIEM TRA)");
+  } else if (isEmergencyCoverActive) {
     trk.set("displayState", "KHẨN CẤP (Góc Max phủ bạt)");
     trk.set("holdRemainSec", 0);
   } else if (isMaxAzimuthReached) {
@@ -2993,10 +3011,14 @@ bool homeAxisToSwitch(int axis) {
 
   const char *axisName =
       (axis == 1) ? "Truc 1 (Azimuth)" : "Truc 2 (Elevation)";
-  if (axis == 1)
+  if (axis == 1) {
     stateM1 = STATE_AUTO_HOMING;
-  else
+    homedAz = false;
+  } else {
     stateM2 = STATE_AUTO_HOMING;
+    homedEl = false;
+  }
+  systemHomed = (homedAz && homedEl);
 
   auto checkCancel = [&]() -> bool {
     esp_task_wdt_reset();
@@ -3281,6 +3303,12 @@ bool homeAxisToSwitch(int axis) {
 
   Serial.printf(">> [HOMING HOAN TAT 100%%] %s DA XAC THUC DU 3 LAN CHAM & LUI NHA SWITCH -> MOC CHUAN TUYET DOI! (Vi tri: %ld buoc, %ld counts)\n",
                 axisName, (long)pullSteps, (long)pullEncCounts);
+  if (axis == 1)
+    homedAz = true;
+  else
+    homedEl = true;
+  systemHomed = (homedAz && homedEl);
+  if (systemHomed) homingFault = false;
   stateM1 = STATE_IDLE;
   stateM2 = STATE_IDLE;
   requestTelemetryPrint();
@@ -3384,8 +3412,15 @@ bool runDualHomingToSwitches() {
 
   // 1. Trục 2 (Elevation) Home trước để nâng giàn pin an toàn, chống cấn khung
   Serial.println(">> [GIAI DOAN 1/2] BAT DAU HOMING TRUC 2 (ELEVATION)...");
-  if (!homeAxisToSwitch(2)) {
-    Serial.println(">> [THAT BAI] Homing Truc 2 khong thanh cong!");
+  homedEl = homeAxisToSwitch(2);
+  if (!homedEl) {
+    homingFault = true;
+    systemHomed = false;
+    systemFsmState = FSM_STATE_FAULT;
+    currentTrackSource = TRACK_SRC_OFF;
+    autoOpticalTracking = false;
+    Serial.println(">> [THAT BAI] Homing Truc 2 khong thanh cong! Set FAULT va khoa bam.");
+    requestTelemetryPrint();
     return false;
   }
 
@@ -3393,12 +3428,20 @@ bool runDualHomingToSwitches() {
 
   // 2. Trục 1 (Azimuth) Home sau khi Trục 2 đã an toàn
   Serial.println(">> [GIAI DOAN 2/2] BAT DAU HOMING TRUC 1 (AZIMUTH)...");
-  if (!homeAxisToSwitch(1)) {
-    Serial.println(">> [THAT BAI] Homing Truc 1 khong thanh cong!");
+  homedAz = homeAxisToSwitch(1);
+  if (!homedAz) {
+    homingFault = true;
+    systemHomed = false;
+    systemFsmState = FSM_STATE_FAULT;
+    currentTrackSource = TRACK_SRC_OFF;
+    autoOpticalTracking = false;
+    Serial.println(">> [THAT BAI] Homing Truc 1 khong thanh cong! Set FAULT va khoa bam.");
+    requestTelemetryPrint();
     return false;
   }
 
   systemHomed = true;
+  homingFault = false;
   Serial.println("\n>> [HOMING CHOT MOC HOAN TAT 100%] Ca 2 truc da chot "
                  "switch 0.0° tuyet doi!");
   requestTelemetryPrint();
@@ -4878,8 +4921,13 @@ void loop() {
     Serial.println("=======================================================");
 
     // 1. Homing lại cả 2 trục
-    runDualHomingToSwitches();
-
+    if (!runDualHomingToSwitches()) {
+      Serial.println(">> [REMOTE UNLOCK LOI] Homing that bai! Khoa he thong o the FAULT.");
+      systemFsmState = FSM_STATE_FAULT;
+      currentTrackSource = TRACK_SRC_OFF;
+      autoOpticalTracking = false;
+      requestTelemetryPrint();
+    } else {
     // 2. Đọc giờ RTC
     int y = 0, m = 0, d = 0, hh = 0, mm = 0, ss = 0;
     float tC = 0.0f;
@@ -4913,6 +4961,7 @@ void loop() {
       Serial.println(">> [UNLOCK COMPLETE] Da mo khoa thanh cong! Tiep tuc bam "
                      "Hybrid tu dong.");
     }
+    }
     requestTelemetryPrint();
   }
 
@@ -4923,7 +4972,12 @@ void loop() {
     remoteHomeTrigger = false;
     Serial.println(
         "\n>> [REMOTE HOMING] Dang thuc hien Homing ca 2 truc ve cong tac...");
-    runDualHomingToSwitches();
+    if (!runDualHomingToSwitches()) {
+      Serial.println(">> [REMOTE HOMING LOI] Homing that bai! Khoa he thong o the FAULT.");
+      systemFsmState = FSM_STATE_FAULT;
+      currentTrackSource = TRACK_SRC_OFF;
+      autoOpticalTracking = false;
+    } else {
     Serial.println(">> [REMOTE HOMING] Hoan thanh Homing!");
     int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
     float curT = 0.0f;
@@ -4935,6 +4989,7 @@ void loop() {
       isMaxAzimuthReached = false;
       systemFsmState = FSM_STATE_TRACKING;
       Serial.println(">> [REMOTE HOMING] Ban ngay -> Tu dong tiep tuc bam nhat Hybrid!");
+    }
     }
     requestTelemetryPrint();
   }
