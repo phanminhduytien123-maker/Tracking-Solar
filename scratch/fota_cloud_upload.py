@@ -18,6 +18,9 @@ import subprocess
 import urllib.request
 import urllib.error
 
+# Force unbuffered stdout
+sys.stdout.reconfigure(line_buffering=True)
+
 # Configurations
 REPO_OWNER = "phanminhduytien123-maker"
 REPO_NAME = "Tracking-Solar"
