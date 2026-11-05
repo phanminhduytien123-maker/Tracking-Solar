@@ -22,6 +22,12 @@
 #include "solar_geometry.h"
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
+#include <WiFiClientSecure.h>
+
+#define CURRENT_FIRMWARE_VERSION "2.1.0"
+
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
 #include <INA226.h>
@@ -118,6 +124,8 @@ bool computeSolarTrackingTargets(float &targetAz, float &targetEl, float &azSun,
                                  float &elSun, float &zenithSun, float &ws,
                                  bool &isDaylight);
 void checkRemoteFirebaseCommands();
+void executeCloudFOTA(const String &fotaUrl, const String &targetVersion = "");
+void checkSystemOtaTrigger();
 
 // Firebase Objects
 FirebaseData fbdo;
@@ -2455,6 +2463,7 @@ void pushTelemetryToFirebase() {
   const char *psoSourceStr = psoHasConverged ? "ONLINE_RAM" : "NONE";
   trk.set("activeAlgorithm", algStr);
   trk.set("algo_state", algoStateStr);
+  trk.set("firmware_version", CURRENT_FIRMWARE_VERSION);
 
   // Timestamp là Unix epoch UTC+7 từ RTC DS3231 (A5: bỏ millis())
   uint32_t epochNow = getRtcEpochUTC7();
@@ -2550,6 +2559,115 @@ void pushTelemetryToFirebase() {
   root.set("static", sta);
   root.set("algorithm", algoJson);
   Firebase.RTDB.updateNode(&fbdo, "/solar", &root);
+}
+
+// =========================================================================
+// THỰC THI NÂNG CẤP FIRMWARE TỪ XA QUA CLOUD (FOTA - CLOUD OTA)
+// =========================================================================
+void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
+  if (fotaUrl.length() == 0) return;
+
+  Serial.println("\n=======================================================");
+  Serial.printf(">> [FOTA START] Nhan lenh cap nhat firmware tu xa qua Cloud!\n");
+  Serial.printf(">> URL: %s\n", fotaUrl.c_str());
+  if (targetVersion.length() > 0) {
+    Serial.printf(">> Phien ban dich: %s (Hien tai: %s)\n", targetVersion.c_str(), CURRENT_FIRMWARE_VERSION);
+  }
+  Serial.println("=======================================================");
+
+  // 1. Khoa an toan dong co ngay lap tuc
+  if (stepper1) stepper1->forceStopAndNewPosition(stepper1->getCurrentPosition());
+  if (stepper2) stepper2->forceStopAndNewPosition(stepper2->getCurrentPosition());
+  if (stepper1) stepper1->disableOutputs();
+  if (stepper2) stepper2->disableOutputs();
+
+  // 2. Cap nhat Firebase trang thai DOWNLOADING
+  FirebaseJson otaStatus;
+  otaStatus.set("status", "DOWNLOADING");
+  otaStatus.set("progress", 0);
+  otaStatus.set("target_version", targetVersion);
+  otaStatus.set("current_version", CURRENT_FIRMWARE_VERSION);
+  otaStatus.set("url", fotaUrl);
+  otaStatus.set("error", "");
+  Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+
+  // 3. Cau hinh HTTPUpdate
+  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  httpUpdate.rebootOnUpdate(false); // Tu reboot thu cong sau khi luu trang thai len Firebase
+
+  static unsigned long lastProgressPrint = 0;
+  httpUpdate.onProgress([](size_t current, size_t total) {
+    if (total > 0) {
+      int pct = (int)((current * 100) / total);
+      if (millis() - lastProgressPrint >= 1500 || pct == 100) {
+        lastProgressPrint = millis();
+        Serial.printf(">> [FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n", pct, (unsigned)current, (unsigned)total);
+        Firebase.RTDB.setInt(&cmdFbdo, "/system/ota/progress", pct);
+      }
+    }
+  });
+
+  t_httpUpdate_return ret;
+  if (fotaUrl.startsWith("https://")) {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // Bo qua xac thuc chung chi SSL (cho phep tai tu GitHub/CDN an toan)
+    ret = httpUpdate.update(secureClient, fotaUrl);
+  } else {
+    WiFiClient client;
+    ret = httpUpdate.update(client, fotaUrl);
+  }
+
+  if (ret == HTTP_UPDATE_OK) {
+    Serial.println("\n>> [FOTA SUCCESS] Ghi Flash thanh cong 100%! Dang luu trang thai...");
+    otaStatus.set("status", "SUCCESS");
+    otaStatus.set("progress", 100);
+    otaStatus.set("current_version", targetVersion.length() > 0 ? targetVersion : "NEW_VERSION");
+    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    delay(1000);
+    Serial.println(">> [FOTA] Khoi dong lai ESP32 de chay firmware moi...");
+    ESP.restart();
+  } else if (ret == HTTP_UPDATE_NO_UPDATES) {
+    Serial.println(">> [FOTA] Khong co ban cap nhat moi.");
+    otaStatus.set("status", "NO_UPDATES");
+    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    if (stepper1) stepper1->enableOutputs();
+    if (stepper2) stepper2->enableOutputs();
+  } else {
+    String err = httpUpdate.getLastErrorString();
+    int errCode = httpUpdate.getLastError();
+    Serial.printf(">> [FOTA ERROR] Loi (%d): %s\n", errCode, err.c_str());
+    otaStatus.set("status", "FAILED");
+    otaStatus.set("error", err);
+    Firebase.RTDB.setJSON(&cmdFbdo, "/system/ota", &otaStatus);
+    if (stepper1) stepper1->enableOutputs();
+    if (stepper2) stepper2->enableOutputs();
+  }
+}
+
+// Kiem tra co kich hoat OTA tu xa tai /system/ota/trigger
+void checkSystemOtaTrigger() {
+  if (Firebase.RTDB.getJSON(&cmdFbdo, "/system/ota")) {
+    FirebaseJson &json = cmdFbdo.jsonObject();
+    FirebaseJsonData jsonData;
+    bool trigger = false;
+    json.get(jsonData, "trigger");
+    if (jsonData.success) trigger = jsonData.boolValue;
+
+    if (trigger) {
+      String url = "";
+      json.get(jsonData, "url");
+      if (jsonData.success) url = jsonData.stringValue;
+
+      String targetVer = "";
+      json.get(jsonData, "target_version");
+      if (jsonData.success) targetVer = jsonData.stringValue;
+
+      if (url.length() > 0) {
+        Firebase.RTDB.setBool(&cmdFbdo, "/system/ota/trigger", false);
+        executeCloudFOTA(url, targetVer);
+      }
+    }
+  }
 }
 
 // Kiểm tra lệnh điều khiển từ xa từ Web Dashboard (/solar/control)
@@ -2812,6 +2930,22 @@ void checkRemoteFirebaseCommands() {
         remotePsoTrigger = true;
         shouldAck = true;
       }
+      // 9. LỆNH CẬP NHẬT FIRMWARE TỪ XA QUA CLOUD (FOTA)
+      else if (cmd.equalsIgnoreCase("fota") || cmd.equalsIgnoreCase("fota_update") || cmd.equalsIgnoreCase("ota_cloud")) {
+        String fotaUrl = "";
+        json.get(jsonData, "url");
+        if (jsonData.success) fotaUrl = jsonData.stringValue;
+        String fotaVer = "";
+        json.get(jsonData, "version");
+        if (jsonData.success) fotaVer = jsonData.stringValue;
+        if (fotaUrl.length() > 0) {
+          saveLastHandledCmdId(cmdId, newEmgTs);
+          Firebase.RTDB.setBool(&cmdFbdo, "/solar/control/ack", true);
+          Serial.printf(">> [REMOTE FOTA] Nhan lenh FOTA tu xa voi URL: %s\n", fotaUrl.c_str());
+          executeCloudFOTA(fotaUrl, fotaVer);
+          return;
+        }
+      }
     }
 
     // Xử lý xác nhận lệnh (ack) và lưu vào NVS (Yêu cầu 3)
@@ -2857,6 +2991,15 @@ void telemetryTask(void *pvParameters) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
+      }
+    }
+
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /system/ota mỗi 5s
+    static unsigned long lastFotaCheck = 0;
+    if (now - lastFotaCheck >= 5000) {
+      lastFotaCheck = now;
+      if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+        checkSystemOtaTrigger();
       }
     }
 
