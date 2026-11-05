@@ -773,12 +773,13 @@ export class FirebaseSolarService {
     const totalLux = (luxConvFactor !== null && totalLightAdc !== null) ? Math.round(totalLightAdc * luxConvFactor) : (tracking.total_lux !== undefined ? Number(tracking.total_lux) : null);
 
     // Trạng thái ánh sáng: DAY / NIGHT / NO_DATA
+    const avgAdc = (ldrT !== null && ldrB !== null && ldrL !== null && ldrR !== null) ? (totalLightAdc / 4) : 0;
     let lightState = 'NO_DATA';
     if (!isTrackingLive || ldrT === null) {
       lightState = 'NO_DATA'; // Mất kết nối -> Không có dữ liệu cảm biến
     } else if (tracking.light_state) {
       lightState = tracking.light_state; // Firmware trực tiếp gửi
-    } else if (isSleeping) {
+    } else if (isSleeping || avgAdc < 50 || tracking.is_daylight === false) {
       lightState = 'NIGHT';
     } else {
       lightState = 'DAY';
@@ -792,30 +793,43 @@ export class FirebaseSolarService {
     let fuzzyData = null;
 
     if (hasAlgoData) {
+      const costVal = algo.cost_j !== undefined ? Number(algo.cost_j) : (algo.psoCostJ !== undefined ? Number(algo.psoCostJ) : (algo.psoBestFitness !== undefined ? Number(algo.psoBestFitness) : null));
+      const runTimeVal = algo.run_time_ms !== undefined ? Number(algo.run_time_ms) : (algo.psoRunTimeMs !== undefined ? Number(algo.psoRunTimeMs) : null);
+      const iterVal = algo.iteration !== undefined ? Number(algo.iteration) : (algo.psoIteration !== undefined ? Number(algo.psoIteration) : null);
+
       psoData = {
         source: algo.psoSource || algo.source || 'ONLINE',
-        costJ: algo.cost_j !== undefined ? Number(algo.cost_j) : (algo.psoCostJ !== undefined ? Number(algo.psoCostJ) : (algo.psoBestFitness !== undefined ? Number(algo.psoBestFitness) : null)),
-        runTimeMs: algo.run_time_ms !== undefined ? Number(algo.run_time_ms) : (algo.psoRunTimeMs !== undefined ? Number(algo.psoRunTimeMs) : null),
+        costJ: costVal,
+        cost_j: costVal,
+        runTimeMs: runTimeVal,
+        run_time_ms: runTimeVal,
         swarmSize: algo.swarm_size !== undefined ? Number(algo.swarm_size) : (algo.psoSwarmSize !== undefined ? Number(algo.psoSwarmSize) : null),
-        iteration: algo.iteration !== undefined ? Number(algo.iteration) : (algo.psoIteration !== undefined ? Number(algo.psoIteration) : null),
+        iteration: iterVal,
         maxIterations: algo.max_iterations !== undefined ? Number(algo.max_iterations) : (algo.psoMaxIterations !== undefined ? Number(algo.psoMaxIterations) : null),
         status: algo.status || algoState
       };
 
+      const kpAz = Number(algo.kpAzBase || algo.kp_az || 2.40);
+      const kiAz = Number(algo.kiAzBase || algo.ki_az || 0.08);
+      const kdAz = Number(algo.kdAzBase || algo.kd_az || 0.65);
+
       fuzzyData = {
         activeAlgorithm: tracking.activeAlgorithm || algo.name || 'PSO_FUZZY_PID',
+        kp: kpAz,
+        ki: kiAz,
+        kd: kdAz,
         az: {
-          kpBase: Number(algo.kpAzBase || algo.kp_az || 0),
-          kiBase: Number(algo.kiAzBase || algo.ki_az || 0),
-          kdBase: Number(algo.kdAzBase || algo.kd_az || 0),
+          kpBase: kpAz,
+          kiBase: kiAz,
+          kdBase: kdAz,
           deltaKp: Number(algo.deltaKpAz || algo.delta_kp_az || 0),
           deltaKi: Number(algo.deltaKiAz || algo.delta_ki_az || 0),
           deltaKd: Number(algo.deltaKdAz || algo.delta_kd_az || 0)
         },
         el: {
-          kpBase: Number(algo.kpElBase || algo.kp_el || 0),
-          kiBase: Number(algo.kiElBase || algo.ki_el || 0),
-          kdBase: Number(algo.kdElBase || algo.kd_el || 0),
+          kpBase: Number(algo.kpElBase || algo.kp_el || 2.80),
+          kiBase: Number(algo.kiElBase || algo.ki_el || 0.10),
+          kdBase: Number(algo.kdElBase || algo.kd_el || 0.75),
           deltaKp: Number(algo.deltaKpEl || algo.delta_kp_el || 0),
           deltaKi: Number(algo.deltaKiEl || algo.delta_ki_el || 0),
           deltaKd: Number(algo.deltaKdEl || algo.delta_kd_el || 0)
