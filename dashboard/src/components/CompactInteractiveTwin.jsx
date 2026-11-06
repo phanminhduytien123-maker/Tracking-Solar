@@ -1317,7 +1317,7 @@ export default function CompactInteractiveTwin({
     };
 
     // --- A. ĐƯỜNG NĂNG LƯỢNG MẶT TRỜI (CƯỜNG ĐỘ PHỤ THUỘC CÔNG SUẤT INA226, BAN ĐÊM = 0W SẼ TẮT) ---
-    // A1. Năng lượng từ Tấm pin Tracker -> Cảm biến INA226 (#1) trong tủ điện
+    // A1. Năng lượng DC từ Tấm pin Tracker (2 dây Dương Đỏ + / Âm Đen -) -> Cảm biến INA226 (#1) trong tủ điện
     createAnimatedFlowPath(
       scene,
       [
@@ -1325,30 +1325,64 @@ export default function CompactInteractiveTwin({
         new THREE.Vector3(-1.95, frameY + 1.15, -0.08),
         new THREE.Vector3(-1.75, frameY + 0.35, -0.18),
         new THREE.Vector3(-1.25, frameY + 0.12, -0.25),
-        new THREE.Vector3(-0.40, frameY + 0.20, 0.10) // Tới INA226 Tracker trong hộp điện
+        new THREE.Vector3(-0.40, frameY + 0.20, 0.10) // Dây (+) tới INA226 Tracker
       ],
-      0x1e293b,
-      0x38bdf8, // Xanh dương sáng cho năng lượng tấm Tracker
-      0.015,
+      0xb91c1c, // Dây Dương (+) màu đỏ
+      0x38bdf8,
+      0.012,
       5,
       0.32,
       'solar_tracker'
     );
 
-    // A2. Năng lượng từ Tấm pin Cố định -> Cảm biến INA226 (#2) trong tủ điện
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-0.40, frameY + 0.18, 0.06), // Dây Âm (-) từ mass tủ điện về Tấm Tracker
+        new THREE.Vector3(-1.25, frameY + 0.10, -0.28),
+        new THREE.Vector3(-1.75, frameY + 0.33, -0.21),
+        new THREE.Vector3(-1.95, frameY + 1.13, -0.11),
+        new THREE.Vector3(-2.05, frameY + 1.83, -0.08)
+      ],
+      0x1e293b, // Dây Âm (-) màu đen
+      0x38bdf8,
+      0.012,
+      4,
+      0.32,
+      'solar_tracker'
+    );
+
+    // A2. Năng lượng DC từ Tấm pin Cố định (2 dây Dương Đỏ + / Âm Đen -) -> Cảm biến INA226 (#2) trong tủ điện
     createAnimatedFlowPath(
       scene,
       [
         new THREE.Vector3(2.15, frameY + 1.65, -0.05),
         new THREE.Vector3(2.08, frameY + 0.45, -0.08),
-        new THREE.Vector3(1.45, frameY + 0.10, -0.22),
-        new THREE.Vector3(0.78, frameY + 0.22, -0.20),
-        new THREE.Vector3(-0.24, frameY + 0.20, 0.10) // Tới INA226 Static trong hộp điện
+        new THREE.Vector3(1.45, frameY + 0.12, -0.12),
+        new THREE.Vector3(0.78, frameY + 0.22, -0.14),
+        new THREE.Vector3(-0.24, frameY + 0.20, 0.10) // Dây (+) tới INA226 Static
       ],
-      0x1e293b,
-      0xfbbf24, // Vàng cam cho năng lượng tấm Cố định
-      0.015,
+      0xb91c1c, // Dây Dương (+) màu đỏ
+      0xfbbf24,
+      0.012,
       5,
+      0.32,
+      'solar_static'
+    );
+
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-0.24, frameY + 0.18, 0.06), // Dây Âm (-) từ mass tủ điện về Tấm Cố định
+        new THREE.Vector3(0.78, frameY + 0.20, -0.17),
+        new THREE.Vector3(1.45, frameY + 0.10, -0.15),
+        new THREE.Vector3(2.08, frameY + 0.43, -0.11),
+        new THREE.Vector3(2.15, frameY + 1.63, -0.08)
+      ],
+      0x1e293b, // Dây Âm (-) màu đen
+      0xfbbf24,
+      0.012,
+      4,
       0.32,
       'solar_static'
     );
@@ -1384,20 +1418,37 @@ export default function CompactInteractiveTwin({
       'solar_static'
     );
 
-    // A4. Từ mạch sạc Solar PWM -> Nạp ra Bình Ắc quy 12V (cường độ theo tổng công suất 2 tấm INA226)
+    // A4. Mạch kín 2 dây (Dương Đỏ + và Âm Đen -) giữa Mạch sạc Solar PWM và Bình Ắc quy 12V:
+    // - Ban ngày (INA226 > 0.05W): Mạch PWM nạp điện ra Cọc (+) Ắc quy và khép mạch qua Cọc (-)
+    // - Ban đêm (INA226 = 0W): Cọc (+) Ắc quy cấp điện ngược vào Mạch PWM để nuôi hệ thống ESP32 & Driver, khép mạch về Cọc (-)
     createAnimatedFlowPath(
       scene,
       [
-        new THREE.Vector3(0.12, frameY + 0.36, -0.28), // Ngõ ra Battery của mạch sạc PWM
-        new THREE.Vector3(0.88, frameY + 0.28, -0.32),
-        new THREE.Vector3(1.60, 0.43, -0.27) // Cọc (+) Bình Ắc quy 12V sau khi xoay dọc 90°
+        new THREE.Vector3(0.08, frameY + 0.36, -0.26), // Cổng BATT (+) của mạch sạc Solar PWM
+        new THREE.Vector3(0.88, frameY + 0.26, -0.26),
+        new THREE.Vector3(1.60, 0.43, -0.27)           // Cọc Dương (+) màu đỏ của Bình Ắc quy 12V
       ],
-      0x991b1b,
-      0x22c55e, // Xanh lá nạp điện vào ắc quy
+      0xdc2626, // Dây Dương (+) màu đỏ
+      0x22c55e,
       0.013,
       4,
       0.36,
-      'battery_charge'
+      'battery_pos'
+    );
+
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(1.60, 0.43, -0.63),          // Cọc Âm (-) màu đen của Bình Ắc quy 12V
+        new THREE.Vector3(0.88, frameY + 0.24, -0.58),
+        new THREE.Vector3(0.16, frameY + 0.34, -0.32)  // Cổng BATT (-) / GND của mạch sạc Solar PWM
+      ],
+      0x18181b, // Dây Âm (-) màu đen nối vào cọc đen ắc quy
+      0x38bdf8,
+      0.013,
+      4,
+      0.36,
+      'battery_neg'
     );
 
     // --- B. TƯƠNG TÁC NỘI BỘ TRONG TỦ ĐIỆN (LUÔN HOẠT ĐỘNG KHI HỆ THỐNG BẬT) ---
@@ -1655,6 +1706,7 @@ export default function CompactInteractiveTwin({
         let speedScale = 1.0;
         let opacity = 0.88;
         let radiusScale = 1.0;
+        let dirSign = 1;
 
         if (sys.flowType === 'solar_tracker') {
           if (trkPower <= 0.05) {
@@ -1674,21 +1726,28 @@ export default function CompactInteractiveTwin({
             opacity = Math.min(1.0, 0.4 + norm * 0.6);
             radiusScale = 0.8 + norm * 0.45;
           }
-        } else if (sys.flowType === 'battery_charge') {
-          if (totalSolarPower <= 0.05) {
-            active = false;
-          } else {
+        } else if (sys.flowType === 'battery_pos' || sys.flowType === 'battery_neg') {
+          // Logic mạch kín 2 dây của Bình Ắc quy:
+          // - Ban ngày (totalSolarPower > 0.05W): Mạch PWM nạp điện vào cọc (+) ắc quy, khép mạch về từ cọc (-)
+          // - Ban đêm (totalSolarPower <= 0.05W): Ắc quy xả dòng nuôi hệ thống (chạy ngược từ cọc (+) vào tủ điện, khép mạch về cọc (-))
+          if (totalSolarPower > 0.05) {
             const norm = Math.min(totalSolarPower / 45.0, 1.5);
             speedScale = 0.45 + norm * 1.4;
             opacity = Math.min(1.0, 0.45 + norm * 0.55);
             radiusScale = 0.85 + norm * 0.5;
+            dirSign = 1; // Chiều nạp vào ắc quy
+          } else {
+            speedScale = 0.45;
+            opacity = 0.72;
+            radiusScale = 0.78;
+            dirSign = -1; // Chiều ắc quy xả nguồn nuôi tủ điện ban đêm
           }
         }
 
         sys.pulses.forEach((p) => {
           p.mesh.visible = active;
           if (active) {
-            p.offset = (p.offset + dt * sys.baseSpeed * speedScale) % 1.0;
+            p.offset = (p.offset + dirSign * dt * sys.baseSpeed * speedScale + 1.0) % 1.0;
             const pos = sys.curve.getPointAt(p.offset);
             p.mesh.position.copy(pos);
             p.mesh.scale.setScalar(radiusScale);
@@ -1896,11 +1955,11 @@ export default function CompactInteractiveTwin({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng nạp Ắc quy (INA226 → PWM)</td>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Mạch Ắc quy 12V (2 dây + / -)</td>
                   <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
                     {(Number(tracking.power) || 0) + (Number(stat.power) || 0) > 0.05
-                      ? `Đang nạp (${formatValueOrDash((Number(tracking.power) || 0) + (Number(stat.power) || 0), 1, 'W')})`
-                      : '0,0 W (Ngắt dòng sạc ban đêm)'}
+                      ? `Đang nạp vào Ắc quy (${formatValueOrDash((Number(tracking.power) || 0) + (Number(stat.power) || 0), 1, 'W')})`
+                      : 'Xả nguồn 12V nuôi tủ điện (Ban đêm 0,0 W)'}
                   </td>
                 </tr>
                 <tr>
