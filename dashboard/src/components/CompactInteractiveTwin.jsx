@@ -1251,9 +1251,10 @@ export default function CompactInteractiveTwin({
     // =========================================================================
     // 5. HỆ THỐNG DÂY CÁP, BÌNH ẮC QUY 12V VÀ DÒNG NĂNG LƯỢNG / TÍN HIỆU 3D
     // =========================================================================
-    // Cụm Bình Ắc quy 12V đặt bên cạnh/dưới tủ điện để nhận dòng sạc từ mạch sạc PWM
+    // Cụm Bình Ắc quy 12V đặt dọc (xoay 90 độ) bên cạnh/dưới tủ điện để nhận dòng sạc từ mạch sạc PWM
     const batteryGroup = new THREE.Group();
-    batteryGroup.position.set(1.38, 0.02, -0.52);
+    batteryGroup.position.set(1.52, 0.02, -0.45);
+    batteryGroup.rotation.y = Math.PI / 2;
     scene.add(batteryGroup);
 
     const batBody = new THREE.Mesh(
@@ -1388,8 +1389,8 @@ export default function CompactInteractiveTwin({
       scene,
       [
         new THREE.Vector3(0.12, frameY + 0.36, -0.28), // Ngõ ra Battery của mạch sạc PWM
-        new THREE.Vector3(0.75, frameY + 0.28, -0.42),
-        new THREE.Vector3(1.20, 0.43, -0.44) // Cọc (+) Bình Ắc quy 12V
+        new THREE.Vector3(0.88, frameY + 0.28, -0.32),
+        new THREE.Vector3(1.60, 0.43, -0.27) // Cọc (+) Bình Ắc quy 12V sau khi xoay dọc 90°
       ],
       0x991b1b,
       0x22c55e, // Xanh lá nạp điện vào ắc quy
