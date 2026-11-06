@@ -22,7 +22,6 @@ import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebase
 import { fetchLiveWeather, getFallbackWeatherData, HCMC_COORDINATES } from './services/weatherService';
 import { checkUserLoginAllowedAsync } from './services/userService';
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles, MapPin } from 'lucide-react';
-import { TbSolarPanel, TbLayoutDashboard } from 'react-icons/tb';
 
 export default function App() {
   // Authentication State
@@ -950,10 +949,11 @@ export default function App() {
       <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10">
 
         {compactMode ? (
-          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN (ĐỘC LẬP HOÀN TOÀN VỚI GIAO DIỆN TIÊU CHUẨN) */
-          <section aria-label="Mô hình trực quan Compact Mode">
+          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN 3D (ĐỘC LẬP HOÀN TOÀN VỚI GIAO DIỆN TIÊU CHUẨN) */
+          <section aria-label="Mô hình 3D trực quan Compact Mode">
             <CompactInteractiveTwin
               telemetry={telemetry}
+              themeMode={themeMode}
               isAdmin={authSession?.role === 'admin'}
               onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
               onOpenManualModal={() => setIsManualModalOpen(true)}
@@ -1171,22 +1171,17 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* Nút Gạt Mode Compact (Mô hình trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
+            {/* Nút Gạt Mode Compact (Mô hình 3D trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
             <button
               id="btn-toggle-compact-mode"
               onClick={() => setCompactMode((prev) => !prev)}
-              className={`p-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center gap-2 text-xs font-semibold ${
+              className={`px-2.5 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center gap-2 text-xs font-semibold ${
                 compactMode
                   ? 'bg-blue-700 hover:bg-blue-800 border-blue-500 text-white'
                   : 'bg-white/90 dark:bg-slate-900/90 hover:bg-zinc-100 dark:hover:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-800 dark:text-slate-100'
               }`}
-              title={compactMode ? 'Đang bật Mode Compact trực quan — Nhấn để về giao diện Tiêu chuẩn' : 'Bật Mode Compact: Xem mô hình 2 tấm pin, trục đai răng & hộp điện trực quan'}
+              title={compactMode ? 'Đang bật Mode Compact 3D — Nhấn để về giao diện Tiêu chuẩn' : 'Bật Mode Compact: Xem mô hình 3D tương tác của 2 tấm pin, trục đai răng & hộp điện'}
             >
-              {compactMode ? (
-                <TbLayoutDashboard className="w-4 h-4 text-sky-200 shrink-0" />
-              ) : (
-                <TbSolarPanel className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
-              )}
               <span className={`text-[11px] ${compactMode ? 'text-white font-bold' : 'text-zinc-900 dark:text-white'}`}>
                 Mode Compact
               </span>

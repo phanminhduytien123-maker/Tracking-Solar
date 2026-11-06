@@ -13,7 +13,6 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { Maximize2, X } from 'lucide-react';
-import { TbChartAreaLine, TbChartBar, TbDownload, TbAdjustmentsHorizontal } from 'react-icons/tb';
 import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
 
 ChartJS.register(
@@ -660,7 +659,6 @@ export default function ChartsSection({
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <TbChartAreaLine className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
                 <span>Đồ thị công suất trong ngày</span>
                 {selectedIntradayDate && (
                   <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 rounded-sm">
@@ -713,9 +711,8 @@ export default function ChartsSection({
         <div className="lab-card p-4 flex flex-col justify-between">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <TbChartBar className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>Đồ thị năng lượng tích lũy</span>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                Đồ thị năng lượng tích lũy
               </h3>
               <p className="text-xs text-zinc-600 dark:text-slate-300 font-medium mt-0.5">
                 Sản lượng điện (Wh) và % Gain cải thiện theo khoảng thời gian
@@ -771,21 +768,19 @@ export default function ChartsSection({
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportCSV}
-              className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
               title="Tải toàn bộ số liệu 30 ngày về máy dạng file CSV"
             >
-              <TbDownload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>Xuất CSV 30 ngày</span>
+              Xuất CSV 30 ngày
             </button>
 
             {isAdmin && onOpenDataSettings && (
               <button
                 onClick={() => onOpenDataSettings()}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer shadow-xs transition-colors"
                 title="Mở tab cài đặt để chỉnh sửa dữ liệu"
               >
-                <TbAdjustmentsHorizontal className="w-3.5 h-3.5 shrink-0" />
-                <span>Tùy biến dữ liệu</span>
+                Tùy biến dữ liệu
               </button>
             )}
           </div>
@@ -794,7 +789,7 @@ export default function ChartsSection({
         {/* 5 THẺ KPI TỔNG KẾT 30 NGÀY */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* KPI 1: Năng lượng */}
-          <div className="lab-card p-3.5 flex flex-col justify-between border-t-2 border-t-blue-600 dark:border-t-sky-400">
+          <div className="lab-card p-3.5 flex flex-col justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
               Tổng năng lượng 30 ngày
             </span>
@@ -813,7 +808,7 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 2: Điện áp Voc */}
-          <div className="lab-card p-3.5 flex flex-col justify-between border-t-2 border-t-amber-500 dark:border-t-amber-400">
+          <div className="lab-card p-3.5 flex flex-col justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
               Voc trung bình
             </span>
@@ -834,7 +829,7 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 3: Dòng Isc */}
-          <div className="lab-card p-3.5 flex flex-col justify-between border-t-2 border-t-emerald-600 dark:border-t-emerald-400">
+          <div className="lab-card p-3.5 flex flex-col justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
               Isc đỉnh trung bình
             </span>
@@ -855,7 +850,7 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 4: Nhiệt độ */}
-          <div className="lab-card p-3.5 flex flex-col justify-between border-t-2 border-t-purple-600 dark:border-t-purple-400">
+          <div className="lab-card p-3.5 flex flex-col justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
               Nhiệt độ TB (Tcell)
             </span>
@@ -876,7 +871,7 @@ export default function ChartsSection({
           </div>
 
           {/* KPI 5: Trạng thái đo */}
-          <div className="lab-card p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1 border-t-2 border-t-indigo-600 dark:border-t-indigo-400">
+          <div className="lab-card p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
               Độ tin cậy chu kỳ
             </span>
