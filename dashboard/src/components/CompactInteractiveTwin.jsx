@@ -421,8 +421,16 @@ export default function CompactInteractiveTwin({
     tiltRad: THREE.MathUtils.degToRad(30),
     lidRad: 0,
     camTargetPos: null,
-    camLookAt: null
+    camLookAt: null,
+    trkPower: 0,
+    staPower: 0
   });
+
+  // Đồng bộ công suất tức thời đọc từ 2 cảm biến INA226 để điều khiển cường độ dòng năng lượng mặt trời
+  useEffect(() => {
+    targetAnglesRef.current.trkPower = Math.max(0, Number(tracking.power) || 0);
+    targetAnglesRef.current.staPower = Math.max(0, Number(stat.power) || 0);
+  }, [tracking.power, stat.power]);
 
   // Đồng bộ góc quay 2 trục của tấm Tracker
   useEffect(() => {
@@ -1241,23 +1249,289 @@ export default function CompactInteractiveTwin({
     staTopGroup.add(staticPanel);
 
     // =========================================================================
-    // 5. DÂY CÁP ĐIỆN MÀU ĐEN NỐI HỘP ĐIỆN VỚI 2 TRỤ PIN
+    // 5. HỆ THỐNG DÂY CÁP, BÌNH ẮC QUY 12V VÀ DÒNG NĂNG LƯỢNG / TÍN HIỆU 3D
     // =========================================================================
-    const cableCurveLeft = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.64, frameY + 0.25, -0.15),
-      new THREE.Vector3(-1.25, frameY + 0.12, -0.25),
-      new THREE.Vector3(-1.75, frameY + 0.35, -0.18),
-      new THREE.Vector3(-1.95, frameY + 1.15, -0.08)
-    ]);
-    scene.add(new THREE.Mesh(new THREE.TubeGeometry(cableCurveLeft, 24, 0.018, 8, false), rubberBeltMat));
+    // Cụm Bình Ắc quy 12V đặt bên cạnh/dưới tủ điện để nhận dòng sạc từ mạch sạc PWM
+    const batteryGroup = new THREE.Group();
+    batteryGroup.position.set(1.38, 0.02, -0.52);
+    scene.add(batteryGroup);
 
-    const cableCurveRight = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.78, frameY + 0.22, -0.20),
-      new THREE.Vector3(1.45, frameY + 0.10, -0.22),
-      new THREE.Vector3(2.08, frameY + 0.45, -0.08),
-      new THREE.Vector3(2.12, frameY + 1.45, -0.05)
-    ]);
-    scene.add(new THREE.Mesh(new THREE.TubeGeometry(cableCurveRight, 24, 0.016, 8, false), rubberBeltMat));
+    const batBody = new THREE.Mesh(
+      new RoundedBoxGeometry(0.56, 0.36, 0.34, 2, 0.012),
+      matteBlackPrintMat
+    );
+    batBody.position.set(0, 0.18, 0);
+    batBody.castShadow = true;
+    batteryGroup.add(batBody);
+
+    const batCap = new THREE.Mesh(
+      new RoundedBoxGeometry(0.57, 0.05, 0.35, 2, 0.008),
+      pcbBlueMat
+    );
+    batCap.position.set(0, 0.37, 0);
+    batteryGroup.add(batCap);
+
+    // Cọc dương (+) đỏ và Cọc âm (-) đen của Ắc quy
+    const termPos = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 16), wireRedMat);
+    termPos.position.set(-0.18, 0.41, 0.08);
+    const termNeg = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 16), blackAnodizedMat);
+    termNeg.position.set(0.18, 0.41, 0.08);
+    batteryGroup.add(termPos, termNeg);
+
+    // Hàm tạo đường cáp kèm hạt xung năng lượng chạy dọc theo chiều dài dây
+    const flowSystems = [];
+    const createAnimatedFlowPath = (parent, points, wireColorHex, pulseColorHex, wireRadius, pulseCount, baseSpeed, flowType) => {
+      const curve = new THREE.CatmullRomCurve3(points);
+      const wireMat = new THREE.MeshStandardMaterial({
+        color: wireColorHex,
+        roughness: 0.45,
+        metalness: 0.15
+      });
+      const tubeMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, wireRadius, 8, false), wireMat);
+      parent.add(tubeMesh);
+
+      const pulses = [];
+      const pulseGeom = new THREE.SphereGeometry(wireRadius * 2.25, 12, 12);
+      for (let i = 0; i < pulseCount; i++) {
+        const pulseMat = new THREE.MeshBasicMaterial({
+          color: pulseColorHex,
+          transparent: true,
+          opacity: 0.9
+        });
+        const pulseMesh = new THREE.Mesh(pulseGeom, pulseMat);
+        parent.add(pulseMesh);
+        pulses.push({
+          mesh: pulseMesh,
+          mat: pulseMat,
+          offset: i / pulseCount
+        });
+      }
+
+      flowSystems.push({
+        curve,
+        pulses,
+        baseSpeed,
+        flowType
+      });
+    };
+
+    // --- A. ĐƯỜNG NĂNG LƯỢNG MẶT TRỜI (CƯỜNG ĐỘ PHỤ THUỘC CÔNG SUẤT INA226, BAN ĐÊM = 0W SẼ TẮT) ---
+    // A1. Năng lượng từ Tấm pin Tracker -> Cảm biến INA226 (#1) trong tủ điện
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-2.05, frameY + 1.85, -0.05),
+        new THREE.Vector3(-1.95, frameY + 1.15, -0.08),
+        new THREE.Vector3(-1.75, frameY + 0.35, -0.18),
+        new THREE.Vector3(-1.25, frameY + 0.12, -0.25),
+        new THREE.Vector3(-0.40, frameY + 0.20, 0.10) // Tới INA226 Tracker trong hộp điện
+      ],
+      0x1e293b,
+      0x38bdf8, // Xanh dương sáng cho năng lượng tấm Tracker
+      0.015,
+      5,
+      0.32,
+      'solar_tracker'
+    );
+
+    // A2. Năng lượng từ Tấm pin Cố định -> Cảm biến INA226 (#2) trong tủ điện
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(2.15, frameY + 1.65, -0.05),
+        new THREE.Vector3(2.08, frameY + 0.45, -0.08),
+        new THREE.Vector3(1.45, frameY + 0.10, -0.22),
+        new THREE.Vector3(0.78, frameY + 0.22, -0.20),
+        new THREE.Vector3(-0.24, frameY + 0.20, 0.10) // Tới INA226 Static trong hộp điện
+      ],
+      0x1e293b,
+      0xfbbf24, // Vàng cam cho năng lượng tấm Cố định
+      0.015,
+      5,
+      0.32,
+      'solar_static'
+    );
+
+    // A3. Từ 2 cảm biến INA226 -> Bộ điều khiển sạc Solar PWM (trong hộp điện)
+    createAnimatedFlowPath(
+      boxGroup,
+      [
+        new THREE.Vector3(-0.48, 0.17, 0.05),
+        new THREE.Vector3(-0.42, 0.28, -0.14),
+        new THREE.Vector3(-0.32, 0.35, -0.28)
+      ],
+      0xdc2626,
+      0x38bdf8,
+      0.009,
+      3,
+      0.42,
+      'solar_tracker'
+    );
+
+    createAnimatedFlowPath(
+      boxGroup,
+      [
+        new THREE.Vector3(-0.32, 0.17, 0.05),
+        new THREE.Vector3(-0.22, 0.28, -0.14),
+        new THREE.Vector3(-0.14, 0.35, -0.28)
+      ],
+      0xd97706,
+      0xfbbf24,
+      0.009,
+      3,
+      0.42,
+      'solar_static'
+    );
+
+    // A4. Từ mạch sạc Solar PWM -> Nạp ra Bình Ắc quy 12V (cường độ theo tổng công suất 2 tấm INA226)
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(0.12, frameY + 0.36, -0.28), // Ngõ ra Battery của mạch sạc PWM
+        new THREE.Vector3(0.75, frameY + 0.28, -0.42),
+        new THREE.Vector3(1.20, 0.43, -0.44) // Cọc (+) Bình Ắc quy 12V
+      ],
+      0x991b1b,
+      0x22c55e, // Xanh lá nạp điện vào ắc quy
+      0.013,
+      4,
+      0.36,
+      'battery_charge'
+    );
+
+    // --- B. TƯƠNG TÁC NỘI BỘ TRONG TỦ ĐIỆN (LUÔN HOẠT ĐỘNG KHI HỆ THỐNG BẬT) ---
+    // B1. Cấp nguồn từ Bình Ắc quy / Mạch PWM -> ESP32-S3 & 2 Driver Động cơ Stepper
+    createAnimatedFlowPath(
+      boxGroup,
+      [
+        new THREE.Vector3(-0.04, 0.34, -0.24),
+        new THREE.Vector3(-0.15, 0.26, 0.02),
+        new THREE.Vector3(-0.22, 0.20, 0.24)
+      ],
+      0xb91c1c,
+      0xf43f5e,
+      0.008,
+      3,
+      0.28,
+      'internal_power'
+    );
+
+    // B2. Giao tiếp I2C: Cảm biến INA226 & Đồng hồ thời gian thực DS3231 RTC -> Vi điều khiển ESP32-S3
+    createAnimatedFlowPath(
+      boxGroup,
+      [
+        new THREE.Vector3(-0.48, 0.17, 0.05),
+        new THREE.Vector3(-0.38, 0.22, -0.09), // Qua DS3231 RTC
+        new THREE.Vector3(-0.32, 0.22, 0.05),  // Qua INA226 #2
+        new THREE.Vector3(-0.22, 0.21, 0.24)   // Về ESP32-S3
+      ],
+      0x0284c7,
+      0x38bdf8,
+      0.007,
+      3,
+      0.45,
+      'signal_i2c'
+    );
+
+    // B3. Xung điều khiển Step/Dir từ ESP32-S3 -> 2 bộ Driver TB6600 trong tủ điện
+    createAnimatedFlowPath(
+      boxGroup,
+      [
+        new THREE.Vector3(-0.22, 0.22, 0.20),
+        new THREE.Vector3(-0.05, 0.40, 0.12),
+        new THREE.Vector3(0.10, 0.35, 0.12),
+        new THREE.Vector3(0.40, 0.35, 0.16)
+      ],
+      0x2563eb,
+      0x60a5fa,
+      0.008,
+      3,
+      0.40,
+      'motor_drive'
+    );
+
+    // --- C. ĐƯỜNG CẤP XUNG ĐỘNG CƠ & PHẢN HỒI ENCODER / CÔNG TẮC HÀNH TRÌNH NGOÀI CƠ KHÍ ---
+    // C1. Từ Driver trong tủ điện -> Động cơ bước NEMA 17 Trục 1 (Phương vị) & Trục 2 (Độ ngửa)
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(0.32, frameY + 0.35, 0.18), // Từ cụm Driver trong tủ điện
+        new THREE.Vector3(-0.68, frameY + 0.18, 0.16),
+        new THREE.Vector3(-1.45, frameY + 0.10, 0.35),
+        new THREE.Vector3(-2.05, frameY + 0.12, 0.58) // Tới Motor NEMA 17 Trục 1
+      ],
+      0x1e293b,
+      0xf97316, // Cam sáng cho xung lực cấp ra Động cơ
+      0.011,
+      4,
+      0.38,
+      'motor_drive'
+    );
+
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-1.45, frameY + 0.10, 0.35),
+        new THREE.Vector3(-1.95, frameY + 0.55, 0.12),
+        new THREE.Vector3(-2.22, frameY + 1.42, -0.05) // Lên Motor NEMA 17 Trục 2 trên trụ đứng
+      ],
+      0x1e293b,
+      0xf97316,
+      0.010,
+      3,
+      0.38,
+      'motor_drive'
+    );
+
+    // C2. Phản hồi xung từ Encoder 1 & Encoder 2 -> Quay về ESP32-S3 trong tủ điện
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-2.05, frameY + 0.12, -0.56), // Từ Encoder 1 (đầu kia thanh đỡ dọc)
+        new THREE.Vector3(-1.55, frameY + 0.10, -0.42),
+        new THREE.Vector3(-0.85, frameY + 0.15, -0.12),
+        new THREE.Vector3(-0.14, frameY + 0.24, 0.28) // Về chân ngắt ESP32-S3
+      ],
+      0x0f172a,
+      0xa855f7, // Tím sáng cho xung phản hồi Encoder
+      0.009,
+      4,
+      0.44,
+      'feedback_encoder'
+    );
+
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-1.90, frameY + 1.42, 0.12), // Từ cụm Encoder 2 trên trụ
+        new THREE.Vector3(-1.75, frameY + 0.52, -0.08),
+        new THREE.Vector3(-0.85, frameY + 0.15, -0.12),
+        new THREE.Vector3(-0.14, frameY + 0.24, 0.28) // Về chân ngắt ESP32-S3
+      ],
+      0x0f172a,
+      0xa855f7,
+      0.009,
+      3,
+      0.44,
+      'feedback_encoder'
+    );
+
+    // C3. Tín hiệu từ Công tắc hành trình (SW1, SW2) & 4 Cảm biến ánh sáng TEMT6000 -> Về ESP32-S3
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(-1.89, frameY + 0.16, -0.42), // Từ Công tắc hành trình SW1
+        new THREE.Vector3(-1.75, frameY + 1.35, 0.16),  // Qua Công tắc hành trình SW2
+        new THREE.Vector3(-1.15, frameY + 0.22, 0.22),
+        new THREE.Vector3(-0.14, frameY + 0.23, 0.31)   // Về ESP32-S3
+      ],
+      0x064e3b,
+      0x10b981, // Xanh ngọc cho tín hiệu Công tắc hành trình & Cảm biến về ESP32
+      0.009,
+      4,
+      0.40,
+      'feedback_switch'
+    );
 
     sceneObjectsRef.current = {
       azimuthGroup,
@@ -1309,12 +1583,15 @@ export default function CompactInteractiveTwin({
         return;
       }
 
-      // 3. Nhấn vào Hộp điện -> Mở nắp hộp, Zoom vào bên trong Hộp điện & Hiện thông số Hộp điện
-      if (raycaster.intersectObjects(boxGroup.children, true).length > 0) {
+      // 3. Nhấn vào Hộp điện hoặc Bình Ắc quy -> Mở nắp hộp, Zoom vào bên trong Hộp điện & Hiện thông số Hộp điện
+      if (
+        raycaster.intersectObjects(boxGroup.children, true).length > 0 ||
+        raycaster.intersectObjects(batteryGroup.children, true).length > 0
+      ) {
         setIsBoxOpen(true);
         setSelectedPanel('box');
-        targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.08, 3.15, 1.75);
-        targetAnglesRef.current.camLookAt = new THREE.Vector3(0.08, 0.55, 0.05);
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.28, 3.25, 1.85);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(0.25, 0.45, -0.05);
         return;
       }
 
@@ -1356,15 +1633,68 @@ export default function CompactInteractiveTwin({
 
     // Vòng lặp Render 3D
     let animId;
+    let lastTime = performance.now();
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
 
-      const { phiRad, tiltRad, lidRad, camTargetPos, camLookAt } = targetAnglesRef.current;
+      const { phiRad, tiltRad, lidRad, camTargetPos, camLookAt, trkPower, staPower } = targetAnglesRef.current;
 
       azimuthGroup.rotation.y += (phiRad - azimuthGroup.rotation.y) * 0.1;
       elevationGroup.rotation.z += (tiltRad - elevationGroup.rotation.z) * 0.1;
       lidGroup.rotation.z += (-lidRad - lidGroup.rotation.z) * 0.12;
       fanBladesGroup.rotation.y += 0.14;
+
+      // Cập nhật dòng chảy năng lượng mặt trời (phụ thuộc số đọc INA226) và dòng tín hiệu điều khiển
+      const totalSolarPower = (trkPower || 0) + (staPower || 0);
+      flowSystems.forEach((sys) => {
+        let active = true;
+        let speedScale = 1.0;
+        let opacity = 0.88;
+        let radiusScale = 1.0;
+
+        if (sys.flowType === 'solar_tracker') {
+          if (trkPower <= 0.05) {
+            active = false;
+          } else {
+            const norm = Math.min(trkPower / 25.0, 1.5);
+            speedScale = 0.45 + norm * 1.35;
+            opacity = Math.min(1.0, 0.4 + norm * 0.6);
+            radiusScale = 0.8 + norm * 0.45;
+          }
+        } else if (sys.flowType === 'solar_static') {
+          if (staPower <= 0.05) {
+            active = false;
+          } else {
+            const norm = Math.min(staPower / 25.0, 1.5);
+            speedScale = 0.45 + norm * 1.35;
+            opacity = Math.min(1.0, 0.4 + norm * 0.6);
+            radiusScale = 0.8 + norm * 0.45;
+          }
+        } else if (sys.flowType === 'battery_charge') {
+          if (totalSolarPower <= 0.05) {
+            active = false;
+          } else {
+            const norm = Math.min(totalSolarPower / 45.0, 1.5);
+            speedScale = 0.45 + norm * 1.4;
+            opacity = Math.min(1.0, 0.45 + norm * 0.55);
+            radiusScale = 0.85 + norm * 0.5;
+          }
+        }
+
+        sys.pulses.forEach((p) => {
+          p.mesh.visible = active;
+          if (active) {
+            p.offset = (p.offset + dt * sys.baseSpeed * speedScale) % 1.0;
+            const pos = sys.curve.getPointAt(p.offset);
+            p.mesh.position.copy(pos);
+            p.mesh.scale.setScalar(radiusScale);
+            p.mat.opacity = opacity;
+          }
+        });
+      });
 
       if (camTargetPos) {
         camera.position.lerp(camTargetPos, 0.08);
@@ -1565,9 +1895,20 @@ export default function CompactInteractiveTwin({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Cấu hình phần cứng</td>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng nạp Ắc quy (INA226 → PWM)</td>
                   <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                    ESP32-S3 + 2x INA226 + DS3231 RTC + Sạc PWM
+                    {(Number(tracking.power) || 0) + (Number(stat.power) || 0) > 0.05
+                      ? `Đang nạp (${formatValueOrDash((Number(tracking.power) || 0) + (Number(stat.power) || 0), 1, 'W')})`
+                      : '0,0 W (Ngắt dòng sạc ban đêm)'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Luồng tín hiệu nội bộ</td>
+                  <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100 text-xs">
+                    <div>I2C (INA226 + DS3231) → ESP32-S3 → Driver Stepper</div>
+                    <div className="text-zinc-500 dark:text-slate-400 mt-0.5">
+                      Phản hồi: Encoder 1/2 + Công tắc hành trình SW1/SW2 → ESP32
+                    </div>
                   </td>
                 </tr>
                 <tr>
