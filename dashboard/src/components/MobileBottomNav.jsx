@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutDashboard, Sliders, BarChart3, Activity, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { TbSolarPanel } from 'react-icons/tb';
 
 export default function MobileBottomNav({
   currentUser,
@@ -8,7 +9,9 @@ export default function MobileBottomNav({
   onOpenSettings,
   onLogout,
   themeMode = 'light',
-  onToggleTheme
+  onToggleTheme,
+  compactMode = false,
+  onToggleCompactMode
 }) {
   const isAdmin = currentUser?.role === 'admin';
 
@@ -76,7 +79,25 @@ export default function MobileBottomNav({
           <span className="text-[11px] font-medium">Thông số</span>
         </button>
 
-        {/* 5. Giao diện Sáng / Tối */}
+        {/* 5. Mode Compact (Mô hình trực quan) */}
+        {onToggleCompactMode && (
+          <button
+            onClick={onToggleCompactMode}
+            className="flex flex-col items-center justify-center gap-1 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-1.5 cursor-pointer"
+            title="Chuyển đổi Mode Compact trực quan"
+          >
+            <div className={`w-8 h-8 rounded flex items-center justify-center border ${
+              compactMode
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-zinc-100 dark:bg-slate-800 border-zinc-300 dark:border-slate-700 text-blue-600 dark:text-sky-400'
+            }`}>
+              <TbSolarPanel className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-medium">Compact</span>
+          </button>
+        )}
+
+        {/* 6. Giao diện Sáng / Tối */}
         {onToggleTheme && (
           <button
             onClick={onToggleTheme}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import VisualPanelsComparison from './components/VisualPanelsComparison';
+import CompactInteractiveTwin from './components/CompactInteractiveTwin';
 import ChartsSection from './components/ChartsSection';
 import DetailedTelemetryModal from './components/DetailedTelemetryModal';
 import ManualControlModal from './components/ManualControlModal';
@@ -21,6 +22,7 @@ import { FirebaseSolarService, getCleanZeroTelemetry } from './services/firebase
 import { fetchLiveWeather, getFallbackWeatherData, HCMC_COORDINATES } from './services/weatherService';
 import { checkUserLoginAllowedAsync } from './services/userService';
 import { Sun, Cloud, CloudRain, CloudLightning, Moon, Sparkles, MapPin } from 'lucide-react';
+import { TbSolarPanel, TbLayoutDashboard } from 'react-icons/tb';
 
 export default function App() {
   // Authentication State
@@ -167,6 +169,9 @@ export default function App() {
   const toggleTheme = () => {
     setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  // Chế độ hiển thị Compact trực quan (Digital Twin): Độc lập hoàn toàn với giao diện tiêu chuẩn
+  const [compactMode, setCompactMode] = useState(false);
 
   // Engine instances
   const mockEngineRef = useRef(new MockTelemetryEngine());
@@ -944,39 +949,56 @@ export default function App() {
       {/* 2. MAIN STREAMLINED DASHBOARD */}
       <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10">
 
-        {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
-        <section aria-label="So sánh đối chứng hai tấm pin">
-          <VisualPanelsComparison
-            INA226={telemetry.INA226}
-            motors={telemetry.motors}
-            system={telemetry.system}
-            isAdmin={authSession?.role === 'admin'}
-            onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
-            onOpenManualModal={() => setIsManualModalOpen(true)}
-            onOpenSettingsModal={() => openSettingsTab('config')}
-            onOpenDetails={() => setIsDetailsModalOpen(true)}
-          />
-        </section>
+        {compactMode ? (
+          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN (ĐỘC LẬP HOÀN TOÀN VỚI GIAO DIỆN TIÊU CHUẨN) */
+          <section aria-label="Mô hình trực quan Compact Mode">
+            <CompactInteractiveTwin
+              telemetry={telemetry}
+              isAdmin={authSession?.role === 'admin'}
+              onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+              onOpenManualModal={() => setIsManualModalOpen(true)}
+              onOpenSettingsModal={() => openSettingsTab('config')}
+              onOpenDetails={() => setIsDetailsModalOpen(true)}
+            />
+          </section>
+        ) : (
+          /* CHẾ ĐỘ BÌNH THƯỜNG HIỆN TẠI (GIỮ NGUYÊN 100%) */
+          <>
+            {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
+            <section aria-label="So sánh đối chứng hai tấm pin">
+              <VisualPanelsComparison
+                INA226={telemetry.INA226}
+                motors={telemetry.motors}
+                system={telemetry.system}
+                isAdmin={authSession?.role === 'admin'}
+                onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+                onOpenManualModal={() => setIsManualModalOpen(true)}
+                onOpenSettingsModal={() => openSettingsTab('config')}
+                onOpenDetails={() => setIsDetailsModalOpen(true)}
+              />
+            </section>
 
-        {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN ĐỐI CHỨNG (HÔM NAY & 30 NGÀY) */}
-        <section aria-label="Biểu đồ sản lượng điện">
-          <ChartsSection
-            intradayData={intradayData}
-            history30Days={history30Days}
-            onClearCharts={handleClearCharts}
-            isAdmin={authSession?.role === 'admin'}
-            themeMode={themeMode}
-            availableDates={availableHistoryDates}
-            selectedIntradayDate={selectedIntradayDate}
-            onSelectIntradayDate={(dateStr) => {
-              setSelectedIntradayDate(dateStr);
-              if (allIntradayProfiles[dateStr]) {
-                setIntradayData(allIntradayProfiles[dateStr]);
-              }
-            }}
-            onOpenDataSettings={handleOpenDataSettings}
-          />
-        </section>
+            {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN ĐỐI CHỨNG (HÔM NAY & 30 NGÀY) */}
+            <section aria-label="Biểu đồ sản lượng điện">
+              <ChartsSection
+                intradayData={intradayData}
+                history30Days={history30Days}
+                onClearCharts={handleClearCharts}
+                isAdmin={authSession?.role === 'admin'}
+                themeMode={themeMode}
+                availableDates={availableHistoryDates}
+                selectedIntradayDate={selectedIntradayDate}
+                onSelectIntradayDate={(dateStr) => {
+                  setSelectedIntradayDate(dateStr);
+                  if (allIntradayProfiles[dateStr]) {
+                    setIntradayData(allIntradayProfiles[dateStr]);
+                  }
+                }}
+                onOpenDataSettings={handleOpenDataSettings}
+              />
+            </section>
+          </>
+        )}
 
       </main>
 
@@ -1078,9 +1100,11 @@ export default function App() {
         onLogout={handleLogout}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
+        compactMode={compactMode}
+        onToggleCompactMode={() => setCompactMode((prev) => !prev)}
       />
 
-      {/* 6. DISCRETE WEATHER PRESET DEMO PILL & DARK/LIGHT MODE TOGGLE (Bottom Right corner) */}
+      {/* 6. DISCRETE WEATHER PRESET DEMO PILL & DARK/LIGHT MODE TOGGLE & COMPACT MODE SWITCH (Bottom Right corner) */}
       <div className="fixed bottom-4 right-4 z-40 hidden sm:flex items-center gap-2">
         {showWeatherSwitcher ? (
           <div className="p-1.5 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-700 shadow-xl flex items-center gap-1 animate-in fade-in duration-150">
@@ -1147,6 +1171,35 @@ export default function App() {
           </div>
         ) : (
           <>
+            {/* Nút Gạt Mode Compact (Mô hình trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
+            <button
+              id="btn-toggle-compact-mode"
+              onClick={() => setCompactMode((prev) => !prev)}
+              className={`p-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center gap-2 text-xs font-semibold ${
+                compactMode
+                  ? 'bg-blue-700 hover:bg-blue-800 border-blue-500 text-white'
+                  : 'bg-white/90 dark:bg-slate-900/90 hover:bg-zinc-100 dark:hover:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-800 dark:text-slate-100'
+              }`}
+              title={compactMode ? 'Đang bật Mode Compact trực quan — Nhấn để về giao diện Tiêu chuẩn' : 'Bật Mode Compact: Xem mô hình 2 tấm pin, trục đai răng & hộp điện trực quan'}
+            >
+              {compactMode ? (
+                <TbLayoutDashboard className="w-4 h-4 text-sky-200 shrink-0" />
+              ) : (
+                <TbSolarPanel className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
+              )}
+              <span className={`text-[11px] ${compactMode ? 'text-white font-bold' : 'text-zinc-900 dark:text-white'}`}>
+                Mode Compact
+              </span>
+              {/* Công tắc gạt nhỏ (Toggle Switch Pill) */}
+              <span
+                className={`w-7 h-4 rounded-full p-0.5 transition-colors flex items-center ${
+                  compactMode ? 'bg-sky-400 justify-end' : 'bg-zinc-300 dark:bg-slate-700 justify-start'
+                }`}
+              >
+                <span className="w-3 h-3 rounded-full bg-white shadow-xs" />
+              </span>
+            </button>
+
             {/* Nút Chuyển Chế độ Sáng / Tối */}
             <button
               id="btn-toggle-theme"
