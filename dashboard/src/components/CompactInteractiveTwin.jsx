@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -11,10 +11,214 @@ import {
 } from '../utils/formatters';
 
 /**
+ * THUẬT TOÁN THIÊN VĂN FULL NOAA (Đồng bộ 100% với firmware/esp32_tracker_control/lib/solar_core/solar_ephemeris.cpp)
+ * Tính chính xác Góc phương vị Mặt trời (Azimuth từ Bắc = 0° theo chiều kim đồng hồ),
+ * Góc độ cao (Elevation), Góc thiên đỉnh (Zenith) và giờ Bình minh / Hoàng hôn.
+ */
+function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.66617, tzOffsetHours = 7) {
+  const DEG_TO_RAD = Math.PI / 180.0;
+  const RAD_TO_DEG = 180.0 / Math.PI;
+  const degToRad = (d) => d * DEG_TO_RAD;
+  const radToDeg = (r) => r * RAD_TO_DEG;
+  const clampVal = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const wrap360 = (a) => {
+    let r = a % 360.0;
+    if (r < 0) r += 360.0;
+    return r;
+  };
+
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+  const hour = dateObj.getHours();
+  const minute = dateObj.getMinutes();
+  const second = dateObj.getSeconds();
+
+  let y = year;
+  let m = month;
+  if (m <= 2) {
+    y -= 1;
+    m += 12;
+  }
+  const aTerm = Math.floor(y / 100);
+  const bTerm = 2 - aTerm + Math.floor(aTerm / 4);
+
+  const dayFraction = (hour + minute / 60.0 + second / 3600.0 - tzOffsetHours) / 24.0;
+  const jd =
+    Math.floor(365.25 * (y + 4716)) +
+    Math.floor(30.6001 * (m + 1)) +
+    day +
+    bTerm -
+    1524.5 +
+    dayFraction;
+
+  const t = (jd - 2451545.0) / 36525.0;
+
+  let l0 = wrap360(280.46646 + t * (36000.76983 + 0.0003032 * t));
+  let mAnomaly = wrap360(357.52911 + t * (35999.05029 - 0.0001537 * t));
+  const e = 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+
+  const mRad = degToRad(mAnomaly);
+  const c =
+    Math.sin(mRad) * (1.914602 - t * (0.004817 + 0.000014 * t)) +
+    Math.sin(2.0 * mRad) * (0.019993 - 0.000101 * t) +
+    Math.sin(3.0 * mRad) * 0.000289;
+
+  const sunTrueLon = l0 + c;
+  const omega = 125.04 - 1934.136 * t;
+  const lambda = sunTrueLon - 0.00569 - 0.00478 * Math.sin(degToRad(omega));
+
+  const eps0 = 23.0 + (26.0 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60.0) / 60.0;
+  const eps = eps0 + 0.00256 * Math.cos(degToRad(omega));
+
+  const epsRad = degToRad(eps);
+  const lambdaRad = degToRad(lambda);
+  const sinDelta = Math.sin(epsRad) * Math.sin(lambdaRad);
+  const deltaRad = Math.asin(clampVal(sinDelta, -1.0, 1.0));
+
+  let yParam = Math.tan(epsRad / 2.0);
+  yParam *= yParam;
+  const l0Rad = degToRad(l0);
+
+  const eot =
+    4.0 *
+    RAD_TO_DEG *
+    (yParam * Math.sin(2.0 * l0Rad) -
+      2.0 * e * Math.sin(mRad) +
+      4.0 * e * yParam * Math.sin(mRad) * Math.cos(2.0 * l0Rad) -
+      0.5 * yParam * yParam * Math.sin(4.0 * l0Rad) -
+      1.25 * e * e * Math.sin(2.0 * mRad));
+
+  const timeOffset = eot + 4.0 * lonDeg - 60.0 * tzOffsetHours;
+  let trueSolarTimeMin = (hour * 60.0 + minute + second / 60.0 + timeOffset) % 1440.0;
+  if (trueSolarTimeMin < 0) trueSolarTimeMin += 1440.0;
+
+  let hourAngleDeg = trueSolarTimeMin / 4.0 - 180.0;
+  if (hourAngleDeg < -180.0) hourAngleDeg += 360.0;
+
+  const haRad = degToRad(hourAngleDeg);
+  const latRad = degToRad(latDeg);
+
+  const cosZenith = clampVal(
+    Math.sin(latRad) * Math.sin(deltaRad) + Math.cos(latRad) * Math.cos(deltaRad) * Math.cos(haRad),
+    -1.0,
+    1.0
+  );
+  const zenithDeg = radToDeg(Math.acos(cosZenith));
+  const elRaw = 90.0 - zenithDeg;
+
+  let elCorrected = elRaw;
+  if (elRaw > -0.85) {
+    let rArcsec = 0.0;
+    if (elRaw > 5.0) {
+      const tanEl = Math.tan(degToRad(elRaw));
+      rArcsec = 58.1 / tanEl - 0.07 / Math.pow(tanEl, 3) + 0.000086 / Math.pow(tanEl, 5);
+    } else if (elRaw >= -0.575) {
+      rArcsec = 1735.0 + elRaw * (-518.2 + elRaw * (103.4 + elRaw * (-12.79 + elRaw * 0.711)));
+    } else {
+      rArcsec = -20.774 / Math.tan(degToRad(elRaw));
+    }
+    elCorrected += rArcsec / 3600.0;
+  }
+
+  const sinHa = Math.sin(haRad);
+  const cosHa = Math.cos(haRad);
+  const xAz = Math.cos(latRad) * Math.sin(deltaRad) - Math.sin(latRad) * Math.cos(deltaRad) * cosHa;
+  const yAz = -Math.cos(deltaRad) * sinHa;
+  const azFromNorth = wrap360(radToDeg(Math.atan2(yAz, xAz)));
+
+  // Bình minh & Hoàng hôn
+  const cosH0 =
+    (Math.cos(degToRad(90.833)) - Math.sin(latRad) * Math.sin(deltaRad)) /
+    (Math.cos(latRad) * Math.cos(deltaRad));
+  let solarNoonMin = (720.0 - 4.0 * lonDeg - eot + 60.0 * tzOffsetHours) % 1440.0;
+  if (solarNoonMin < 0) solarNoonMin += 1440.0;
+
+  let sunriseMin = 345;
+  let sunsetMin = 1065;
+  if (cosH0 >= -1.0 && cosH0 <= 1.0) {
+    const h0Deg = radToDeg(Math.acos(clampVal(cosH0, -1.0, 1.0)));
+    sunriseMin = Math.round(clampVal(solarNoonMin - 4.0 * h0Deg, 0, 1440));
+    sunsetMin = Math.round(clampVal(solarNoonMin + 4.0 * h0Deg, 0, 1440));
+  }
+
+  const formatMin = (mTotal) => {
+    const hh = Math.floor(mTotal / 60).toString().padStart(2, '0');
+    const mm = Math.floor(mTotal % 60).toString().padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  return {
+    azimuthDeg: Math.round(azFromNorth * 10) / 10,
+    elevationDeg: Math.round(elCorrected * 10) / 10,
+    zenithDeg: Math.round((90.0 - elCorrected) * 10) / 10,
+    isDaylight: elCorrected >= 0,
+    sunriseStr: formatMin(sunriseMin),
+    sunsetStr: formatMin(sunsetMin)
+  };
+}
+
+/**
+ * Quy đổi tọa độ thiên văn NOAA (Azimuth từ Bắc = 0°, Đông = 90°, Nam = 180°, Tây = 270°; Elevation = độ cao)
+ * sang tọa độ không gian 3D theo đúng quy ước hướng của mô hình thực tế (Hình 2):
+ * - Trái (-X) = BẮC (0°)
+ * - Trên (-Z) = ĐÔNG (90°)
+ * - Phải (+X) = NAM (180°)
+ * - Dưới (+Z) = TÂY (270°)
+ */
+function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 4.6) {
+  const azRad = THREE.MathUtils.degToRad(azimuthDeg);
+  const elRad = THREE.MathUtils.degToRad(Math.max(2, elevationDeg));
+  const x = -radius * Math.cos(elRad) * Math.cos(azRad);
+  const y = radius * Math.sin(elRad) + 0.35;
+  const z = -radius * Math.cos(elRad) * Math.sin(azRad);
+  return new THREE.Vector3(x, y, z);
+}
+
+/**
+ * Tạo nhãn chữ 3D trên mặt sàn cho 4 hướng: ĐÔNG (90°), TÂY (270°), NAM (180°), BẮC (0°)
+ */
+function createCompassFloorLabel(text, subText, borderColor = '#38bdf8') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(12, 12, 488, 136, 18);
+  ctx.fill();
+
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 52px "Be Vietnam Pro", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 64);
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '600 32px "Be Vietnam Pro", sans-serif';
+  ctx.fillText(subText, 256, 114);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.42), mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/**
  * Tạo texture mặt tấm pin mặt trời Monocrystalline độ phân giải cao (1024x1024)
- * Mô phỏng sát thực tế tấm pin trong ảnh chụp:
- * - Viền nền trắng mỏng quanh mép + đường chia đôi màu trắng dọc chính giữa tấm pin
- * - 2 dãy tế bào quang điện đơn tinh thể xanh đen đậm (#081528), chia thành các dải cell ngang có busbar bạc mảnh
  */
 function createRealisticSolarPanelTexture() {
   const canvas = document.createElement('canvas');
@@ -22,7 +226,6 @@ function createRealisticSolarPanelTexture() {
   canvas.height = 1024;
   const ctx = canvas.getContext('2d');
 
-  // Lớp nền backsheet trắng ngà ở viền ngoài
   ctx.fillStyle = '#e2e8f0';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -30,7 +233,7 @@ function createRealisticSolarPanelTexture() {
   const centerGap = 10;
   const halfW = (canvas.width - margin * 2 - centerGap) / 2;
   const totalH = canvas.height - margin * 2;
-  const numStrips = 18; // 18 dải cell ngang mỗi nửa (giống tấm pin thực tế)
+  const numStrips = 18;
   const stripH = totalH / numStrips;
 
   for (let col = 0; col < 2; col++) {
@@ -39,7 +242,6 @@ function createRealisticSolarPanelTexture() {
     for (let r = 0; r < numStrips; r++) {
       const startY = margin + r * stripH;
 
-      // Nền silicon đơn tinh thể xanh đen sâu
       const grad = ctx.createLinearGradient(startX, startY, startX + halfW, startY + stripH);
       grad.addColorStop(0, '#071324');
       grad.addColorStop(0.5, '#0c213d');
@@ -47,7 +249,6 @@ function createRealisticSolarPanelTexture() {
       ctx.fillStyle = grad;
       ctx.fillRect(startX + 1.5, startY + 1.5, halfW - 3, stripH - 3);
 
-      // Các đường finger thu điện ngang siêu mảnh
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
       ctx.lineWidth = 0.8;
       for (let f = 1; f <= 3; f++) {
@@ -58,7 +259,6 @@ function createRealisticSolarPanelTexture() {
         ctx.stroke();
       }
 
-      // 5 đường busbar bạc dọc trên mỗi nửa tấm pin
       ctx.strokeStyle = 'rgba(226, 232, 240, 0.55)';
       ctx.lineWidth = 1.6;
       for (let b = 1; b <= 5; b++) {
@@ -78,7 +278,7 @@ function createRealisticSolarPanelTexture() {
 }
 
 /**
- * Tạo texture rãnh nhôm định hình V-Slot 20x20 (Bề mặt nhôm xước аноdized + rãnh đen chính giữa)
+ * Tạo texture rãnh nhôm định hình V-Slot 20x20
  */
 function createVSlotExtrusionTexture() {
   const canvas = document.createElement('canvas');
@@ -86,23 +286,19 @@ function createVSlotExtrusionTexture() {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
 
-  // Nền nhôm bạc anodized
   ctx.fillStyle = '#d4d8dd';
   ctx.fillRect(0, 0, 256, 256);
 
-  // Vân nhôm xước dọc nhẹ
   ctx.fillStyle = 'rgba(255,255,255,0.18)';
   for (let i = 0; i < 256; i += 4) {
     ctx.fillRect(i, 0, 1, 256);
   }
 
-  // Rãnh V-Slot tối màu ở chính giữa thanh nhôm
   ctx.fillStyle = '#334155';
   ctx.fillRect(98, 0, 60, 256);
   ctx.fillStyle = '#0f172a';
   ctx.fillRect(110, 0, 36, 256);
 
-  // 2 mép vát sáng cạnh rãnh V-Slot
   ctx.fillStyle = '#f1f5f9';
   ctx.fillRect(94, 0, 4, 256);
   ctx.fillRect(158, 0, 4, 256);
@@ -115,11 +311,10 @@ function createVSlotExtrusionTexture() {
 }
 
 /**
- * Tạo hình học gá chữ T in 3D màu trắng (Đỡ dưới tấm pin Tracker, giống hệt ảnh chụp thực tế)
+ * Tạo hình học gá chữ T in 3D màu trắng
  */
 function createSculptedTBracketGeometry() {
   const shape = new THREE.Shape();
-  // Cánh ngang phía trên dài 0.92, dày 0.14, có thân trụ ở giữa rộng 0.36 hạ xuống -0.26, bo góc mượt
   shape.moveTo(-0.44, 0.12);
   shape.lineTo(0.44, 0.12);
   shape.quadraticCurveTo(0.48, 0.12, 0.48, 0.08);
@@ -149,10 +344,11 @@ function createSculptedTBracketGeometry() {
 }
 
 /**
- * COMPACT MODE: MÔ HÌNH 3D KỸ THUẬT CAD/SOLIDWORKS TƯƠNG TÁC TRỰC QUAN
+ * COMPACT MODE: MÔ HÌNH 3D TOÀN TAB + TỌA ĐỘ ĐÔNG TÂY NAM BẮC & MẶT TRỜI NOAA + CLICK XEM THÔNG SỐ TỪNG TẤM
  */
 export default function CompactInteractiveTwin({
   telemetry,
+  location = null,
   isAdmin = true,
   themeMode = 'light',
   onOpenDetails,
@@ -171,15 +367,40 @@ export default function CompactInteractiveTwin({
   const az = motors?.azimuth || {};
   const el = motors?.elevation || {};
 
-  const livePhi = az.phi !== undefined && az.phi !== null ? Number(az.phi) : (az.currentAngle !== null ? Number(az.currentAngle) : 0);
+  const livePhi = az.phi !== undefined && az.phi !== null ? Number(az.phi) : (az.currentAngle !== null ? Number(az.currentAngle) : 2.3);
   const liveEps = el.epsilon !== undefined && el.epsilon !== null ? Number(el.epsilon) : (el.currentAngle !== null ? Number(el.currentAngle) : 9.3);
 
-  // State tương tác 3D
-  const [cameraPreset, setCameraPreset] = useState('overview'); // 'overview' | 'mechanism' | 'box' | 'front'
+  const siteLat = Number(location?.lat) || 10.78816;
+  const siteLon = Number(location?.lon) || 106.66617;
+
+  // State tương tác 3D & Bảng thông số khi nhấn vào từng tấm pin
+  const [cameraPreset, setCameraPreset] = useState('overview'); // 'overview' | 'top' | 'mechanism' | 'box'
   const [isBoxOpen, setIsBoxOpen] = useState(false);
+  const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'both' | 'box'
   const [isInteractiveSim, setIsInteractiveSim] = useState(false);
   const [simPhi, setSimPhi] = useState(2.3);
   const [simEps, setSimEps] = useState(9.3);
+  const [simHourFloat, setSimHourFloat] = useState(() => {
+    const now = new Date();
+    return Math.round((now.getHours() + now.getMinutes() / 60) * 10) / 10;
+  });
+  const [clockTick, setClockTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((t) => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Tính vị trí Mặt trời theo thuật toán thiên văn NOAA
+  const noaaSun = useMemo(() => {
+    const targetDate = new Date();
+    if (isInteractiveSim) {
+      const hh = Math.floor(simHourFloat);
+      const mm = Math.round((simHourFloat - hh) * 60);
+      targetDate.setHours(hh, mm, 0, 0);
+    }
+    return calculateNoaaSolarPosition(targetDate, siteLat, siteLon, 7);
+  }, [isInteractiveSim, simHourFloat, siteLat, siteLon, clockTick]);
 
   const effectivePhi = isInteractiveSim ? simPhi : livePhi;
   const effectiveEps = isInteractiveSim ? simEps : liveEps;
@@ -209,6 +430,8 @@ export default function CompactInteractiveTwin({
     elevationGroup: null,
     lidGroup: null,
     fanBladesGroup: null,
+    sunGroup: null,
+    sunRayLine: null,
     sw1LedMat: null,
     sw2LedMat: null,
     camera: null,
@@ -224,33 +447,42 @@ export default function CompactInteractiveTwin({
     camLookAt: null
   });
 
-  /**
-   * Đồng bộ góc quay thực tế từ Firmware vào mô hình cơ khí 3D:
-   * - Trong thực tế (như Hình 2 người dùng cung cấp):
-   *   + Khi φ ≈ 0° -> +2,3° (Trạng thái nghỉ/ngủ hoặc đầu hành trình): Gá chữ T nhìn thẳng về phía trước (+Z),
-   *     trục độ ngửa xoay trong mặt phẳng Trái - Phải (quanh trục Z).
-   *   + Theo cấu hình Firmware: (CTHT = 90°, Zenith nằm ngang = 50°, Ngửa đón = 10°).
-   *     Khi ε ≈ 9,3° (như Hình 2): Mặt tấm pin Tracker hướng về bên trái (-X), hơi ngả lên với góc nghiêng ~30° so với phương ngang
-   *     (không bị cụp gập xuống, cạnh thấp ở bên trái -X, cạnh cao ở bên phải +X).
-   */
+  // Đồng bộ góc quay 2 trục của tấm Tracker
   useEffect(() => {
     const phiDeg = Number(effectivePhi) || 0;
-    // Khi φ = 0°..2.3°, trụ hướng mặt gá chữ T về phía trước (+Z), xoay quanh trục đứng Y khi φ thay đổi
     targetAnglesRef.current.phiRad = THREE.MathUtils.degToRad(-phiDeg * 0.85);
 
     const epsDeg = Number(effectiveEps);
     const validEps = !isNaN(epsDeg) ? epsDeg : 9.3;
-    // Quy đổi chuẩn xác theo mốc vật lý của hệ thống (Zenith nằm ngang = 50°, tại ε = 9.3° tấm pin nghiêng +30.5° hướng mặt sang trái):
     const tiltLeftDeg = Math.max(-48, Math.min(48, (50 - validEps) * 0.75));
     targetAnglesRef.current.tiltRad = THREE.MathUtils.degToRad(tiltLeftDeg);
   }, [effectivePhi, effectiveEps]);
+
+  // Đồng bộ vị trí Mặt trời NOAA trong không gian 3D
+  useEffect(() => {
+    const { sunGroup, sunRayLine } = sceneObjectsRef.current;
+    if (!sunGroup || !sunRayLine) return;
+
+    const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
+    sunGroup.position.copy(sunPos);
+
+    // Cập nhật tia nắng nối từ Mặt trời NOAA xuống tâm mô hình
+    const posAttr = sunRayLine.geometry.attributes.position;
+    posAttr.setXYZ(0, sunPos.x, sunPos.y, sunPos.z);
+    posAttr.setXYZ(1, -2.05, 1.85, 0);
+    posAttr.needsUpdate = true;
+
+    // Đổi độ sáng Mặt trời nếu đang là ban đêm (El < 0°)
+    sunGroup.visible = true;
+    sunRayLine.visible = noaaSun.isDaylight;
+  }, [noaaSun]);
 
   // Đồng bộ góc mở nắp hộp điện 3D
   useEffect(() => {
     targetAnglesRef.current.lidRad = isBoxOpen ? THREE.MathUtils.degToRad(105) : 0;
   }, [isBoxOpen]);
 
-  // Đồng bộ màu đèn báo nhỏ trên công tắc hành trình SW1, SW2
+  // Đồng bộ đèn báo công tắc hành trình SW1, SW2
   useEffect(() => {
     const { sw1LedMat, sw2LedMat } = sceneObjectsRef.current;
     if (sw1LedMat) {
@@ -273,35 +505,37 @@ export default function CompactInteractiveTwin({
   const applyCameraPreset = (preset) => {
     setCameraPreset(preset);
     if (preset === 'overview') {
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 3.8, 7.6);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.35, 0);
+      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 4.2, 8.2);
+      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.25, 0);
+    } else if (preset === 'top') {
+      // Góc nhìn từ đỉnh xuống giống Hình 2: Trên = Đông, Phải = Nam, Dưới = Tây, Trái = Bắc
+      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 9.5, 0.01);
+      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 0.5, 0);
     } else if (preset === 'mechanism') {
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(-2.05, 2.15, 3.15);
+      targetAnglesRef.current.camTargetPos = new THREE.Vector3(-2.05, 2.15, 3.25);
       targetAnglesRef.current.camLookAt = new THREE.Vector3(-2.05, 1.45, 0);
     } else if (preset === 'box') {
       setIsBoxOpen(true);
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.05, 3.45, 2.15);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0.05, 0.65, 0.08);
-    } else if (preset === 'front') {
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 2.05, 8.1);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.35, 0);
+      setSelectedPanel('box');
+      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.08, 3.35, 1.85);
+      targetAnglesRef.current.camLookAt = new THREE.Vector3(0.08, 0.55, 0.05);
     }
   };
 
-  // Khởi tạo không gian 3D Kỹ thuật (CAD / SolidWorks PBR)
+  // Khởi tạo không gian 3D Kỹ thuật Toàn Tab
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    const width = container.clientWidth || 720;
-    const height = container.clientHeight || 430;
+    const width = container.clientWidth || 1080;
+    const height = container.clientHeight || 560;
     const isDark = document.documentElement.classList.contains('dark');
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(isDark ? 0x0b1120 : 0xf1f5f9);
 
-    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100);
-    camera.position.set(0, 3.8, 7.6);
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
+    camera.position.set(0, 4.2, 8.2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
@@ -309,9 +543,8 @@ export default function CompactInteractiveTwin({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.1;
 
-    // Tạo môi trường phản xạ ánh sáng kim loại PBR (RoomEnvironment) giúp nhôm, thép và mặt kính pin chân thực như CAD
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
@@ -319,16 +552,16 @@ export default function CompactInteractiveTwin({
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1.35, 0);
+    controls.target.set(0, 1.25, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
-    controls.minDistance = 1.6;
-    controls.maxDistance = 15;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 18;
     controls.update();
 
     // Hệ thống đèn chiếu sáng kỹ thuật
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
@@ -339,19 +572,120 @@ export default function CompactInteractiveTwin({
     keyLight.shadow.bias = -0.0005;
     scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0xe2e8f0, 0.55);
-    fillLight.position.set(-6, 4, 4);
+    const fillLight = new THREE.DirectionalLight(0xe2e8f0, 0.6);
+    fillLight.position.set(-6, 5, 4);
     scene.add(fillLight);
 
-    // Mặt sàn & lưới kỹ thuật mảnh
-    const gridHelper = new THREE.GridHelper(12, 24, 0x475569, 0x64748b);
+    // Mặt sàn & lưới tọa độ kỹ thuật
+    const gridHelper = new THREE.GridHelper(13, 26, 0x475569, 0x64748b);
     gridHelper.position.y = 0;
-    gridHelper.material.opacity = 0.2;
+    gridHelper.material.opacity = 0.22;
     gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
     // =========================================================================
-    // VẬT LIỆU PBR CÔNG NGHIỆP (CHÂN THỰC, KHÔNG HOẠT HÌNH)
+    // 0. HỆ TRỤC LA BÀN ĐÔNG - TÂY - NAM - BẮC & QUỸ ĐẠO MẶT TRỜI NOAA TRONG 3D
+    // Theo đúng Hình 2 của người dùng:
+    // - Trên (-Z) = ĐÔNG (90°)
+    // - Phải (+X) = NAM (180°)
+    // - Dưới (+Z) = TÂY (270°)
+    // - Trái (-X) = BẮC (0°)
+    // =========================================================================
+    const compassGroup = new THREE.Group();
+    compassGroup.position.y = 0.01;
+    scene.add(compassGroup);
+
+    // Vòng tròn la bàn bao quanh trạm
+    const ringGeom = new THREE.RingGeometry(4.25, 4.32, 96);
+    ringGeom.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x64748b,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide
+    });
+    compassGroup.add(new THREE.Mesh(ringGeom, ringMat));
+
+    // Đường trục Bắc (-X) <-> Nam (+X) và Đông (-Z) <-> Tây (+Z)
+    const axisLineMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.4 });
+    const nsPoints = [new THREE.Vector3(-4.25, 0.01, 0), new THREE.Vector3(4.25, 0.01, 0)];
+    const ewPoints = [new THREE.Vector3(0, 0.01, -2.55), new THREE.Vector3(0, 0.01, 2.55)];
+    compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(nsPoints), axisLineMat));
+    compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ewPoints), axisLineMat));
+
+    // 4 Nhãn hướng Đông - Tây - Nam - Bắc đặt đúng vị trí Hình 2
+    const labelEast = createCompassFloorLabel('ĐÔNG', '90° (Bình minh)', '#f59e0b');
+    labelEast.position.set(0, 0.015, -2.65); // TRÊN (-Z) = ĐÔNG
+    compassGroup.add(labelEast);
+
+    const labelWest = createCompassFloorLabel('TÂY', '270° (Hoàng hôn)', '#fb923c');
+    labelWest.position.set(0, 0.015, 2.65); // DƯỚI (+Z) = TÂY
+    compassGroup.add(labelWest);
+
+    const labelSouth = createCompassFloorLabel('NAM', '180° (Hướng chuẩn)', '#38bdf8');
+    labelSouth.position.set(4.35, 0.015, 0); // PHẢI (+X) = NAM
+    compassGroup.add(labelSouth);
+
+    const labelNorth = createCompassFloorLabel('BẮC', '0° / 360°', '#94a3b8');
+    labelNorth.position.set(-4.35, 0.015, 0); // TRÁI (-X) = BẮC
+    compassGroup.add(labelNorth);
+
+    // Vẽ đường cong Quỹ đạo Mặt trời NOAA trong ngày (Từ 06:00 Đông -> 12:00 Nam -> 17:30 Tây)
+    const arcPoints = [];
+    const sampleDate = new Date();
+    for (let h = 6.0; h <= 17.5; h += 0.5) {
+      const hh = Math.floor(h);
+      const mm = Math.round((h - hh) * 60);
+      sampleDate.setHours(hh, mm, 0, 0);
+      const p = calculateNoaaSolarPosition(sampleDate, siteLat, siteLon, 7);
+      if (p.elevationDeg > 0) {
+        arcPoints.push(noaaTo3DPosition(p.azimuthDeg, p.elevationDeg, 4.5));
+      }
+    }
+    if (arcPoints.length >= 2) {
+      const solarCurve = new THREE.CatmullRomCurve3(arcPoints);
+      const arcGeom = new THREE.BufferGeometry().setFromPoints(solarCurve.getPoints(60));
+      const arcMat = new THREE.LineDashedMaterial({
+        color: 0xf59e0b,
+        dashSize: 0.18,
+        gapSize: 0.1,
+        transparent: true,
+        opacity: 0.65
+      });
+      const arcLine = new THREE.Line(arcGeom, arcMat);
+      arcLine.computeLineDistances();
+      scene.add(arcLine);
+    }
+
+    // Quả cầu Mặt trời NOAA + Vòng hào quang mỏng + Tia chiếu xuống giàn pin
+    const sunGroup = new THREE.Group();
+    const sunSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 28, 28),
+      new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+    );
+    const sunHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 24, 24),
+      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.28 })
+    );
+    sunGroup.add(sunSphere, sunHalo);
+    const initSunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
+    sunGroup.position.copy(initSunPos);
+    scene.add(sunGroup);
+
+    const rayGeom = new THREE.BufferGeometry().setFromPoints([
+      initSunPos,
+      new THREE.Vector3(-2.05, 1.85, 0)
+    ]);
+    const sunRayLine = new THREE.Line(
+      rayGeom,
+      new THREE.LineDashedMaterial({ color: 0xfbbf24, dashSize: 0.14, gapSize: 0.1, transparent: true, opacity: 0.55 })
+    );
+    sunRayLine.computeLineDistances();
+    sunRayLine.visible = noaaSun.isDaylight;
+    scene.add(sunRayLine);
+
+    // =========================================================================
+    // VẬT LIỆU PBR CÔNG NGHIỆP
     // =========================================================================
     const vSlotTex = createVSlotExtrusionTexture();
     const aluExtrusionMat = new THREE.MeshStandardMaterial({
@@ -401,15 +735,17 @@ export default function CompactInteractiveTwin({
       roughness: 0.28
     });
     const pcbBlueMat = new THREE.MeshStandardMaterial({
-      color: 0x0369a1,
+      color: 0x0284c7,
       metalness: 0.25,
       roughness: 0.35
     });
     const pcbGreenMat = new THREE.MeshStandardMaterial({
-      color: 0x15803d,
+      color: 0x16a34a,
       metalness: 0.25,
       roughness: 0.35
     });
+    const wireRedMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+    const wireBlueMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4 });
 
     const solarTex = createRealisticSolarPanelTexture();
     const solarGlassMat = new THREE.MeshPhysicalMaterial({
@@ -421,7 +757,6 @@ export default function CompactInteractiveTwin({
       reflectivity: 0.9
     });
 
-    // Hàm tạo thanh nhôm định hình V-Slot 20x20 có bo cạnh & nắp bịt đầu
     const addVSlotBar = (parent, w, h, d, x, y, z) => {
       const geom = new RoundedBoxGeometry(w, h, d, 2, 0.012);
       const mesh = new THREE.Mesh(geom, aluExtrusionMat);
@@ -432,7 +767,6 @@ export default function CompactInteractiveTwin({
       return mesh;
     };
 
-    // Hàm tạo ke góc nhôm L-bracket + ốc lục giác M5 tại các điểm nối khung nhôm
     const addCornerBracket = (parent, x, y, z, rotY = 0) => {
       const grp = new THREE.Group();
       grp.position.set(x, y, z);
@@ -444,7 +778,6 @@ export default function CompactInteractiveTwin({
       parent.add(grp);
     };
 
-    // Hàm tạo động cơ bước NEMA 17 chuẩn kỹ thuật (Thân thép đen nhiều tầng + 2 nắp nhôm bạc + trục thép + 4 ốc M3)
     const createDetailedNema17 = () => {
       const motorGrp = new THREE.Group();
       const capTop = new THREE.Mesh(new RoundedBoxGeometry(0.35, 0.06, 0.35, 2, 0.015), aluFrameMat);
@@ -460,7 +793,6 @@ export default function CompactInteractiveTwin({
       return motorGrp;
     };
 
-    // Hàm tạo vòng bi 608ZZ (Vành ngoài thép, nắp chắn bạc, tâm trục M8)
     const createBallBearing = (radius = 0.075, thickness = 0.04) => {
       const brgGrp = new THREE.Group();
       const outerRing = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, thickness, 24), chromeSteelMat);
@@ -473,13 +805,11 @@ export default function CompactInteractiveTwin({
       return brgGrp;
     };
 
-    // Hàm tạo cụm Tấm pin mặt trời chuẩn công nghiệp (Khung nhôm ghép 4 thanh có gờ nổi, mặt kính solar, tấm đáy trắng, hộp cáp sau)
     const createIndustrialSolarPanel = (widthX, depthZ, withSensors = false) => {
       const panelGrp = new THREE.Group();
       const frameH = 0.058;
       const railW = 0.045;
 
-      // 4 thanh khung nhôm bao quanh viền
       const railLeft = new THREE.Mesh(new RoundedBoxGeometry(railW, frameH, depthZ, 2, 0.006), aluFrameMat);
       railLeft.position.set(-widthX / 2 + railW / 2, 0, 0);
       const railRight = new THREE.Mesh(new RoundedBoxGeometry(railW, frameH, depthZ, 2, 0.006), aluFrameMat);
@@ -489,7 +819,6 @@ export default function CompactInteractiveTwin({
       const railBack = new THREE.Mesh(new RoundedBoxGeometry(widthX - railW * 2, frameH, railW, 2, 0.006), aluFrameMat);
       railBack.position.set(0, 0, -depthZ / 2 + railW / 2);
 
-      // Tấm laminate kính + cell + backsheet trắng nằm lọt lòng trong gờ khung nhôm
       const coreMesh = new THREE.Mesh(
         new THREE.BoxGeometry(widthX - railW * 1.8, frameH * 0.55, depthZ - railW * 1.8),
         whitePrintMat
@@ -498,7 +827,6 @@ export default function CompactInteractiveTwin({
       coreMesh.castShadow = true;
       coreMesh.receiveShadow = true;
 
-      // Mặt kính cường lực phủ tế bào quang điện
       const glassPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(widthX - railW * 1.9, depthZ - railW * 1.9),
         solarGlassMat
@@ -508,7 +836,6 @@ export default function CompactInteractiveTwin({
 
       panelGrp.add(railLeft, railRight, railFront, railBack, coreMesh, glassPlane);
 
-      // Nếu là tấm pin Tracking: gắn 4 ngàm kẹp cảm biến TEMT6000 mỏng gọn ôm sát mép khung nhôm (y hệt ảnh thực tế)
       if (withSensors) {
         const clipCoords = [
           [0, depthZ / 2 + 0.008, 0],
@@ -520,16 +847,11 @@ export default function CompactInteractiveTwin({
           const clipGrp = new THREE.Group();
           clipGrp.position.set(cx, 0.006, cz);
           clipGrp.rotation.y = rotY;
-
-          // Ngàm chữ U in 3D màu trắng nhỏ gọn ôm viền nhôm
           const uClip = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.052, 0.055, 2, 0.006), whitePrintMat);
-          // Mạch PCB cảm biến TEMT6000 nhỏ màu xanh trên mặt ngàm
           const sensorPcb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.032), pcbBlueMat);
           sensorPcb.position.set(0, 0.028, -0.004);
-          // Mắt quang cảm biến chính giữa
           const sensorEye = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.006, 0.014), blackAnodizedMat);
           sensorEye.position.set(0, 0.034, -0.004);
-
           clipGrp.add(uClip, sensorPcb, sensorEye);
           panelGrp.add(clipGrp);
         });
@@ -539,27 +861,22 @@ export default function CompactInteractiveTwin({
     };
 
     // =========================================================================
-    // 1. KHUNG ĐẾ NHÔM ĐỊNH HÌNH 20x20 ĐẶT SÀN (Dài 6.4, Rộng 2.3, Cao 0.34)
+    // 1. KHUNG ĐẾ NHÔM ĐỊNH HÌNH 20x20 ĐẶT SÀN
     // =========================================================================
     const frameGroup = new THREE.Group();
     scene.add(frameGroup);
 
     const frameY = 0.34;
-    const barT = 0.115; // Tiết diện thanh nhôm 20x20 thanh mảnh đúng tỷ lệ thực tế
-    // 2 thanh dọc trước & sau
+    const barT = 0.115;
     addVSlotBar(frameGroup, 6.4, barT, barT, 0, frameY, 1.08);
     addVSlotBar(frameGroup, 6.4, barT, barT, 0, frameY, -1.08);
-    // 3 thanh ngang chia khoang
     addVSlotBar(frameGroup, barT, barT, 2.04, -3.14, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, -0.96, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, 3.14, frameY, 0);
-    // 2 thanh giằng song song đỡ cụm ổ xoay Trục 1 (Giống hệt Ảnh 1)
     addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, 0.18);
     addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, -0.18);
-    // Thanh đỡ trụ tấm cố định bên phải
     addVSlotBar(frameGroup, barT, barT, 2.04, 2.15, frameY, 0);
 
-    // 6 chân trụ đứng nhôm 20x20 + đế cao su đen chống trượt + ke góc nhôm
     const legCoords = [
       [-3.14, 1.08], [-3.14, -1.08],
       [-0.96, 1.08], [-0.96, -1.08],
@@ -574,92 +891,88 @@ export default function CompactInteractiveTwin({
     });
 
     // =========================================================================
-    // 2. CỤM BÊN TRÁI: HỆ THỐNG PIN TRACKING 2 TRỤC (Tâm tại x = -2.05, z = 0)
+    // 2. CỤM BÊN TRÁI: HỆ THỐNG PIN TRACKING 2 TRỤC (trackerRootGroup để click chọn)
     // =========================================================================
+    const trackerRootGroup = new THREE.Group();
+    trackerRootGroup.name = 'trackerSystem';
+    scene.add(trackerRootGroup);
+
     const trackerX = -2.05;
 
-    // 2A. Ổ xoay trung tâm Trục 1 (Cụm trụ tròn đen in 3D chia 2 thớt + đế kẹp thanh nhôm 20x20)
     const hubClampBase = new THREE.Mesh(new RoundedBoxGeometry(0.56, 0.14, 0.56, 2, 0.015), matteBlackPrintMat);
     hubClampBase.position.set(trackerX, frameY + 0.04, 0);
-    scene.add(hubClampBase);
+    trackerRootGroup.add(hubClampBase);
 
     const hubLowerCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 40), matteBlackPrintMat);
     hubLowerCylinder.position.set(trackerX, frameY + 0.22, 0);
     hubLowerCylinder.castShadow = true;
-    scene.add(hubLowerCylinder);
+    trackerRootGroup.add(hubLowerCylinder);
 
-    // Rãnh puly đai răng trên thân ổ xoay Trục 1
     const hubBeltGroove = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.08, 40), rubberBeltMat);
     hubBeltGroove.position.set(trackerX, frameY + 0.20, 0);
-    scene.add(hubBeltGroove);
+    trackerRootGroup.add(hubBeltGroove);
 
-    // Gá trắng in 3D bên phải ổ xoay + Động cơ bước NEMA17 Trục 1 + Puly nhôm GT2
     const m1Plate = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.06, 0.44, 2, 0.01), whitePrintMat);
     m1Plate.position.set(trackerX + 0.58, frameY + 0.08, 0);
-    scene.add(m1Plate);
+    trackerRootGroup.add(m1Plate);
 
-    // 4 ốc lục giác M3 trên mặt bích gá động cơ
     [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]].forEach(([bx, bz]) => {
       const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.02, 12), chromeSteelMat);
       screw.position.set(trackerX + 0.58 + bx, frameY + 0.115, bz);
-      scene.add(screw);
+      trackerRootGroup.add(screw);
     });
 
     const nema1 = createDetailedNema17();
     nema1.position.set(trackerX + 0.58, frameY - 0.12, 0);
-    scene.add(nema1);
+    trackerRootGroup.add(nema1);
 
     const pulley1 = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.11, 24), aluFrameMat);
     pulley1.position.set(trackerX + 0.58, frameY + 0.18, 0);
-    scene.add(pulley1);
+    trackerRootGroup.add(pulley1);
 
-    // 2 nhánh dây đai răng GT2 màu đen nối puly động cơ 1 vào ổ xoay trung tâm
     const belt1Front = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.055, 0.018), rubberBeltMat);
     belt1Front.position.set(trackerX + 0.29, frameY + 0.19, 0.12);
     belt1Front.rotation.y = 0.12;
-    scene.add(belt1Front);
+    trackerRootGroup.add(belt1Front);
 
     const belt1Back = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.055, 0.018), rubberBeltMat);
     belt1Back.position.set(trackerX + 0.29, frameY + 0.19, -0.12);
     belt1Back.rotation.y = -0.12;
-    scene.add(belt1Back);
+    trackerRootGroup.add(belt1Back);
 
-    // Gá trắng bên trái ổ xoay + Encoder Trục 1 + Công tắc hành trình vi động SW1 chuẩn thực tế
     const enc1Plate = new THREE.Mesh(new RoundedBoxGeometry(0.40, 0.06, 0.38, 2, 0.01), whitePrintMat);
     enc1Plate.position.set(trackerX - 0.56, frameY + 0.08, 0);
-    scene.add(enc1Plate);
+    trackerRootGroup.add(enc1Plate);
 
     const enc1Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.24, 28), matteBlackPrintMat);
     enc1Housing.position.set(trackerX - 0.56, frameY - 0.08, 0);
-    scene.add(enc1Housing);
+    trackerRootGroup.add(enc1Housing);
 
     const enc1Pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.09, 20), whitePrintMat);
     enc1Pulley.position.set(trackerX - 0.56, frameY + 0.16, 0);
-    scene.add(enc1Pulley);
+    trackerRootGroup.add(enc1Pulley);
 
     const belt1Enc = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.045, 0.016), rubberBeltMat);
     belt1Enc.position.set(trackerX - 0.28, frameY + 0.17, 0.08);
-    scene.add(belt1Enc);
+    trackerRootGroup.add(belt1Enc);
 
-    // Cụm công tắc hành trình SW1 (Thân micro-switch đen + lá thép bạc + đèn LED báo trạng thái nhỏ)
     const sw1Body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.04), matteBlackPrintMat);
     sw1Body.position.set(trackerX - 0.42, frameY + 0.13, 0.16);
-    scene.add(sw1Body);
+    trackerRootGroup.add(sw1Body);
     const sw1Lever = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.008, 0.025), chromeSteelMat);
     sw1Lever.position.set(trackerX - 0.39, frameY + 0.15, 0.14);
     sw1Lever.rotation.y = -0.35;
-    scene.add(sw1Lever);
+    trackerRootGroup.add(sw1Lever);
     const sw1LedMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
     const sw1Led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 12), sw1LedMat);
     sw1Led.position.set(trackerX - 0.42, frameY + 0.165, 0.16);
-    scene.add(sw1Led);
+    trackerRootGroup.add(sw1Led);
 
-    // 2B. NHÓM XOAY PHƯƠNG VỊ TRỤC 1 (azimuthGroup xoay quanh trục đứng Y)
+    // Nhóm xoay Phương vị Trục 1
     const azimuthGroup = new THREE.Group();
     azimuthGroup.position.set(trackerX, frameY + 0.34, 0);
-    scene.add(azimuthGroup);
+    trackerRootGroup.add(azimuthGroup);
 
-    // Thớt trên của ổ xoay đen + 6 bu-lông lục giác M4 quanh vành
     const hubUpperCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.15, 40), matteBlackPrintMat);
     hubUpperCylinder.position.set(0, 0.075, 0);
     hubUpperCylinder.castShadow = true;
@@ -672,14 +985,11 @@ export default function CompactInteractiveTwin({
       azimuthGroup.add(bolt);
     }
 
-    // Trụ đứng nhôm định hình V-Slot 20x40 ghép đôi (Cao 1.68)
     const colHeight = 1.68;
     addVSlotBar(azimuthGroup, 0.115, colHeight, 0.115, -0.058, 0.15 + colHeight / 2, 0);
     addVSlotBar(azimuthGroup, 0.115, colHeight, 0.115, 0.058, 0.15 + colHeight / 2, 0);
 
-    // Cụm truyền động đai răng Trục 2 (Độ ngửa ε) gắn giữa thân trụ (Giống Ảnh 1 & Hình 2)
     const midY = 1.12;
-    // Mặt bích gá động cơ Trục 2 màu trắng in 3D bên trái trụ (có 4 vít M3 ở 4 góc)
     const m2Plate = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.34, 0.06, 2, 0.01), whitePrintMat);
     m2Plate.position.set(-0.22, midY, 0.09);
     m2Plate.castShadow = true;
@@ -692,7 +1002,6 @@ export default function CompactInteractiveTwin({
       azimuthGroup.add(s);
     });
 
-    // Hốc tròn đen chứa bánh đai chủ động Trục 2 + Puly nhôm ở tâm
     const m2PulleyPocket = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.07, 28), matteBlackPrintMat);
     m2PulleyPocket.rotation.x = Math.PI / 2;
     m2PulleyPocket.position.set(-0.22, midY, 0.10);
@@ -703,13 +1012,11 @@ export default function CompactInteractiveTwin({
     m2AluHub.position.set(-0.22, midY, 0.11);
     azimuthGroup.add(m2AluHub);
 
-    // Thân động cơ bước NEMA 17 Trục 2 nằm phía sau gá trắng
     const nema2 = createDetailedNema17();
     nema2.rotation.x = Math.PI / 2;
     nema2.position.set(-0.22, midY, -0.12);
     azimuthGroup.add(nema2);
 
-    // Gá trắng bên phải trụ giữ cụm căng đai + Encoder 2 + Công tắc hành trình SW2 (Giống Ảnh 1)
     const enc2Mount = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.22, 0.18, 2, 0.01), whitePrintMat);
     enc2Mount.position.set(0.14, midY - 0.03, 0.08);
     azimuthGroup.add(enc2Mount);
@@ -727,7 +1034,6 @@ export default function CompactInteractiveTwin({
     sw2Led.position.set(0.32, midY - 0.11, 0.16);
     azimuthGroup.add(sw2Led);
 
-    // Gối đỡ đen in 3D trên đỉnh trụ nhôm + Bánh đai bị động lớn màu trắng + 2 nhánh dây đai răng đen
     const topPivotY = 0.15 + colHeight;
     const topSaddleBlack = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.24, 0.32, 2, 0.015), matteBlackPrintMat);
     topSaddleBlack.position.set(0, topPivotY - 0.04, 0);
@@ -738,7 +1044,6 @@ export default function CompactInteractiveTwin({
     upperDrivenPulley.position.set(0, topPivotY + 0.02, 0.16);
     azimuthGroup.add(upperDrivenPulley);
 
-    // 2 Nhánh dây đai răng đen nối từ puly giữa trụ lên bánh đai đỉnh trụ (Giống Ảnh 1)
     const belt2Left = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.74, 0.042), rubberBeltMat);
     belt2Left.position.set(-0.15, (midY + topPivotY) / 2 + 0.02, 0.14);
     belt2Left.rotation.z = -0.28;
@@ -749,22 +1054,17 @@ export default function CompactInteractiveTwin({
     belt2Right.rotation.z = -0.26;
     azimuthGroup.add(belt2Right);
 
-    // =========================================================================
-    // 2C. NHÓM NGHIÊNG ĐỘ NGỬA TRỤC 2 (elevationGroup xoay quanh trục Z — nghiêng sang TRÁI y hệt Hình 2)
-    // =========================================================================
+    // Nhóm nghiêng Độ ngửa Trục 2 (Nghiêng mặt sang TRÁI -X đúng theo Hình 2)
     const elevationGroup = new THREE.Group();
     elevationGroup.position.set(0, topPivotY + 0.06, 0);
-    // Đặt góc khởi tạo ban đầu hướng mặt về bên trái ~30° (Đúng trạng thái thực tế trong Hình 2)
     elevationGroup.rotation.z = THREE.MathUtils.degToRad(30);
     azimuthGroup.add(elevationGroup);
 
-    // Trục thép ngang xuyên qua gối đỡ đỉnh trụ
     const pivotShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.48, 20), chromeSteelMat);
     pivotShaft.rotation.x = Math.PI / 2;
     pivotShaft.position.set(0, -0.04, 0);
     elevationGroup.add(pivotShaft);
 
-    // 2 Tấm gá chữ T màu trắng in 3D (Trước & Sau) + Vòng bi 608ZZ lộ ra ở 2 đầu (Giống hệt Ảnh 1, Ảnh 5 & Hình 2)
     const tBracketGeom = createSculptedTBracketGeometry();
     const tBracketFront = new THREE.Mesh(tBracketGeom, whitePrintMat);
     tBracketFront.position.set(0, 0.04, 0.18);
@@ -776,7 +1076,6 @@ export default function CompactInteractiveTwin({
     tBracketBack.castShadow = true;
     elevationGroup.add(tBracketBack);
 
-    // Vòng bi 608ZZ gắn trên tai gá chữ T (Giống hệt chi tiết vòng bi bạc trong Ảnh 1 & Ảnh 5)
     const brgRight = createBallBearing(0.065, 0.035);
     brgRight.position.set(0.32, 0.03, 0.21);
     elevationGroup.add(brgRight);
@@ -785,16 +1084,15 @@ export default function CompactInteractiveTwin({
     brgCenter.position.set(0, -0.08, 0.21);
     elevationGroup.add(brgCenter);
 
-    // Thanh đà nhôm đỡ dọc theo mặt dưới tấm pin Tracker (Thấy rõ trong Hình 2 chụp ban đêm)
-    addVSlotBar(elevationGroup, 1.92, 0.075, 0.08, 0, 0.18, 0);
+    addVSlotBar(elevationGroup, 1.75, 0.075, 0.08, 0, 0.18, 0);
 
-    // TẤM PIN TRACKER ĐẶT DỌC THEO CHIỀU NGHIÊNG (Dài 2.08 dọc theo độ dốc X, Rộng 1.46 theo chiều Z)
-    const trackerPanel = createIndustrialSolarPanel(2.08, 1.46, true);
+    // Tấm pin Tracker đặt dọc (Xoay dọc đồng bộ, hướng mặt sang bên trái)
+    const trackerPanel = createIndustrialSolarPanel(1.56, 2.04, true);
     trackerPanel.position.set(0, 0.245, 0);
     elevationGroup.add(trackerPanel);
 
     // =========================================================================
-    // 3. CHÍNH GIỮA: HỘP ĐIỆN CÔNG NGHIỆP MÀU TRẮNG CÓ KHÓA GÀI, ĂNG-TEN & MẠCH ĐIỆN
+    // 3. CHÍNH GIỮA: HỘP ĐIỆN TRẮNG (ĐÃ XÓA TẤM CHE ĐỂ LỘ RÕ TOÀN BỘ LINH KIỆN BÊN TRONG)
     // =========================================================================
     const boxGroup = new THREE.Group();
     boxGroup.position.set(0.08, frameY + 0.04, 0.05);
@@ -806,7 +1104,7 @@ export default function CompactInteractiveTwin({
     const boxD = 1.24;
     const wallT = 0.045;
 
-    // Đáy hộp và 4 thành hộp nhựa ABS trắng có gờ viền chống nước
+    // Đáy hộp và 4 thành hộp nhựa ABS trắng (RỖNG HOÀN TOÀN PHÍA TRÊN ĐỂ NHÌN THẤY MẠCH ĐIỆN)
     const boxFloor = new THREE.Mesh(new RoundedBoxGeometry(boxW, wallT, boxD, 2, 0.01), enclosureAbsMat);
     boxFloor.position.set(0, wallT / 2, 0);
     boxGroup.add(boxFloor);
@@ -831,12 +1129,18 @@ export default function CompactInteractiveTwin({
     wallRight.castShadow = true;
     boxGroup.add(wallRight);
 
-    // Gioăng cao su đen chống nước trên miệng hộp
-    const gasketRim = new THREE.Mesh(new THREE.BoxGeometry(boxW - 0.02, 0.012, boxD - 0.02), matteBlackPrintMat);
-    gasketRim.position.set(0, boxH + 0.002, 0);
-    boxGroup.add(gasketRim);
+    // 4 thanh gioăng cao su mỏng chỉ chạy dọc trên đỉnh 4 mép tường (Không che lòng hộp!)
+    const rimF = new THREE.Mesh(new THREE.BoxGeometry(boxW, 0.012, wallT * 0.7), matteBlackPrintMat);
+    rimF.position.set(0, boxH + 0.005, boxD / 2 - wallT / 2);
+    const rimB = new THREE.Mesh(new THREE.BoxGeometry(boxW, 0.012, wallT * 0.7), matteBlackPrintMat);
+    rimB.position.set(0, boxH + 0.005, -boxD / 2 + wallT / 2);
+    const rimL = new THREE.Mesh(new THREE.BoxGeometry(wallT * 0.7, 0.012, boxD), matteBlackPrintMat);
+    rimL.position.set(-boxW / 2 + wallT / 2, boxH + 0.005, 0);
+    const rimR = new THREE.Mesh(new THREE.BoxGeometry(wallT * 0.7, 0.012, boxD), matteBlackPrintMat);
+    rimR.position.set(boxW / 2 - wallT / 2, boxH + 0.005, 0);
+    boxGroup.add(rimF, rimB, rimL, rimR);
 
-    // 2 Khóa gài có gân nổi ở mặt trước hộp điện (Giống Ảnh 5)
+    // 2 Khóa gài mặt trước hộp điện
     [-0.38, 0.38].forEach((lx) => {
       const latchBase = new THREE.Mesh(new RoundedBoxGeometry(0.15, 0.22, 0.045, 2, 0.008), whitePrintMat);
       latchBase.position.set(lx, boxH - 0.11, boxD / 2 + 0.018);
@@ -845,7 +1149,7 @@ export default function CompactInteractiveTwin({
       boxGroup.add(latchBase, latchClip);
     });
 
-    // Ăng-ten WiFi màu đen có khớp xoay & đầu nối đồng SMA gắn mặt trước hộp điện (Giống Ảnh 4 & Ảnh 5)
+    // Ăng-ten WiFi màu đen mặt trước
     const smaNut = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.05, 6), brassMat);
     smaNut.rotation.x = Math.PI / 2;
     smaNut.position.set(0.26, boxH * 0.46, boxD / 2 + 0.02);
@@ -862,67 +1166,89 @@ export default function CompactInteractiveTwin({
     antWhip.castShadow = true;
     boxGroup.add(antWhip);
 
-    // CÁC LINH KIỆN ĐIỆN TỬ BÊN TRONG HỘP ĐIỆN (Giống Ảnh 4)
-    // 1. Bộ điều khiển sạc Solar PWM (Xanh dương - đen, có màn hình LCD & 2 cổng USB)
-    const pwmBody = new THREE.Mesh(new RoundedBoxGeometry(0.82, 0.22, 0.34, 2, 0.01), matteBlackPrintMat);
-    pwmBody.position.set(-0.16, 0.15, -0.34);
+    // LINH KIỆN BÊN TRONG HỘP ĐIỆN (Nâng cao độ chi tiết & dễ quan sát khi mở nắp)
+    // 1. Bộ điều khiển sạc Solar PWM (Xanh dương - đen, có màn hình LCD, tem trắng CE & 3 nút bấm)
+    const pwmBody = new THREE.Mesh(new RoundedBoxGeometry(0.84, 0.26, 0.36, 2, 0.01), matteBlackPrintMat);
+    pwmBody.position.set(-0.16, 0.22, -0.34);
     boxGroup.add(pwmBody);
 
-    const pwmFace = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.015, 0.22), pcbBlueMat);
-    pwmFace.position.set(-0.16, 0.262, -0.34);
+    const pwmFace = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.02, 0.24), pcbBlueMat);
+    pwmFace.position.set(-0.16, 0.355, -0.34);
     boxGroup.add(pwmFace);
 
-    const pwmLcd = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.018, 0.10), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.2 }));
-    pwmLcd.position.set(-0.18, 0.265, -0.34);
+    const pwmSticker = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.022, 0.07), whitePrintMat);
+    pwmSticker.position.set(-0.34, 0.358, -0.44);
+    boxGroup.add(pwmSticker);
+
+    const pwmLcd = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.024, 0.11),
+      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.2, roughness: 0.2 })
+    );
+    pwmLcd.position.set(-0.16, 0.358, -0.33);
     boxGroup.add(pwmLcd);
 
     // 2. Bảng mạch đục lỗ trắng góc trái dưới + ESP32-S3 + 2x INA226 + DS3231 + Quạt tản nhiệt
-    const perfBoard = new THREE.Mesh(new RoundedBoxGeometry(0.62, 0.025, 0.62, 2, 0.005), whitePrintMat);
-    perfBoard.position.set(-0.32, 0.06, 0.18);
+    const perfBoard = new THREE.Mesh(new RoundedBoxGeometry(0.64, 0.03, 0.64, 2, 0.005), whitePrintMat);
+    perfBoard.position.set(-0.32, 0.12, 0.18);
     boxGroup.add(perfBoard);
 
-    const espBreakout = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.04, 0.26), pcbGreenMat);
-    espBreakout.position.set(-0.22, 0.095, 0.26);
-    const espModule = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.03, 0.16), matteBlackPrintMat);
-    espModule.position.set(-0.22, 0.125, 0.26);
-    const espShield = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.015, 0.12), chromeSteelMat);
-    espShield.position.set(-0.22, 0.142, 0.24);
+    const espBreakout = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.28), pcbGreenMat);
+    espBreakout.position.set(-0.22, 0.16, 0.26);
+    const espModule = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.18), matteBlackPrintMat);
+    espModule.position.set(-0.22, 0.195, 0.26);
+    const espShield = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.015, 0.13), chromeSteelMat);
+    espShield.position.set(-0.22, 0.218, 0.24);
     boxGroup.add(espBreakout, espModule, espShield);
 
-    // 2 module cảm biến dòng/áp INA226 màu xanh dương + RTC DS3231 có pin cúc áo CR2032 bạc
-    const ina1 = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.03, 0.09), pcbBlueMat);
-    ina1.position.set(-0.48, 0.09, 0.05);
-    const ina2 = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.03, 0.09), pcbBlueMat);
-    ina2.position.set(-0.33, 0.09, 0.05);
-    const rtcPcb = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.11), pcbBlueMat);
-    rtcPcb.position.set(-0.38, 0.09, -0.08);
-    const cr2032 = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.015, 20), chromeSteelMat);
-    cr2032.position.set(-0.38, 0.112, -0.08);
+    // 2 module INA226 màu xanh dương + RTC DS3231 có pin CR2032
+    const ina1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.10), pcbBlueMat);
+    ina1.position.set(-0.48, 0.155, 0.05);
+    const ina2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.10), pcbBlueMat);
+    ina2.position.set(-0.32, 0.155, 0.05);
+    const rtcPcb = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.035, 0.12), pcbBlueMat);
+    rtcPcb.position.set(-0.38, 0.155, -0.09);
+    const cr2032 = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.018, 20), chromeSteelMat);
+    cr2032.position.set(-0.38, 0.18, -0.09);
     boxGroup.add(ina1, ina2, rtcPcb, cr2032);
 
     // Quạt tản nhiệt đen góc dưới trái
-    const fanFrame = new THREE.Mesh(new RoundedBoxGeometry(0.20, 0.11, 0.20, 2, 0.008), matteBlackPrintMat);
-    fanFrame.position.set(-0.50, 0.11, 0.34);
+    const fanFrame = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.12, 0.22, 2, 0.008), matteBlackPrintMat);
+    fanFrame.position.set(-0.50, 0.18, 0.35);
     boxGroup.add(fanFrame);
 
     const fanBladesGroup = new THREE.Group();
-    fanBladesGroup.position.set(-0.50, 0.17, 0.34);
-    const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 16), matteBlackPrintMat);
-    const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.008, 0.032), blackAnodizedMat);
-    const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.008, 0.16), blackAnodizedMat);
+    fanBladesGroup.position.set(-0.50, 0.245, 0.35);
+    const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16), matteBlackPrintMat);
+    const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.008, 0.035), blackAnodizedMat);
+    const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.008, 0.17), blackAnodizedMat);
     fanBladesGroup.add(fanHub, blade1, blade2);
     boxGroup.add(fanBladesGroup);
 
-    // 3. 2 Bộ Driver động cơ bước màu đen bên phải hộp + Cọc domino xanh lá
+    // 3. 2 Bộ Driver động cơ bước màu đen bên phải hộp + Domino xanh lá + ốc vặn
     [0.18, 0.48].forEach((dx) => {
-      const drvBody = new THREE.Mesh(new RoundedBoxGeometry(0.25, 0.24, 0.62, 2, 0.01), blackAnodizedMat);
-      drvBody.position.set(dx, 0.16, 0.16);
-      const drvTerm = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.045, 0.48), pcbGreenMat);
-      drvTerm.position.set(dx - 0.08, 0.29, 0.16);
+      const drvBody = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.26, 0.64, 2, 0.01), blackAnodizedMat);
+      drvBody.position.set(dx, 0.20, 0.16);
+      const drvTerm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.055, 0.50), pcbGreenMat);
+      drvTerm.position.set(dx - 0.08, 0.34, 0.16);
       boxGroup.add(drvBody, drvTerm);
     });
 
-    // NẮP HỘP ĐIỆN 3D CÓ BẢN LỀ BÊN PHẢI (lidGroup xoay mở nắp mượt mà)
+    // Dây điện nội bộ màu đỏ & xanh nối giữa sạc PWM, ESP32-S3 và 2 Driver (Giống Ảnh 4)
+    const intWire1 = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.22, 0.22, 0.20),
+      new THREE.Vector3(-0.05, 0.42, 0.10),
+      new THREE.Vector3(0.10, 0.36, 0.08)
+    ]);
+    boxGroup.add(new THREE.Mesh(new THREE.TubeGeometry(intWire1, 16, 0.01, 6, false), wireRedMat));
+
+    const intWire2 = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.32, 0.22, 0.05),
+      new THREE.Vector3(-0.10, 0.44, -0.08),
+      new THREE.Vector3(0.39, 0.36, 0.18)
+    ]);
+    boxGroup.add(new THREE.Mesh(new THREE.TubeGeometry(intWire2, 16, 0.01, 6, false), wireBlueMat));
+
+    // NẮP HỘP ĐIỆN 3D CÓ BẢN LỀ BÊN PHẢI
     const lidGroup = new THREE.Group();
     lidGroup.position.set(boxW / 2, boxH, 0);
     boxGroup.add(lidGroup);
@@ -933,33 +1259,38 @@ export default function CompactInteractiveTwin({
     lidGroup.add(lidMesh);
 
     // =========================================================================
-    // 4. CỤM BÊN PHẢI: TẤM PIN CỐ ĐỊNH (NAM 180°, NGỬA 75° / NGHIÊNG 15° VỀ PHÍA TRƯỚC)
+    // 4. CỤM BÊN PHẢI: TẤM PIN CỐ ĐỊNH (XOAY DỌC & QUAY MẶT VỀ BÊN PHẢI +X = HƯỚNG NAM 180°)
     // =========================================================================
+    const staticRootGroup = new THREE.Group();
+    staticRootGroup.name = 'staticSystem';
+    scene.add(staticRootGroup);
+
     const staticX = 2.15;
 
     const staBase = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.12, 0.32, 2, 0.01), matteBlackPrintMat);
     staBase.position.set(staticX, frameY + 0.06, 0);
-    scene.add(staBase);
+    staticRootGroup.add(staBase);
 
     const staColH = 1.65;
-    addVSlotBar(scene, 0.12, staColH, 0.12, staticX, frameY + 0.12 + staColH / 2, 0);
+    addVSlotBar(staticRootGroup, 0.12, staColH, 0.12, staticX, frameY + 0.12 + staColH / 2, 0);
 
-    // Cụm gá trắng cố định nghiêng 15° hướng Nam (+Z, về phía người xem giống hệt Hình 2)
+    // Cụm gá trắng cố định nghiêng 15° QUAY MẶT VỀ BÊN PHẢI (+X, tức hướng Nam 180° theo Hình 2)
     const staTopGroup = new THREE.Group();
     staTopGroup.position.set(staticX, frameY + 0.12 + staColH, 0);
-    staTopGroup.rotation.x = THREE.MathUtils.degToRad(15);
-    scene.add(staTopGroup);
+    staTopGroup.rotation.z = -THREE.MathUtils.degToRad(15); // Nghiêng 15° hướng mặt sang phải (+X = Nam 180°)
+    staticRootGroup.add(staTopGroup);
 
     const staBracket = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.09, 0.68, 2, 0.012), whitePrintMat);
     staBracket.position.set(0, 0.03, 0);
     staTopGroup.add(staBracket);
 
-    const staticPanel = createIndustrialSolarPanel(2.08, 1.46, false);
+    // Tấm pin cố định xoay dọc (Chiều rộng X = 1.56, Chiều dài dọc Z = 2.04) và nghiêng mặt về bên phải (+X)
+    const staticPanel = createIndustrialSolarPanel(1.56, 2.04, false);
     staticPanel.position.set(0, 0.10, 0);
     staTopGroup.add(staticPanel);
 
     // =========================================================================
-    // 5. DÂY CÁP ĐIỆN MÀU ĐEN UỐN CONG TỰ NHIÊN NỐI HỘP ĐIỆN VỚI 2 TRỤ PIN
+    // 5. DÂY CÁP ĐIỆN MÀU ĐEN NỐI HỘP ĐIỆN VỚI 2 TRỤ PIN
     // =========================================================================
     const cableCurveLeft = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-0.64, frameY + 0.25, -0.15),
@@ -967,8 +1298,7 @@ export default function CompactInteractiveTwin({
       new THREE.Vector3(-1.75, frameY + 0.35, -0.18),
       new THREE.Vector3(-1.95, frameY + 1.15, -0.08)
     ]);
-    const cableLeft = new THREE.Mesh(new THREE.TubeGeometry(cableCurveLeft, 24, 0.018, 8, false), rubberBeltMat);
-    scene.add(cableLeft);
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(cableCurveLeft, 24, 0.018, 8, false), rubberBeltMat));
 
     const cableCurveRight = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0.78, frameY + 0.22, -0.20),
@@ -976,14 +1306,15 @@ export default function CompactInteractiveTwin({
       new THREE.Vector3(2.08, frameY + 0.45, -0.08),
       new THREE.Vector3(2.12, frameY + 1.45, -0.05)
     ]);
-    const cableRight = new THREE.Mesh(new THREE.TubeGeometry(cableCurveRight, 24, 0.016, 8, false), rubberBeltMat);
-    scene.add(cableRight);
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(cableCurveRight, 24, 0.016, 8, false), rubberBeltMat));
 
     sceneObjectsRef.current = {
       azimuthGroup,
       elevationGroup,
       lidGroup,
       fanBladesGroup,
+      sunGroup,
+      sunRayLine,
       sw1LedMat,
       sw2LedMat,
       camera,
@@ -992,7 +1323,9 @@ export default function CompactInteractiveTwin({
       gridHelper
     };
 
-    // Xử lý nhấn chuột trực tiếp vào Hộp điện 3D để đóng/mở nắp
+    // =========================================================================
+    // 6. XỬ LÝ CLICK TRỰC TIẾP VÀO TỪNG TẤM PIN HOẶC HỘP ĐIỆN TRONG 3D
+    // =========================================================================
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let downX = 0;
@@ -1009,33 +1342,41 @@ export default function CompactInteractiveTwin({
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const intersects = raycaster.intersectObjects(boxGroup.children, true);
-      if (intersects.length > 0) {
+
+      const hitTracker = raycaster.intersectObjects(trackerRootGroup.children, true);
+      if (hitTracker.length > 0) {
+        setSelectedPanel('tracker');
+        return;
+      }
+
+      const hitStatic = raycaster.intersectObjects(staticRootGroup.children, true);
+      if (hitStatic.length > 0) {
+        setSelectedPanel('static');
+        return;
+      }
+
+      const hitBox = raycaster.intersectObjects(boxGroup.children, true);
+      if (hitBox.length > 0) {
         setIsBoxOpen((prev) => !prev);
+        setSelectedPanel('box');
       }
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointerup', handlePointerUp);
 
-    // Vòng lặp Render 3D & Nội suy chuyển động cơ khí mượt mà
+    // Vòng lặp Render 3D
     let animId;
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
       const { phiRad, tiltRad, lidRad, camTargetPos, camLookAt } = targetAnglesRef.current;
 
-      // Nội suy mượt góc phương vị Trục 1 (quanh trục Y) và góc nghiêng Trục 2 (quanh trục Z — nghiêng mặt về bên trái y hệt Hình 2)
       azimuthGroup.rotation.y += (phiRad - azimuthGroup.rotation.y) * 0.1;
       elevationGroup.rotation.z += (tiltRad - elevationGroup.rotation.z) * 0.1;
-
-      // Nội suy đóng/mở nắp hộp điện 3D
       lidGroup.rotation.z += (-lidRad - lidGroup.rotation.z) * 0.12;
-
-      // Quay cánh quạt tản nhiệt trong hộp điện
       fanBladesGroup.rotation.y += 0.14;
 
-      // Nội suy chuyển góc nhìn Camera khi chọn Preset
       if (camTargetPos && camLookAt) {
         camera.position.lerp(camTargetPos, 0.08);
         controls.target.lerp(camLookAt, 0.08);
@@ -1052,8 +1393,8 @@ export default function CompactInteractiveTwin({
 
     const handleResize = () => {
       if (!container) return;
-      const newW = container.clientWidth || 720;
-      const newH = container.clientHeight || 430;
+      const newW = container.clientWidth || 1080;
+      const newH = container.clientHeight || 560;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
@@ -1075,6 +1416,8 @@ export default function CompactInteractiveTwin({
     if (!isInteractiveSim) {
       setSimPhi(Math.round((livePhi ?? 2.3) * 10) / 10);
       setSimEps(Math.round((liveEps ?? 9.3) * 10) / 10);
+      const now = new Date();
+      setSimHourFloat(Math.round((now.getHours() + now.getMinutes() / 60) * 10) / 10);
       setIsInteractiveSim(true);
     } else {
       setIsInteractiveSim(false);
@@ -1082,15 +1425,15 @@ export default function CompactInteractiveTwin({
   };
 
   return (
-    <div className="lab-card p-4 sm:p-5 space-y-4">
-      {/* 1. TIÊU ĐỀ KHỐI & CÁC NÚT CHỨC NĂNG (ĐỒNG BỘ FONT CHỮ & PHONG CÁCH VỚI BẢNG SO SÁNH MODE THƯỜNG, KHÔNG DÙNG ICON) */}
+    <div className="lab-card p-4 sm:p-5 space-y-3">
+      {/* 1. TIÊU ĐỀ KHỐI & CÁC NÚT CHỨC NĂNG (ĐỒNG BỘ FONT CHỮ VỚI MODE THƯỜNG, KHÔNG DÙNG ICON) */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-slate-800">
         <div>
           <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-            Mô hình 3D đối chứng hai tấm pin (Compact Mode)
+            Mô hình 3D đối chứng hai tấm pin & Quỹ đạo Mặt trời NOAA (Compact Mode)
           </h2>
           <p className="text-xs text-zinc-500 dark:text-slate-300 font-medium mt-0.5">
-            Mô phỏng không gian 3D thời gian thực của hệ thống quay hai trục, hộp điện trung tâm và tấm cố định chuẩn
+            Nhấn trực tiếp vào [Tấm Tracker], [Tấm Cố định] hoặc [Hộp điện] trên mô hình 3D để xem bảng thông số đo đạc của từng khối
           </p>
         </div>
 
@@ -1131,295 +1474,485 @@ export default function CompactInteractiveTwin({
         </div>
       </div>
 
-      {/* 2. BỐ CỤC CHÍNH: KHUNG 3D TƯƠNG TÁC (TRÁI) & BẢNG SO SÁNH ĐỐI CHỨNG CHUẨN (PHẢI) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* CỘT TRÁI (7 COLS): KHUNG MÔ HÌNH 3D TƯƠNG TÁC (XOAY 360°, THU PHÓNG, ĐÓNG/MỞ HỘP ĐIỆN) */}
-        <div className="lg:col-span-7 border border-zinc-200 dark:border-slate-700 rounded-sm bg-zinc-50 dark:bg-slate-900/90 overflow-hidden flex flex-col">
-          {/* Thanh điều khiển góc nhìn 3D tối giản */}
-          <div className="px-3 py-2 bg-zinc-100/80 dark:bg-slate-800/90 border-b border-zinc-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex flex-wrap items-center gap-1">
-              <button
-                onClick={() => applyCameraPreset('overview')}
-                className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                  cameraPreset === 'overview'
-                    ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                    : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Toàn cảnh 3D
-              </button>
-              <button
-                onClick={() => applyCameraPreset('mechanism')}
-                className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                  cameraPreset === 'mechanism'
-                    ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                    : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Cận cảnh Trục & Đai răng
-              </button>
-              <button
-                onClick={() => applyCameraPreset('box')}
-                className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                  cameraPreset === 'box'
-                    ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                    : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Soi bên trong Hộp điện
-              </button>
-              <button
-                onClick={() => applyCameraPreset('front')}
-                className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                  cameraPreset === 'front'
-                    ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                    : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Góc nhìn chính diện
-              </button>
-            </div>
+      {/* 2. DẢI TỌA ĐỘ THIÊN VĂN MẶT TRỜI NOAA THỜI GIAN THỰC */}
+      <div className="px-3.5 py-2 bg-zinc-100/90 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div>
+            <span className="text-zinc-600 dark:text-slate-300">Vị trí Mặt trời (NOAA): </span>
+            <span className="font-bold text-amber-700 dark:text-amber-400">
+              Phương vị Az = {formatValueOrDash(noaaSun.azimuthDeg, 1, '°')} ({getCompassDirectionName(noaaSun.azimuthDeg)})
+            </span>
+          </div>
+          <div>
+            <span className="text-zinc-600 dark:text-slate-300">Độ cao El: </span>
+            <span className="font-bold text-zinc-900 dark:text-white">
+              {formatSignedNumber(noaaSun.elevationDeg, 1, '°')}
+            </span>
+            <span className="text-zinc-500 dark:text-slate-400 ml-1">
+              (Zenith: {formatValueOrDash(noaaSun.zenithDeg, 1, '°')} — {noaaSun.isDaylight ? 'Ban ngày' : 'Ban đêm'})
+            </span>
+          </div>
+          <div>
+            <span className="text-zinc-600 dark:text-slate-300">Chu kỳ ngày NOAA: </span>
+            <span className="font-semibold text-zinc-900 dark:text-white">
+              Bình minh {noaaSun.sunriseStr} – Hoàng hôn {noaaSun.sunsetStr}
+            </span>
+          </div>
+        </div>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setIsBoxOpen((prev) => !prev)}
-                className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                  isBoxOpen
-                    ? 'bg-zinc-800 text-white border-zinc-700 dark:bg-slate-200 dark:text-slate-900'
-                    : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-                }`}
-              >
-                {isBoxOpen ? 'Đóng nắp hộp điện' : 'Mở nắp hộp điện'}
-              </button>
+        <div className="text-[11px] text-zinc-500 dark:text-slate-400 font-medium">
+          Quy ước hướng: Trên = Đông (90°) | Phải = Nam (180°) | Dưới = Tây (270°) | Trái = Bắc (0°)
+        </div>
+      </div>
 
-              <button
-                onClick={toggleSandbox}
-                className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                  isInteractiveSim
-                    ? 'bg-blue-700 text-white border-blue-600'
-                    : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-                }`}
-              >
-                {isInteractiveSim ? 'Đang thử góc 3D (Về thực tế)' : 'Thử xoay góc 3D'}
-              </button>
-            </div>
+      {/* 3. KHUNG MÔ HÌNH 3D HIỂN THỊ TOÀN TAB (100% WIDTH) */}
+      <div className="w-full border border-zinc-200 dark:border-slate-700 rounded-sm bg-zinc-50 dark:bg-slate-900/90 overflow-hidden flex flex-col">
+        {/* Thanh công cụ điều khiển góc nhìn 3D & Chọn nhanh đối tượng */}
+        <div className="px-3 py-2 bg-zinc-100/80 dark:bg-slate-800/90 border-b border-zinc-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-zinc-500 dark:text-slate-400 font-medium mr-1">Góc nhìn:</span>
+            <button
+              onClick={() => applyCameraPreset('overview')}
+              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
+                cameraPreset === 'overview'
+                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
+                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
+              }`}
+            >
+              Toàn cảnh 3D
+            </button>
+            <button
+              onClick={() => applyCameraPreset('top')}
+              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
+                cameraPreset === 'top'
+                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
+                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
+              }`}
+            >
+              Nhìn từ trên (Đông-Tây-Nam-Bắc)
+            </button>
+            <button
+              onClick={() => applyCameraPreset('mechanism')}
+              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
+                cameraPreset === 'mechanism'
+                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
+                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
+              }`}
+            >
+              Cận cảnh Trục & Đai răng
+            </button>
+            <button
+              onClick={() => applyCameraPreset('box')}
+              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
+                cameraPreset === 'box'
+                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
+                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
+              }`}
+            >
+              Bên trong Hộp điện
+            </button>
           </div>
 
-          {/* Thanh trượt thử nghiệm xoay 2 trục 3D (Khi bật chế độ Thử xoay góc 3D) */}
-          {isInteractiveSim && (
-            <div className="px-3.5 py-2.5 bg-zinc-100 dark:bg-slate-800/70 border-b border-zinc-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
-                  <span>Góc quay Trục 1 (Phương vị φ):</span>
-                  <span>{formatSignedNumber(simPhi, 1, '°')}</span>
-                </div>
-                <input
-                  type="range"
-                  min="-90"
-                  max="150"
-                  step="1"
-                  value={simPhi}
-                  onChange={(e) => setSimPhi(Number(e.target.value))}
-                  className="w-full accent-blue-700 cursor-pointer h-1.5"
-                />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setSelectedPanel((prev) => (prev === 'tracker' ? null : 'tracker'))}
+              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
+                selectedPanel === 'tracker'
+                  ? 'bg-blue-700 text-white border-blue-600'
+                  : 'bg-white dark:bg-slate-800 text-blue-700 dark:text-sky-300 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              Thông số Tấm Tracker
+            </button>
+            <button
+              onClick={() => setSelectedPanel((prev) => (prev === 'static' ? null : 'static'))}
+              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
+                selectedPanel === 'static'
+                  ? 'bg-amber-700 text-white border-amber-600'
+                  : 'bg-white dark:bg-slate-800 text-amber-800 dark:text-amber-300 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              Thông số Tấm Cố định
+            </button>
+            <button
+              onClick={() => setSelectedPanel((prev) => (prev === 'both' ? null : 'both'))}
+              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
+                selectedPanel === 'both'
+                  ? 'bg-zinc-800 text-white border-zinc-700 dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              So sánh cả 2 tấm
+            </button>
+            <button
+              onClick={() => setIsBoxOpen((prev) => !prev)}
+              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
+                isBoxOpen
+                  ? 'bg-zinc-800 text-white border-zinc-700 dark:bg-slate-200 dark:text-slate-900'
+                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              {isBoxOpen ? 'Đóng nắp hộp điện' : 'Mở nắp hộp điện'}
+            </button>
+            <button
+              onClick={toggleSandbox}
+              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
+                isInteractiveSim
+                  ? 'bg-blue-700 text-white border-blue-600'
+                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              {isInteractiveSim ? 'Đang thử góc & giờ NOAA (Về thực tế)' : 'Thử góc 3D & Giờ NOAA'}
+            </button>
+          </div>
+        </div>
+
+        {/* Thanh trượt thử nghiệm xoay 2 trục 3D & Giờ Mặt trời NOAA */}
+        {isInteractiveSim && (
+          <div className="px-4 py-2.5 bg-zinc-100 dark:bg-slate-800/70 border-b border-zinc-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
+                <span>Góc quay Trục 1 (Phương vị φ):</span>
+                <span>{formatSignedNumber(simPhi, 1, '°')}</span>
               </div>
-              <div>
-                <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
-                  <span>Góc ngửa Trục 2 (Độ ngửa ε):</span>
-                  <span>{formatValueOrDash(simEps, 1, '°')}</span>
+              <input
+                type="range"
+                min="-90"
+                max="150"
+                step="1"
+                value={simPhi}
+                onChange={(e) => setSimPhi(Number(e.target.value))}
+                className="w-full accent-blue-700 cursor-pointer h-1.5"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
+                <span>Góc ngửa Trục 2 (Độ ngửa ε):</span>
+                <span>{formatValueOrDash(simEps, 1, '°')}</span>
+              </div>
+              <input
+                type="range"
+                min="9"
+                max="90"
+                step="1"
+                value={simEps}
+                onChange={(e) => setSimEps(Number(e.target.value))}
+                className="w-full accent-blue-700 cursor-pointer h-1.5"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-300 mb-1">
+                <span>Giờ Mặt trời NOAA trong ngày:</span>
+                <span>
+                  {Math.floor(simHourFloat).toString().padStart(2, '0')}:
+                  {Math.round((simHourFloat % 1) * 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="5.5"
+                max="18.0"
+                step="0.25"
+                value={simHourFloat}
+                onChange={(e) => setSimHourFloat(Number(e.target.value))}
+                className="w-full accent-amber-600 cursor-pointer h-1.5"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Khung Canvas 3D Toàn Tab */}
+        <div className="relative w-full h-[500px] sm:h-[580px]">
+          <div
+            ref={mountRef}
+            className="w-full h-full cursor-grab active:cursor-grabbing"
+            title="Nhấn vào Tấm Tracker (Trái), Tấm Cố định (Phải) hoặc Hộp điện (Giữa) để xem thông số"
+          />
+
+          {/* BẢNG THÔNG SỐ NỔI KHI NHẤN VÀO TẤM PIN HOẶC HỘP ĐIỆN TRONG 3D (SỬ DỤNG ĐÚNG LAB-TABLE CỦA MODE THƯỜNG) */}
+          {selectedPanel && (
+            <div className="absolute top-3 right-3 z-20 w-[94%] sm:w-[430px] max-h-[92%] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-600 rounded-sm shadow-2xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-700 pb-2">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+                    {selectedPanel === 'tracker'
+                      ? 'Thông số Tấm tracker (Trục kép)'
+                      : selectedPanel === 'static'
+                      ? 'Thông số Tấm cố định (Nam, ngửa 75°)'
+                      : selectedPanel === 'box'
+                      ? 'Thông số Hộp điện điều khiển trung tâm'
+                      : 'Bảng so sánh đối chứng hai tấm pin'}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-slate-400">
+                    Nhấn trực tiếp vào tấm pin khác trên mô hình 3D để chuyển đổi
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  min="9"
-                  max="90"
-                  step="1"
-                  value={simEps}
-                  onChange={(e) => setSimEps(Number(e.target.value))}
-                  className="w-full accent-blue-700 cursor-pointer h-1.5"
-                />
+                <button
+                  onClick={() => setSelectedPanel(null)}
+                  className="px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-slate-800 border border-zinc-300 dark:border-slate-700 rounded-xs cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+
+              {selectedPanel === 'tracker' && (
+                <table className="lab-table text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
+                      <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
+                      <th className="text-left font-bold py-2 px-2.5 text-blue-700 dark:text-sky-300">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
+                          <span>Tấm tracker (Trục kép)</span>
+                        </div>
+                        <span className={`text-[11px] font-semibold block mt-0.5 ${trkBadge.textColor}`}>
+                          {trkBadge.text}
+                        </span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
+                      <td className="py-2 px-2.5 font-bold text-base text-blue-700 dark:text-sky-300">
+                        {formatValueOrDash(tracking.power, 1, 'W')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(tracking.voltage, 2, 'V')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(tracking.current, 2, 'A')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
+                      <td className="py-2 px-2.5 font-bold text-blue-700 dark:text-sky-300">
+                        {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng hiện tại</td>
+                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
+                        <div>
+                          <span>Quay φ: </span>
+                          <span className="font-bold text-zinc-900 dark:text-white">
+                            {formatSignedNumber(effectivePhi, 1, '°')}
+                          </span>
+                          <span className="mx-1.5 text-zinc-400">|</span>
+                          <span>Ngửa ε: </span>
+                          <span className="font-bold text-zinc-900 dark:text-white">
+                            {formatValueOrDash(effectiveEps, 1, '°')}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
+                          {compassAzimuth !== null
+                            ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})`
+                            : '(Zenith nằm ngang = 50°, CTHT = 90°)'}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công tắc hành trình</td>
+                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
+                        SW1: <span className="font-semibold">{az.limitHome ? 'Chạm' : 'Hở'}</span> | SW2:{' '}
+                        <span className="font-semibold">{el.limitSwitch90 ? 'Chạm' : 'Hở'}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
+              {selectedPanel === 'static' && (
+                <table className="lab-table text-xs sm:text-sm">
+                  <thead>
+                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
+                      <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
+                      <th className="text-left font-bold py-2 px-2.5 text-amber-800 dark:text-amber-300">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
+                          <span>Tấm cố định (Nam, ngửa 75°)</span>
+                        </div>
+                        <span className={`text-[11px] font-semibold block mt-0.5 ${staBadge.textColor}`}>
+                          {staBadge.text}
+                        </span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
+                      <td className="py-2 px-2.5 font-bold text-base text-amber-800 dark:text-amber-300">
+                        {formatValueOrDash(stat.power, 1, 'W')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(stat.voltage, 2, 'V')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(stat.current, 2, 'A')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
+                      <td className="py-2 px-2.5 font-bold text-amber-800 dark:text-amber-300">
+                        {formatValueOrDash(stat.energyWh, 1, 'Wh')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng cố định</td>
+                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
+                        <div className="font-semibold text-zinc-900 dark:text-white">Hướng Nam 180°, ngửa 75°</div>
+                        <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
+                          (Đặt dọc, nghiêng cố định 15° về hướng Nam / Phải)
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
+              {selectedPanel === 'both' && (
+                <table className="lab-table text-xs">
+                  <thead>
+                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
+                      <th className="text-left font-bold py-2 px-2 text-zinc-900 dark:text-white">Thông số</th>
+                      <th className="text-left font-bold py-2 px-2 text-blue-700 dark:text-sky-300">Tấm tracker</th>
+                      <th className="text-left font-bold py-2 px-2 text-amber-800 dark:text-amber-300">Tấm cố định</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                    <tr>
+                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Công suất (P)</td>
+                      <td className="py-2 px-2 font-bold text-blue-700 dark:text-sky-300">
+                        {formatValueOrDash(tracking.power, 1, 'W')}
+                      </td>
+                      <td className="py-2 px-2 font-bold text-amber-800 dark:text-amber-300">
+                        {formatValueOrDash(stat.power, 1, 'W')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Điện áp (V)</td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(tracking.voltage, 2, 'V')}
+                      </td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(stat.voltage, 2, 'V')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Dòng điện (I)</td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(tracking.current, 2, 'A')}
+                      </td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        {formatValueOrDash(stat.current, 2, 'A')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Sản lượng (ΣE)</td>
+                      <td className="py-2 px-2 font-bold text-blue-700 dark:text-sky-300">
+                        {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
+                      </td>
+                      <td className="py-2 px-2 font-bold text-amber-800 dark:text-amber-300">
+                        {formatValueOrDash(stat.energyWh, 1, 'Wh')}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Góc hiện tại</td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        φ: {formatSignedNumber(effectivePhi, 1, '°')} | ε: {formatValueOrDash(effectiveEps, 1, '°')}
+                      </td>
+                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
+                        Nam 180°, ngửa 75°
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
+              {selectedPanel === 'box' && (
+                <table className="lab-table text-xs sm:text-sm">
+                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Trạng thái vận hành</td>
+                      <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">
+                        {system?.displayState || 'Bình thường'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Vi điều khiển & Cảm biến</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        ESP32-S3 + 2x INA226 + DS3231 RTC
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Nhiệt độ hộp điện (RTC)</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {system?.rtcTemp !== null && system?.rtcTemp !== undefined
+                          ? `${Number(system.rtcTemp).toFixed(1).replace('.', ',')} °C`
+                          : '--'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Độ lệch đồng hồ RTC</td>
+                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                        {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
+                          ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
+                          : '--'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Nắp hộp điện 3D</td>
+                      <td className="py-2 px-2.5">
+                        <button
+                          onClick={() => setIsBoxOpen((prev) => !prev)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-blue-700 text-white rounded-xs cursor-pointer"
+                        >
+                          {isBoxOpen ? 'Đóng nắp hộp' : 'Mở nắp hộp'}
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
+              {/* Dòng kết luận Chênh lệch năng lượng % Gain */}
+              <div className="p-2.5 bg-zinc-50 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-xs flex items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-zinc-800 dark:text-slate-200">
+                  Chênh lệch năng lượng (k = 1,018):
+                </span>
+                {hasValidGain ? (
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                    {formatSignedNumber(comparison.percentGain, 1, '%')}
+                  </span>
+                ) : (
+                  <span className="text-zinc-500 dark:text-slate-400 italic">
+                    Chờ đủ ngưỡng 5,0 Wh
+                  </span>
+                )}
               </div>
             </div>
           )}
 
-          {/* Khung Canvas 3D WebGL */}
-          <div className="relative w-full h-[390px] sm:h-[440px]">
-            <div
-              ref={mountRef}
-              className="w-full h-full cursor-grab active:cursor-grabbing"
-              title="Kéo chuột trái để xoay 360°, lăn chuột để phóng to/thu nhỏ, nhấn vào hộp điện để mở nắp"
-            />
-
-            {/* Nhãn hướng dẫn thao tác chuột tối giản dưới góc khung 3D */}
-            <div className="absolute bottom-2.5 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none text-[11px] text-zinc-600 dark:text-slate-300">
-              <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700">
-                Chuột trái: Xoay 360° | Con lăn: Thu phóng | Chuột phải: Di chuyển | Nhấn vào hộp điện: Mở nắp
-              </span>
-              <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700 font-semibold text-zinc-800 dark:text-slate-100">
-                Trạng thái: {system?.displayState || 'Bình thường'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* CỘT PHẢI (5 COLS): BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN (GIỐNG HỆT FONT CHỮ, FONT SỐ & PHONG CÁCH CỦA MODE THƯỜNG) */}
-        <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
-          <div className="overflow-x-auto">
-            <table className="lab-table text-xs sm:text-sm">
-              <thead>
-                <tr className="bg-zinc-50/80 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200">
-                  <th className="text-left font-bold py-2.5 px-3 text-zinc-900 dark:text-white">
-                    Thông số đo đạc
-                  </th>
-                  <th className="text-left font-bold py-2.5 px-3 text-blue-700 dark:text-sky-300">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
-                      <span>Tấm tracker (Trục kép)</span>
-                    </div>
-                    <span className={`text-xs font-semibold block mt-0.5 ${trkBadge.textColor}`}>
-                      {trkBadge.text}
-                    </span>
-                  </th>
-                  <th className="text-left font-bold py-2.5 px-3 text-amber-800 dark:text-amber-300">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
-                      <span>Tấm cố định (Nam, 75°)</span>
-                    </div>
-                    <span className={`text-xs font-semibold block mt-0.5 ${staBadge.textColor}`}>
-                      {staBadge.text}
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
-                {/* 1. Công suất tức thời */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Công suất tức thời (P)
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-blue-700 dark:text-sky-300">
-                    {formatValueOrDash(tracking.power, 1, 'W')}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-amber-800 dark:text-amber-300">
-                    {formatValueOrDash(stat.power, 1, 'W')}
-                  </td>
-                </tr>
-
-                {/* 2. Điện áp */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Điện áp (V)
-                  </td>
-                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
-                    {formatValueOrDash(tracking.voltage, 2, 'V')}
-                  </td>
-                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
-                    {formatValueOrDash(stat.voltage, 2, 'V')}
-                  </td>
-                </tr>
-
-                {/* 3. Dòng điện */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Dòng điện (I)
-                  </td>
-                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
-                    {formatValueOrDash(tracking.current, 2, 'A')}
-                  </td>
-                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
-                    {formatValueOrDash(stat.current, 2, 'A')}
-                  </td>
-                </tr>
-
-                {/* 4. Năng lượng hôm nay */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Năng lượng hôm nay (ΣE)
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-blue-700 dark:text-sky-300">
-                    {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-amber-800 dark:text-amber-300">
-                    {formatValueOrDash(stat.energyWh, 1, 'Wh')}
-                  </td>
-                </tr>
-
-                {/* 5. Góc định hướng hiện tại */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Góc định hướng hiện tại
-                  </td>
-                  <td className="py-2.5 px-3 text-zinc-800 dark:text-slate-100">
-                    <div>
-                      <span>Quay φ: </span>
-                      <span className="font-bold text-zinc-900 dark:text-white">
-                        {effectivePhi !== null ? formatSignedNumber(effectivePhi, 1, '°') : '--'}
-                      </span>
-                      <span className="mx-1.5 text-zinc-400 dark:text-slate-500">|</span>
-                      <span>Ngửa ε: </span>
-                      <span className="font-bold text-zinc-900 dark:text-white">
-                        {effectiveEps !== null ? formatValueOrDash(effectiveEps, 1, '°') : '--'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
-                      {compassAzimuth !== null
-                        ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})`
-                        : '(Nằm ngang = 50°, CTHT = 90°)'}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-zinc-800 dark:text-slate-100">
-                    <div className="font-medium text-zinc-900 dark:text-white">
-                      Hướng Nam 180°, ngửa 75°
-                    </div>
-                    <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
-                      (Góc nghiêng cố định 15°)
-                    </span>
-                  </td>
-                </tr>
-
-                {/* 6. Trạng thái công tắc hành trình cơ khí */}
-                <tr>
-                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                    Công tắc hành trình
-                  </td>
-                  <td className="py-2.5 px-3 text-zinc-800 dark:text-slate-100" colSpan={2}>
-                    <span>SW1 (Phương vị): </span>
-                    <span className="font-semibold text-zinc-900 dark:text-white">
-                      {az.limitHome ? 'Đang chạm (Home)' : 'Hở (Bình thường)'}
-                    </span>
-                    <span className="mx-2 text-zinc-400 dark:text-slate-500">|</span>
-                    <span>SW2 (Độ ngửa): </span>
-                    <span className="font-semibold text-zinc-900 dark:text-white">
-                      {el.limitSwitch90 ? 'Đang chạm (90°)' : 'Hở (Bình thường)'}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Dòng kết luận Chênh lệch năng lượng % Gain (Giống hệt Mode thường) */}
-          <div className="p-3 bg-zinc-50 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-slate-200">
-              Chênh lệch năng lượng hôm nay (k = 1,018):
+          {/* Nhãn hướng dẫn thao tác chuột dưới góc khung 3D */}
+          <div className="absolute bottom-2.5 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none text-[11px] text-zinc-600 dark:text-slate-300">
+            <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700">
+              Nhấn vào [Tấm Tracker], [Tấm Cố định] hoặc [Hộp điện] để hiện bảng thông số | Chuột trái: Xoay 360° | Con lăn: Thu phóng
             </span>
-            <div className="text-xs sm:text-sm">
-              {hasValidGain ? (
-                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-base">
-                  {formatSignedNumber(comparison.percentGain, 1, '%')}
-                  {comparison.powerDelta !== null && (
-                    <span className="text-xs text-zinc-600 dark:text-slate-300 font-normal ml-1.5">
-                      ({formatSignedNumber(comparison.powerDelta, 1, 'W')})
-                    </span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-zinc-600 dark:text-slate-300 font-medium italic">
-                  {tracking.connStatus !== 'LIVE' || stat.connStatus !== 'LIVE'
-                    ? 'Chưa đủ dữ liệu (mất kết nối)'
-                    : 'Chờ tích lũy đủ ngưỡng 5,0 Wh'}
-                </span>
-              )}
-            </div>
+            <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700 font-semibold text-zinc-800 dark:text-slate-100">
+              Trạng thái: {system?.displayState || 'Bình thường'}
+            </span>
           </div>
         </div>
       </div>

@@ -953,6 +953,7 @@ export default function App() {
           <section aria-label="Mô hình 3D trực quan Compact Mode">
             <CompactInteractiveTwin
               telemetry={telemetry}
+              location={selectedLocation}
               themeMode={themeMode}
               isAdmin={authSession?.role === 'admin'}
               onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
