@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Settings, LogOut, ShieldCheck, CloudSun } from 'lucide-react';
+import { CloudSun } from 'lucide-react';
+import { TbAlertOctagon, TbAdjustmentsHorizontal, TbSettings, TbLogout } from 'react-icons/tb';
 import { formatSignedNumber } from '../utils/formatters';
 
 export default function Header({
@@ -100,7 +101,8 @@ export default function Header({
                 }`}
               title={system?.emergencyActive ? "Nhấn để nhập mật khẩu mở khóa hệ thống" : "Nhấn để dừng khẩn cấp & hạ góc Max phủ bạt che mưa bão"}
             >
-              {system?.emergencyActive ? 'MỞ KHÓA HOẠT ĐỘNG' : 'DỪNG KHẨN CẤP  '}
+              <TbAlertOctagon className="w-3.5 h-3.5 shrink-0" />
+              <span>{system?.emergencyActive ? 'MỞ KHÓA HOẠT ĐỘNG' : 'DỪNG KHẨN CẤP'}</span>
             </button>
           )}
 
@@ -109,9 +111,10 @@ export default function Header({
             <button
               id="btn-open-manual-control"
               onClick={onOpenManualModal}
-              className="px-3 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors"
+              className="px-3 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
             >
-              Điều khiển
+              <TbAdjustmentsHorizontal className="w-3.5 h-3.5 shrink-0" />
+              <span>Điều khiển</span>
             </button>
           )}
 
@@ -120,9 +123,10 @@ export default function Header({
             <button
               id="btn-open-settings"
               onClick={onOpenSettingsModal}
-              className="px-3 py-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
+              className="px-3 py-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
             >
-              Cài đặt
+              <TbSettings className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+              <span>Cài đặt</span>
             </button>
           )}
 
@@ -131,10 +135,11 @@ export default function Header({
             <button
               id="btn-logout"
               onClick={onLogout}
-              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-700 dark:hover:text-red-400 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
+              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-700 dark:hover:text-red-400 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
               title="Đăng xuất"
             >
-              Đăng xuất
+              <TbLogout className="w-3.5 h-3.5 shrink-0" />
+              <span>Đăng xuất</span>
             </button>
           )}
         </div>
@@ -155,11 +160,11 @@ export default function Header({
             {/* Trạng thái máy & Đếm ngược thời gian xoay */}
             <div className="flex items-center gap-1">
               <span>Trạng thái: </span>
-              <span className={`font-semibold ${system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
-                  ? 'text-blue-700 dark:text-sky-300 font-mono'
+              <span className={`font-semibold px-1.5 py-0.5 rounded-xs ${system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
+                  ? 'text-blue-700 dark:text-sky-300 bg-blue-50 dark:bg-sky-950/50 border border-blue-200/70 dark:border-sky-800/60 font-mono'
                   : system?.displayState && system?.displayState.includes('ĐIỀU CHỈNH')
-                    ? 'text-amber-700 dark:text-amber-300 font-mono animate-pulse'
-                    : 'text-zinc-900 dark:text-white'
+                    ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-800/60 font-mono animate-pulse'
+                    : 'text-zinc-900 dark:text-white bg-zinc-200/50 dark:bg-slate-800/80'
                 }`}>
                 {system?.displayState || 'Bình thường'}
               </span>
@@ -167,7 +172,12 @@ export default function Header({
 
             {/* Trạng thái kết nối */}
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-red-600 dark:bg-rose-400'}`} />
+              <span className="relative flex h-2 w-2">
+                {isOnline && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-red-600 dark:bg-rose-400'}`} />
+              </span>
               <span>Kết nối: </span>
               <span className={`font-semibold ${isOnline ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-rose-400'}`}>
                 {isOnline ? 'Trực tiếp' : 'Mất kết nối'}

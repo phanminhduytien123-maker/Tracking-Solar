@@ -1,4 +1,14 @@
 import React from 'react';
+import {
+  TbSolarPanel,
+  TbBolt,
+  TbCircuitVoltmeter,
+  TbWaveSine,
+  TbBatteryCharging,
+  TbCompass,
+  TbTrendingUp,
+  TbFileText
+} from 'react-icons/tb';
 import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge, getCompassDirectionName } from '../utils/formatters';
 
 /**
@@ -50,17 +60,39 @@ export default function VisualPanelsComparison({
 
   const hasValidGain = comparison.hasValidGain && comparison.percentGain !== null;
 
+  // Tính tỷ lệ thanh trực quan (Progress Bar) cho Công suất tức thời & Năng lượng hôm nay
+  const trkP = Math.max(0, Number(tracking.power) || 0);
+  const staP = Math.max(0, Number(stat.power) || 0);
+  const maxPowerRef = Math.max(25, trkP, staP);
+  const trkPowerPct = Math.min(100, Math.round((trkP / maxPowerRef) * 100));
+  const staPowerPct = Math.min(100, Math.round((staP / maxPowerRef) * 100));
+
+  const trkE = Math.max(0, Number(tracking.energyWh) || 0);
+  const staE = Math.max(0, Number(stat.energyWh) || 0);
+  const maxEnergyRef = Math.max(10, trkE, staE);
+  const trkEnergyPct = Math.min(100, Math.round((trkE / maxEnergyRef) * 100));
+  const staEnergyPct = Math.min(100, Math.round((staE / maxEnergyRef) * 100));
+
+  // Góc nghiêng mặt pin so với phương ngang (Horizontal Tilt β = 90° - ε) để vẽ sơ đồ mặt cắt nghiêng
+  const tiltDegFromHorizontal = epsAngle !== null && !isNaN(epsAngle) ? (90 - Number(epsAngle)) : 15;
+  const clampedTiltSvg = Math.max(-55, Math.min(55, tiltDegFromHorizontal));
+
   return (
     <div className="lab-card p-4 sm:p-5 space-y-4">
       {/* Tiêu đề khối & Nút mở chi tiết */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-slate-800">
-        <div>
-          <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-            Bảng so sánh đối chứng hai tấm pin
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-slate-300 font-medium mt-0.5">
-            Đối chiếu số đo thời gian thực giữa hệ thống quay hai trục và tấm cố định chuẩn
-          </p>
+        <div className="flex items-start gap-2.5">
+          <div className="p-2 rounded-md bg-blue-50 dark:bg-sky-950/60 border border-blue-200/70 dark:border-sky-800/60 text-blue-700 dark:text-sky-300 shrink-0 mt-0.5">
+            <TbSolarPanel className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+              Bảng so sánh đối chứng hai tấm pin
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-slate-300 font-medium mt-0.5">
+              Đối chiếu số đo thời gian thực giữa hệ thống quay hai trục và tấm cố định chuẩn
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto mt-1 sm:mt-0 justify-start sm:justify-end">
           {/* 3 nút thao tác dành riêng cho giao diện điện thoại (sm:hidden) do Header ẩn trên mobile */}
@@ -105,21 +137,22 @@ export default function VisualPanelsComparison({
           {/* Nút Xem thông số chi tiết (hiển thị trên cả mobile và desktop) */}
           <button
             onClick={onOpenDetails}
-            className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
           >
-            Xem thông số chi tiết
+            <TbFileText className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400 shrink-0" />
+            <span>Xem thông số chi tiết</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* Cột chính: Bảng số liệu hai cột thẳng hàng (9 cols) */}
-        <div className="lg:col-span-9 overflow-x-auto">
+        <div className="lg:col-span-9 flex flex-col justify-between overflow-x-auto">
           <table className="lab-table text-xs sm:text-sm">
             <thead>
               <tr className="bg-zinc-50/80 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200">
                 <th className="text-left font-bold py-2.5 px-3 w-1/3 text-zinc-900 dark:text-white">Thông số đo đạc</th>
-                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-blue-700 dark:text-sky-300">
+                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-blue-700 dark:text-sky-300 border-t-2 border-t-blue-600 dark:border-t-sky-400">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
                     <span>Tấm tracker (Trục kép)</span>
@@ -128,7 +161,7 @@ export default function VisualPanelsComparison({
                     {trkBadge.text}
                   </span>
                 </th>
-                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-amber-800 dark:text-amber-300">
+                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-amber-800 dark:text-amber-300 border-t-2 border-t-amber-600 dark:border-t-amber-400">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
                     <span>Tấm cố định (Nam, ngửa 75°)</span>
@@ -143,20 +176,42 @@ export default function VisualPanelsComparison({
               {/* 1. Công suất tức thời */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                  Công suất tức thời (P)
+                  <div className="flex items-center gap-2">
+                    <TbBolt className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+                    <span>Công suất tức thời (P)</span>
+                  </div>
                 </td>
-                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-blue-700 dark:text-sky-300">
-                  {formatValueOrDash(tracking.power, 1, 'W')}
+                <td className="py-2.5 px-3">
+                  <div className="font-bold text-base sm:text-lg text-blue-700 dark:text-sky-300">
+                    {formatValueOrDash(tracking.power, 1, 'W')}
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-200/80 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-600 to-sky-400 rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${trkPowerPct}%` }}
+                    />
+                  </div>
                 </td>
-                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-amber-800 dark:text-amber-300">
-                  {formatValueOrDash(stat.power, 1, 'W')}
+                <td className="py-2.5 px-3">
+                  <div className="font-bold text-base sm:text-lg text-amber-800 dark:text-amber-300">
+                    {formatValueOrDash(stat.power, 1, 'W')}
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-200/80 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-600 to-orange-400 rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${staPowerPct}%` }}
+                    />
+                  </div>
                 </td>
               </tr>
 
               {/* 2. Điện áp */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                  Điện áp (V)
+                  <div className="flex items-center gap-2">
+                    <TbCircuitVoltmeter className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
+                    <span>Điện áp (V)</span>
+                  </div>
                 </td>
                 <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
                   {formatValueOrDash(tracking.voltage, 2, 'V')}
@@ -169,7 +224,10 @@ export default function VisualPanelsComparison({
               {/* 3. Dòng điện */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                  Dòng điện (I)
+                  <div className="flex items-center gap-2">
+                    <TbWaveSine className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Dòng điện (I)</span>
+                  </div>
                 </td>
                 <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
                   {formatValueOrDash(tracking.current, 2, 'A')}
@@ -182,20 +240,42 @@ export default function VisualPanelsComparison({
               {/* 4. Năng lượng tích lũy hôm nay */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                  Năng lượng hôm nay (ΣE)
+                  <div className="flex items-center gap-2">
+                    <TbBatteryCharging className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
+                    <span>Năng lượng hôm nay (ΣE)</span>
+                  </div>
                 </td>
-                <td className="py-2.5 px-3 font-bold text-blue-700 dark:text-sky-300">
-                  {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
+                <td className="py-2.5 px-3">
+                  <div className="font-bold text-blue-700 dark:text-sky-300">
+                    {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-200/80 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="h-full bg-blue-600 dark:bg-sky-400 rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${trkEnergyPct}%` }}
+                    />
+                  </div>
                 </td>
-                <td className="py-2.5 px-3 font-bold text-amber-800 dark:text-amber-300">
-                  {formatValueOrDash(stat.energyWh, 1, 'Wh')}
+                <td className="py-2.5 px-3">
+                  <div className="font-bold text-amber-800 dark:text-amber-300">
+                    {formatValueOrDash(stat.energyWh, 1, 'Wh')}
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-200/80 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div
+                      className="h-full bg-amber-600 dark:bg-amber-400 rounded-full transition-all duration-700 ease-out"
+                      style={{ width: `${staEnergyPct}%` }}
+                    />
+                  </div>
                 </td>
               </tr>
 
               {/* 5. Góc định hướng */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
-                  Góc định hướng hiện tại
+                  <div className="flex items-center gap-2">
+                    <TbCompass className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span>Góc định hướng hiện tại</span>
+                  </div>
                 </td>
                 <td className="py-2.5 px-3 text-zinc-800 dark:text-slate-100">
                   <div>
@@ -222,13 +302,16 @@ export default function VisualPanelsComparison({
           </table>
 
           {/* Dòng kết luận Chênh lệch năng lượng % Gain */}
-          <div className="mt-3 p-3 bg-zinc-50 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-slate-200">
-              Chênh lệch năng lượng hôm nay (đã hiệu chuẩn k = 1,018):
-            </span>
+          <div className="mt-3 p-3 bg-gradient-to-r from-zinc-50 via-blue-50/30 to-emerald-50/40 dark:from-slate-800/90 dark:via-slate-800/80 dark:to-emerald-950/30 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <TbTrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-slate-200">
+                Chênh lệch năng lượng hôm nay (đã hiệu chuẩn k = 1,018):
+              </span>
+            </div>
             <div className="text-xs sm:text-sm">
               {hasValidGain ? (
-                <span className="font-bold text-zinc-950 dark:text-white text-base">
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-base">
                   {formatSignedNumber(comparison.percentGain, 1, '%')}
                   {comparison.powerDelta !== null && (
                     <span className="text-xs text-zinc-600 dark:text-slate-300 font-normal ml-2">
@@ -247,46 +330,119 @@ export default function VisualPanelsComparison({
           </div>
         </div>
 
-        {/* Cột phụ: Sơ đồ góc cơ cấu bằng SVG kỹ thuật đơn giản (3 cols) */}
-        <div className="lg:col-span-3 border border-zinc-200 dark:border-slate-700 rounded-sm p-3 bg-zinc-50 dark:bg-slate-800/80 flex flex-col items-center justify-between min-h-[220px]">
-          <span className="text-xs font-bold text-zinc-800 dark:text-slate-100 self-start">
-            Sơ đồ góc cơ cấu (SVG)
-          </span>
+        {/* Cột phụ: Sơ đồ góc cơ cấu & Mô phỏng độ nghiêng trực quan bằng SVG (3 cols) */}
+        <div className="lg:col-span-3 border border-zinc-200 dark:border-slate-700 rounded-sm p-3 bg-zinc-50/90 dark:bg-slate-800/80 flex flex-col items-center justify-between gap-2">
+          <div className="w-full flex items-center justify-between">
+            <span className="text-xs font-bold text-zinc-800 dark:text-slate-100">
+              Sơ đồ góc cơ cấu (SVG)
+            </span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-xs bg-blue-100/80 dark:bg-sky-950/80 text-blue-700 dark:text-sky-300 font-mono">
+              2D LIVE
+            </span>
+          </div>
 
-          <svg viewBox="0 0 140 140" className="w-32 h-32 my-1">
-            {/* Vòng tròn tọa độ phương vị */}
-            <circle cx="70" cy="70" r="50" className="fill-white dark:fill-slate-900/90 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.5" />
-            <line x1="70" y1="15" x2="70" y2="125" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" strokeDasharray="2,2" />
-            <line x1="15" y1="70" x2="125" y2="70" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="1" strokeDasharray="2,2" />
+          {/* Khối 2 hình minh họa SVG: La bàn Phương vị (φ) + Mặt cắt Độ ngửa (ε) */}
+          <div className="w-full grid grid-cols-2 lg:grid-cols-1 gap-2 items-center justify-items-center my-0.5">
+            {/* SVG 1: La bàn phương vị (Top-down view) */}
+            <div className="flex flex-col items-center">
+              <svg viewBox="0 0 140 140" className="w-28 h-28">
+                {/* Vòng hào quang nhẹ phía ngoài */}
+                <circle cx="70" cy="70" r="54" className="fill-none stroke-blue-500/15 dark:stroke-sky-400/15" strokeWidth="3" />
+                {/* Vòng tròn tọa độ phương vị */}
+                <circle cx="70" cy="70" r="50" className="fill-white dark:fill-slate-900/90 stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.5" />
 
-            {/* Các chữ hướng chính - độ tương phản cao */}
-            <text x="70" y="27" textAnchor="middle" fontSize="10" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">B</text>
-            <text x="70" y="120" textAnchor="middle" fontSize="10" className="fill-amber-700 dark:fill-amber-400" fontWeight="700">N (180°)</text>
-            <text x="24" y="73" textAnchor="middle" fontSize="10" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">T</text>
-            <text x="116" y="73" textAnchor="middle" fontSize="10" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">Đ</text>
+                {/* Vạch chia độ mỗi 30° */}
+                {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => {
+                  const rad = (deg - 90) * (Math.PI / 180);
+                  const x1 = 70 + 46 * Math.cos(rad);
+                  const y1 = 70 + 46 * Math.sin(rad);
+                  const x2 = 70 + 50 * Math.cos(rad);
+                  const y2 = 70 + 50 * Math.sin(rad);
+                  return (
+                    <line
+                      key={deg}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      className="stroke-slate-300 dark:stroke-slate-600"
+                      strokeWidth={deg % 90 === 0 ? '1.5' : '0.8'}
+                    />
+                  );
+                })}
 
-            {/* Kim chỉ hướng Tấm Cố Định (Nam 180° cố định - nét đứt cam) */}
-            <line x1="70" y1="70" x2="70" y2="112" stroke="#ea580c" strokeWidth="1.75" strokeDasharray="3,2" />
+                <line x1="70" y1="18" x2="70" y2="122" className="stroke-slate-200 dark:stroke-slate-700/80" strokeWidth="1" strokeDasharray="2,2" />
+                <line x1="18" y1="70" x2="122" y2="70" className="stroke-slate-200 dark:stroke-slate-700/80" strokeWidth="1" strokeDasharray="2,2" />
 
-            {/* Kim chỉ hướng Tấm Tracker (Xanh dương / xanh sáng nét liền - chỉ đúng hướng la bàn thực tế) */}
-            {compassAzimuth !== null || phiAngle !== null ? (() => {
-              const displayAz = compassAzimuth !== null ? compassAzimuth : phiAngle;
-              const rad = (displayAz - 90) * (Math.PI / 180);
-              const x2 = 70 + 44 * Math.cos(rad);
-              const y2 = 70 + 44 * Math.sin(rad);
-              return (
-                <>
-                  <line x1="70" y1="70" x2={x2} y2={y2} stroke="#0284c7" strokeWidth="2.5" />
-                  <circle cx={x2} cy={y2} r="3" fill="#0284c7" />
-                </>
-              );
-            })() : (
-              <line x1="70" y1="70" x2="70" y2="70" stroke="#94a3b8" strokeWidth="1" />
-            )}
+                {/* Các chữ hướng chính */}
+                <text x="70" y="29" textAnchor="middle" fontSize="9.5" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">B</text>
+                <text x="70" y="118" textAnchor="middle" fontSize="9.5" className="fill-amber-700 dark:fill-amber-400" fontWeight="700">N (180°)</text>
+                <text x="26" y="73" textAnchor="middle" fontSize="9.5" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">T</text>
+                <text x="114" y="73" textAnchor="middle" fontSize="9.5" className="fill-slate-600 dark:fill-slate-200" fontWeight="700">Đ</text>
 
-            {/* Tâm quay */}
-            <circle cx="70" cy="70" r="3.5" className="fill-slate-800 dark:fill-slate-200" />
-          </svg>
+                {/* Kim chỉ hướng Tấm Cố Định (Nam 180° cố định - nét đứt cam) */}
+                <line x1="70" y1="70" x2="70" y2="108" stroke="#ea580c" strokeWidth="1.75" strokeDasharray="3,2" />
+
+                {/* Kim chỉ hướng Tấm Tracker (Xanh dương nét liền + cánh pin nhỏ xoay mượt) */}
+                {compassAzimuth !== null || phiAngle !== null ? (() => {
+                  const displayAz = compassAzimuth !== null ? compassAzimuth : phiAngle;
+                  const rad = (displayAz - 90) * (Math.PI / 180);
+                  const x2 = 70 + 42 * Math.cos(rad);
+                  const y2 = 70 + 42 * Math.sin(rad);
+                  return (
+                    <g style={{ transition: 'all 0.6s ease-out' }}>
+                      {/* Mặt tấm pin nhìn từ đỉnh xoay theo phương vị */}
+                      <g transform={`translate(70, 70) rotate(${displayAz})`}>
+                        <rect x="-11" y="-4" width="22" height="8" rx="1.5" className="fill-sky-500/20 stroke-sky-600 dark:stroke-sky-400" strokeWidth="1" />
+                      </g>
+                      <line x1="70" y1="70" x2={x2} y2={y2} stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" />
+                      <circle cx={x2} cy={y2} r="3.2" fill="#0284c7" />
+                    </g>
+                  );
+                })() : (
+                  <line x1="70" y1="70" x2="70" y2="70" stroke="#94a3b8" strokeWidth="1" />
+                )}
+
+                {/* Tâm quay */}
+                <circle cx="70" cy="70" r="3.2" className="fill-slate-800 dark:fill-slate-200" />
+              </svg>
+            </div>
+
+            {/* SVG 2: Minh họa góc ngửa mặt cắt nghiêng (Side-view Elevation ε & Tia nắng) */}
+            <div className="flex flex-col items-center w-full">
+              <svg viewBox="0 0 160 72" className="w-36 h-16">
+                {/* Mặt trời nhỏ & tia bức xạ chuyển động nhẹ */}
+                <g className="animate-pulse-slow">
+                  <circle cx="24" cy="16" r="6" className="fill-amber-400/90 stroke-amber-500" strokeWidth="1" />
+                </g>
+                <line x1="34" y1="20" x2="66" y2="32" className="stroke-amber-400/70 dark:stroke-amber-300/60 animate-solar-ray" strokeWidth="1.2" strokeDasharray="3,3" />
+                <line x1="30" y1="26" x2="62" y2="38" className="stroke-amber-400/50 dark:stroke-amber-300/40 animate-solar-ray" strokeWidth="1" strokeDasharray="3,3" />
+
+                {/* Mặt đất và trụ đỡ cơ khí */}
+                <line x1="20" y1="64" x2="140" y2="64" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.5" />
+                <path d="M76 64 L80 38 L84 64 Z" className="fill-slate-300 dark:fill-slate-600" />
+
+                {/* Góc tham chiếu tấm cố định (nghiêng 15° - nét đứt cam) */}
+                <g transform="translate(80, 38) rotate(-15)">
+                  <line x1="-28" y1="0" x2="28" y2="0" stroke="#ea580c" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.75" />
+                </g>
+
+                {/* Tấm pin Tracker nghiêng theo góc thực tế ε */}
+                <g
+                  transform={`translate(80, 38) rotate(${-clampedTiltSvg})`}
+                  style={{ transition: 'transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)' }}
+                >
+                  <rect x="-30" y="-2.5" width="60" height="5" rx="1.5" className="fill-blue-600 dark:fill-sky-400" />
+                  <line x1="-15" y1="-2.5" x2="-15" y2="2.5" className="stroke-white/40 dark:stroke-slate-900/50" strokeWidth="0.8" />
+                  <line x1="0" y1="-2.5" x2="0" y2="2.5" className="stroke-white/40 dark:stroke-slate-900/50" strokeWidth="0.8" />
+                  <line x1="15" y1="-2.5" x2="15" y2="2.5" className="stroke-white/40 dark:stroke-slate-900/50" strokeWidth="0.8" />
+                </g>
+
+                {/* Khớp quay trục Elevation */}
+                <circle cx="80" cy="38" r="3" className="fill-slate-800 dark:fill-white stroke-white dark:stroke-slate-900" strokeWidth="1" />
+              </svg>
+            </div>
+          </div>
 
           {/* Chú giải góc cơ cấu & phương vị la bàn */}
           <div className="w-full text-[11px] text-zinc-600 dark:text-slate-300 space-y-1 border-t border-zinc-200 dark:border-slate-700 pt-2">
