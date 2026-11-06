@@ -1164,11 +1164,11 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* Nút Gạt Mode Compact (Mô hình 3D trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
+            {/* Nút Mode Compact (Mô hình 3D trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
             <button
               id="btn-toggle-compact-mode"
               onClick={() => setCompactMode((prev) => !prev)}
-              className={`px-2.5 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center gap-2 text-xs font-semibold ${
+              className={`px-3 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center text-xs font-semibold ${
                 compactMode
                   ? 'bg-blue-700 hover:bg-blue-800 border-blue-500 text-white'
                   : 'bg-white/90 dark:bg-slate-900/90 hover:bg-zinc-100 dark:hover:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-800 dark:text-slate-100'
@@ -1177,14 +1177,6 @@ export default function App() {
             >
               <span className={`text-[11px] ${compactMode ? 'text-white font-bold' : 'text-zinc-900 dark:text-white'}`}>
                 Mode Compact
-              </span>
-              {/* Công tắc gạt nhỏ (Toggle Switch Pill) */}
-              <span
-                className={`w-7 h-4 rounded-full p-0.5 transition-colors flex items-center ${
-                  compactMode ? 'bg-sky-400 justify-end' : 'bg-zinc-300 dark:bg-slate-700 justify-start'
-                }`}
-              >
-                <span className="w-3 h-3 rounded-full bg-white shadow-xs" />
               </span>
             </button>
 
