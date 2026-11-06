@@ -829,6 +829,7 @@ export default function CompactInteractiveTwin({
     addVSlotBar(frameGroup, 5.405, barT, barT, -0.495, frameY, -1.08);
     addVSlotBar(frameGroup, barT, barT, 2.04, -3.14, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, -0.96, frameY, 0);
+    addVSlotBar(frameGroup, barT, barT, 2.04, 1.05, frameY, 0);
     addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, 0.18);
     addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, -0.18);
     addVSlotBar(frameGroup, barT, barT, 2.04, 2.15, frameY, 0);
@@ -836,6 +837,7 @@ export default function CompactInteractiveTwin({
     const legCoords = [
       [-3.14, 1.08], [-3.14, -1.08],
       [-0.96, 1.08], [-0.96, -1.08],
+      [1.05, 1.08], [1.05, -1.08],
       [2.15, 1.08], [2.15, -1.08]
     ];
     legCoords.forEach(([lx, lz]) => {
