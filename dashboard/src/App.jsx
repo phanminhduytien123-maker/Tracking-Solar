@@ -946,22 +946,14 @@ export default function App() {
       />
 
       {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10">
+      <main className={compactMode ? 'w-full flex-1 relative z-10' : 'max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10'}>
 
         {compactMode ? (
-          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN 3D (ĐỘC LẬP HOÀN TOÀN VỚI GIAO DIỆN TIÊU CHUẨN) */
-          <section aria-label="Mô hình 3D trực quan Compact Mode">
-            <CompactInteractiveTwin
-              telemetry={telemetry}
-              location={selectedLocation}
-              themeMode={themeMode}
-              isAdmin={authSession?.role === 'admin'}
-              onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
-              onOpenManualModal={() => setIsManualModalOpen(true)}
-              onOpenSettingsModal={() => openSettingsTab('config')}
-              onOpenDetails={() => setIsDetailsModalOpen(true)}
-            />
-          </section>
+          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN 3D HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT */
+          <CompactInteractiveTwin
+            telemetry={telemetry}
+            location={selectedLocation}
+          />
         ) : (
           /* CHẾ ĐỘ BÌNH THƯỜNG HIỆN TẠI (GIỮ NGUYÊN 100%) */
           <>
