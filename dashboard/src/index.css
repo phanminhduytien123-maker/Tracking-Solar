@@ -90,14 +90,20 @@
   }
 }
 
-/* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 6px, kính mờ */
+/* Thẻ bảng đo chuẩn phòng thí nghiệm: phẳng, viền 1px, bo góc 8px, kính mờ & bóng đổ tinh tế */
 .lab-card {
   background-color: var(--bg-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-main);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-primary);
+  box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dark .lab-card {
+  box-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 .lab-table {
@@ -107,8 +113,50 @@
 
 .lab-table th, .lab-table td {
   border: 1px solid var(--border-subtle);
-  padding: 8px 12px;
+  padding: 9px 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.lab-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.lab-table tbody tr:hover {
+  background-color: rgba(59, 130, 246, 0.03);
+}
+
+.dark .lab-table tbody tr:hover {
+  background-color: rgba(56, 189, 248, 0.05);
+}
+
+@keyframes solarRayFlow {
+  0% {
+    stroke-dashoffset: 16;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.08);
+  }
+}
+
+.animate-solar-ray {
+  animation: solarRayFlow 1.4s linear infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 3s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .dark .lab-table th {
