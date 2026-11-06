@@ -476,8 +476,14 @@ export default function CompactInteractiveTwin({
     camTargetPos: null,
     camLookAt: null,
     trkPower: 0,
-    staPower: 0
+    staPower: 0,
+    focusedPanel: null
   });
+
+  // Đồng bộ trạng thái đang focus vào tấm pin / hộp điện
+  useEffect(() => {
+    targetAnglesRef.current.focusedPanel = selectedPanel;
+  }, [selectedPanel]);
 
   // Đồng bộ công suất tức thời đọc từ 2 cảm biến INA226 để điều khiển cường độ dòng năng lượng mặt trời
   useEffect(() => {
@@ -1813,16 +1819,23 @@ export default function CompactInteractiveTwin({
       targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
     };
 
-    // Khi người dùng cuộn chuột lùi (deltaY > 0) để zoom ra -> Tự động đưa tâm nhìn về lại toàn cảnh và đóng popup
+    // Khi người dùng lăn chuột xuống (deltaY > 0):
+    // - Nếu đang focus vào tấm pin / hộp điện / mặt trời -> Lập tức tự động thoát zoom mượt về toàn cảnh, đóng nắp hộp điện và tắt bảng thông số
+    // - Nếu đang ở toàn cảnh -> Lăn chuột thu phóng tự do theo OrbitControls
     const handleWheel = (e) => {
       if (e.deltaY > 0) {
-        targetAnglesRef.current.camTargetPos = null;
-        targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
-        const dist = camera.position.distanceTo(controls.target);
-        if (dist > 4.2) {
+        if (targetAnglesRef.current.focusedPanel) {
+          e.preventDefault();
+          e.stopPropagation();
+          targetAnglesRef.current.focusedPanel = null;
           setSelectedPanel(null);
           setIsBoxOpen(false);
+          targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
+          targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
+          return;
         }
+        targetAnglesRef.current.camTargetPos = null;
+        targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
       } else {
         // Nếu người dùng tự cuộn zoom in bằng chuột thì dừng nội suy preset để nhường quyền cho con lăn
         targetAnglesRef.current.camTargetPos = null;
@@ -1832,7 +1845,7 @@ export default function CompactInteractiveTwin({
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointerup', handlePointerUp);
-    renderer.domElement.addEventListener('wheel', handleWheel, { passive: true });
+    renderer.domElement.addEventListener('wheel', handleWheel, { capture: true, passive: false });
 
     // Vòng lặp Render 3D
     let animId;
@@ -1939,7 +1952,7 @@ export default function CompactInteractiveTwin({
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
-      renderer.domElement.removeEventListener('wheel', handleWheel);
+      renderer.domElement.removeEventListener('wheel', handleWheel, { capture: true });
       cancelAnimationFrame(animId);
       pmremGenerator.dispose();
       controls.dispose();
@@ -1948,7 +1961,14 @@ export default function CompactInteractiveTwin({
   }, []);
 
   return (
-    <div className="relative w-full h-[calc(100vh-115px)] min-h-[540px] select-none overflow-hidden">
+    <div
+      className="relative w-full h-[calc(100vh-115px)] min-h-[540px] select-none overflow-hidden"
+      onWheel={(e) => {
+        if (e.deltaY > 0 && selectedPanel) {
+          zoomBackToOverview();
+        }
+      }}
+    >
       {/* KHUNG CANVAS 3D TRONG SUỐT HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT */}
       <div
         ref={mountRef}
