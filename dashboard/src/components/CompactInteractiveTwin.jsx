@@ -269,6 +269,8 @@ function createRealisticSolarPanelTexture() {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.center.set(0.5, 0.5);
+  texture.rotation = Math.PI / 2;
   texture.anisotropy = 8;
   return texture;
 }
@@ -1059,7 +1061,7 @@ export default function CompactInteractiveTwin({
 
     addVSlotBar(elevationGroup, 1.75, 0.075, 0.08, 0, 0.18, 0);
 
-    const trackerPanel = createIndustrialSolarPanel(1.56, 2.04, true);
+    const trackerPanel = createIndustrialSolarPanel(2.04, 1.56, true);
     trackerPanel.position.set(0, 0.245, 0);
     elevationGroup.add(trackerPanel);
 
@@ -1244,7 +1246,7 @@ export default function CompactInteractiveTwin({
     staBracket.position.set(0, 0.03, 0);
     staTopGroup.add(staBracket);
 
-    const staticPanel = createIndustrialSolarPanel(1.56, 2.04, false);
+    const staticPanel = createIndustrialSolarPanel(2.04, 1.56, false);
     staticPanel.position.set(0, 0.10, 0);
     staTopGroup.add(staticPanel);
 
