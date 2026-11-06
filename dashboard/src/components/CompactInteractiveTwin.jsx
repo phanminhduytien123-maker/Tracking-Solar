@@ -12,8 +12,6 @@ import {
 
 /**
  * THUẬT TOÁN THIÊN VĂN FULL NOAA (Đồng bộ 100% với firmware/esp32_tracker_control/lib/solar_core/solar_ephemeris.cpp)
- * Tính chính xác Góc phương vị Mặt trời (Azimuth từ Bắc = 0° theo chiều kim đồng hồ),
- * Góc độ cao (Elevation), Góc thiên đỉnh (Zenith) và giờ Bình minh / Hoàng hôn.
  */
 function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.66617, tzOffsetHours = 7) {
   const DEG_TO_RAD = Math.PI / 180.0;
@@ -127,7 +125,6 @@ function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.666
   const yAz = -Math.cos(deltaRad) * sinHa;
   const azFromNorth = wrap360(radToDeg(Math.atan2(yAz, xAz)));
 
-  // Bình minh & Hoàng hôn
   const cosH0 =
     (Math.cos(degToRad(90.833)) - Math.sin(latRad) * Math.sin(deltaRad)) /
     (Math.cos(latRad) * Math.cos(deltaRad));
@@ -159,14 +156,13 @@ function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.666
 }
 
 /**
- * Quy đổi tọa độ thiên văn NOAA (Azimuth từ Bắc = 0°, Đông = 90°, Nam = 180°, Tây = 270°; Elevation = độ cao)
- * sang tọa độ không gian 3D theo đúng quy ước hướng của mô hình thực tế (Hình 2):
+ * Quy đổi tọa độ thiên văn NOAA sang không gian 3D:
  * - Trái (-X) = BẮC (0°)
  * - Trên (-Z) = ĐÔNG (90°)
  * - Phải (+X) = NAM (180°)
  * - Dưới (+Z) = TÂY (270°)
  */
-function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 4.6) {
+function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 4.5) {
   const azRad = THREE.MathUtils.degToRad(azimuthDeg);
   const elRad = THREE.MathUtils.degToRad(Math.max(2, elevationDeg));
   const x = -radius * Math.cos(elRad) * Math.cos(azRad);
@@ -184,7 +180,7 @@ function createCompassFloorLabel(text, subText, borderColor = '#38bdf8') {
   canvas.height = 160;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
   ctx.beginPath();
   ctx.roundRect(12, 12, 488, 136, 18);
   ctx.fill();
@@ -343,18 +339,18 @@ function createSculptedTBracketGeometry() {
   });
 }
 
+// Góc nhìn tổng quan mặc định
+const DEFAULT_CAM_POS = new THREE.Vector3(0, 4.1, 7.9);
+const DEFAULT_LOOK_AT = new THREE.Vector3(0, 1.25, 0);
+
 /**
- * COMPACT MODE: MÔ HÌNH 3D TOÀN TAB + TỌA ĐỘ ĐÔNG TÂY NAM BẮC & MẶT TRỜI NOAA + CLICK XEM THÔNG SỐ TỪNG TẤM
+ * COMPACT MODE: HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT (KHÔNG KHUNG, KHÔNG TIÊU ĐỀ, KHÔNG NÚT Rườm Rà)
+ * - Nhấn vào bộ phận nào (Tấm Tracker, Tấm Cố định, Hộp điện, Mặt trời NOAA) thì tự động Zoom vào bộ phận đó và hiện thông số.
+ * - Cuộn chuột lùi (Zoom out) để tự động thu phóng trở lại toàn cảnh và đóng bảng thông số.
  */
 export default function CompactInteractiveTwin({
   telemetry,
-  location = null,
-  isAdmin = true,
-  themeMode = 'light',
-  onOpenDetails,
-  onOpenManualModal,
-  onOpenSettingsModal,
-  onOpenEmergencyModal
+  location = null
 }) {
   const INA226 = telemetry?.INA226 || {};
   const motors = telemetry?.motors || {};
@@ -373,17 +369,8 @@ export default function CompactInteractiveTwin({
   const siteLat = Number(location?.lat) || 10.78816;
   const siteLon = Number(location?.lon) || 106.66617;
 
-  // State tương tác 3D & Bảng thông số khi nhấn vào từng tấm pin
-  const [cameraPreset, setCameraPreset] = useState('overview'); // 'overview' | 'top' | 'mechanism' | 'box'
   const [isBoxOpen, setIsBoxOpen] = useState(false);
-  const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'both' | 'box'
-  const [isInteractiveSim, setIsInteractiveSim] = useState(false);
-  const [simPhi, setSimPhi] = useState(2.3);
-  const [simEps, setSimEps] = useState(9.3);
-  const [simHourFloat, setSimHourFloat] = useState(() => {
-    const now = new Date();
-    return Math.round((now.getHours() + now.getMinutes() / 60) * 10) / 10;
-  });
+  const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'box' | 'sun'
   const [clockTick, setClockTick] = useState(0);
 
   useEffect(() => {
@@ -391,29 +378,20 @@ export default function CompactInteractiveTwin({
     return () => clearInterval(timer);
   }, []);
 
-  // Tính vị trí Mặt trời theo thuật toán thiên văn NOAA
+  // Tính vị trí Mặt trời theo thuật toán thiên văn NOAA thời gian thực
   const noaaSun = useMemo(() => {
-    const targetDate = new Date();
-    if (isInteractiveSim) {
-      const hh = Math.floor(simHourFloat);
-      const mm = Math.round((simHourFloat - hh) * 60);
-      targetDate.setHours(hh, mm, 0, 0);
-    }
-    return calculateNoaaSolarPosition(targetDate, siteLat, siteLon, 7);
-  }, [isInteractiveSim, simHourFloat, siteLat, siteLon, clockTick]);
-
-  const effectivePhi = isInteractiveSim ? simPhi : livePhi;
-  const effectiveEps = isInteractiveSim ? simEps : liveEps;
+    return calculateNoaaSolarPosition(new Date(), siteLat, siteLon, 7);
+  }, [siteLat, siteLon, clockTick]);
 
   // Phương vị địa lý thực tế (Compass Azimuth)
   const compassAzimuth = (() => {
-    if (!isInteractiveSim && az.currentAngle !== null && az.currentAngle !== undefined && !isNaN(az.currentAngle)) {
+    if (az.currentAngle !== null && az.currentAngle !== undefined && !isNaN(az.currentAngle)) {
       return Number(az.currentAngle);
     }
-    if (effectivePhi === null || effectivePhi === undefined) return null;
+    if (livePhi === null || livePhi === undefined) return null;
     const hour = new Date().getHours();
     const isAfternoon = hour >= 12;
-    let azVal = isAfternoon ? (360.0 - effectivePhi) : (180.0 - effectivePhi);
+    let azVal = isAfternoon ? (360.0 - livePhi) : (180.0 - livePhi);
     while (azVal < 0) azVal += 360.0;
     while (azVal >= 360.0) azVal -= 360.0;
     return Math.round(azVal * 10) / 10;
@@ -436,8 +414,7 @@ export default function CompactInteractiveTwin({
     sw2LedMat: null,
     camera: null,
     controls: null,
-    scene: null,
-    gridHelper: null
+    scene: null
   });
   const targetAnglesRef = useRef({
     phiRad: 0,
@@ -449,14 +426,14 @@ export default function CompactInteractiveTwin({
 
   // Đồng bộ góc quay 2 trục của tấm Tracker
   useEffect(() => {
-    const phiDeg = Number(effectivePhi) || 0;
+    const phiDeg = Number(livePhi) || 0;
     targetAnglesRef.current.phiRad = THREE.MathUtils.degToRad(-phiDeg * 0.85);
 
-    const epsDeg = Number(effectiveEps);
+    const epsDeg = Number(liveEps);
     const validEps = !isNaN(epsDeg) ? epsDeg : 9.3;
     const tiltLeftDeg = Math.max(-48, Math.min(48, (50 - validEps) * 0.75));
     targetAnglesRef.current.tiltRad = THREE.MathUtils.degToRad(tiltLeftDeg);
-  }, [effectivePhi, effectiveEps]);
+  }, [livePhi, liveEps]);
 
   // Đồng bộ vị trí Mặt trời NOAA trong không gian 3D
   useEffect(() => {
@@ -466,13 +443,11 @@ export default function CompactInteractiveTwin({
     const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
     sunGroup.position.copy(sunPos);
 
-    // Cập nhật tia nắng nối từ Mặt trời NOAA xuống tâm mô hình
     const posAttr = sunRayLine.geometry.attributes.position;
     posAttr.setXYZ(0, sunPos.x, sunPos.y, sunPos.z);
     posAttr.setXYZ(1, -2.05, 1.85, 0);
     posAttr.needsUpdate = true;
 
-    // Đổi độ sáng Mặt trời nếu đang là ban đêm (El < 0°)
     sunGroup.visible = true;
     sunRayLine.visible = noaaSun.isDaylight;
   }, [noaaSun]);
@@ -493,51 +468,35 @@ export default function CompactInteractiveTwin({
     }
   }, [az.limitHome, el.limitSwitch90]);
 
-  // Đồng bộ màu nền 3D theo chế độ Sáng / Tối
-  useEffect(() => {
-    const { scene } = sceneObjectsRef.current;
-    if (!scene) return;
-    const isDark = themeMode === 'dark' || document.documentElement.classList.contains('dark');
-    scene.background = new THREE.Color(isDark ? 0x0b1120 : 0xf1f5f9);
-  }, [themeMode]);
-
-  // Chuyển góc nhìn Camera 3D
-  const applyCameraPreset = (preset) => {
-    setCameraPreset(preset);
-    if (preset === 'overview') {
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 4.2, 8.2);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.25, 0);
-    } else if (preset === 'top') {
-      // Góc nhìn từ đỉnh xuống giống Hình 2: Trên = Đông, Phải = Nam, Dưới = Tây, Trái = Bắc
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 9.5, 0.01);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 0.5, 0);
-    } else if (preset === 'mechanism') {
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(-2.05, 2.15, 3.25);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(-2.05, 1.45, 0);
-    } else if (preset === 'box') {
-      setIsBoxOpen(true);
-      setSelectedPanel('box');
-      targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.08, 3.35, 1.85);
-      targetAnglesRef.current.camLookAt = new THREE.Vector3(0.08, 0.55, 0.05);
-    }
+  // Hàm thu phóng trở lại toàn cảnh mặc định
+  const zoomBackToOverview = () => {
+    setSelectedPanel(null);
+    setIsBoxOpen(false);
+    targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
+    targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
   };
 
-  // Khởi tạo không gian 3D Kỹ thuật Toàn Tab
+  // Khởi tạo không gian 3D Trong Suốt Ngay Trên Nền Thời Tiết
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    const width = container.clientWidth || 1080;
-    const height = container.clientHeight || 560;
-    const isDark = document.documentElement.classList.contains('dark');
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight - 110;
 
+    // Scene trong suốt hoàn toàn (background = null) để hiển thị trực tiếp trên nền thời tiết
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDark ? 0x0b1120 : 0xf1f5f9);
+    scene.background = null;
 
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
-    camera.position.set(0, 4.2, 8.2);
+    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 120);
+    camera.position.copy(DEFAULT_CAM_POS);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setClearColor(0x000000, 0);
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -552,16 +511,16 @@ export default function CompactInteractiveTwin({
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1.25, 0);
+    controls.target.copy(DEFAULT_LOOK_AT);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
-    controls.minDistance = 1.5;
+    controls.minDistance = 1.3;
     controls.maxDistance = 18;
     controls.update();
 
-    // Hệ thống đèn chiếu sáng kỹ thuật
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Đèn chiếu sáng kỹ thuật
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     scene.add(ambientLight);
 
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
@@ -576,16 +535,15 @@ export default function CompactInteractiveTwin({
     fillLight.position.set(-6, 5, 4);
     scene.add(fillLight);
 
-    // Mặt sàn & lưới tọa độ kỹ thuật
-    const gridHelper = new THREE.GridHelper(13, 26, 0x475569, 0x64748b);
+    // Lưới tọa độ mặt sàn nhẹ và trong suốt trên nền thời tiết
+    const gridHelper = new THREE.GridHelper(12, 24, 0x64748b, 0x94a3b8);
     gridHelper.position.y = 0;
-    gridHelper.material.opacity = 0.22;
+    gridHelper.material.opacity = 0.16;
     gridHelper.material.transparent = true;
     scene.add(gridHelper);
 
     // =========================================================================
     // 0. HỆ TRỤC LA BÀN ĐÔNG - TÂY - NAM - BẮC & QUỸ ĐẠO MẶT TRỜI NOAA TRONG 3D
-    // Theo đúng Hình 2 của người dùng:
     // - Trên (-Z) = ĐÔNG (90°)
     // - Phải (+X) = NAM (180°)
     // - Dưới (+Z) = TÂY (270°)
@@ -595,42 +553,39 @@ export default function CompactInteractiveTwin({
     compassGroup.position.y = 0.01;
     scene.add(compassGroup);
 
-    // Vòng tròn la bàn bao quanh trạm
     const ringGeom = new THREE.RingGeometry(4.25, 4.32, 96);
     ringGeom.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x64748b,
+      color: 0x94a3b8,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.4,
       side: THREE.DoubleSide
     });
     compassGroup.add(new THREE.Mesh(ringGeom, ringMat));
 
-    // Đường trục Bắc (-X) <-> Nam (+X) và Đông (-Z) <-> Tây (+Z)
-    const axisLineMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.4 });
+    const axisLineMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.35 });
     const nsPoints = [new THREE.Vector3(-4.25, 0.01, 0), new THREE.Vector3(4.25, 0.01, 0)];
     const ewPoints = [new THREE.Vector3(0, 0.01, -2.55), new THREE.Vector3(0, 0.01, 2.55)];
     compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(nsPoints), axisLineMat));
     compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ewPoints), axisLineMat));
 
-    // 4 Nhãn hướng Đông - Tây - Nam - Bắc đặt đúng vị trí Hình 2
     const labelEast = createCompassFloorLabel('ĐÔNG', '90° (Bình minh)', '#f59e0b');
-    labelEast.position.set(0, 0.015, -2.65); // TRÊN (-Z) = ĐÔNG
+    labelEast.position.set(0, 0.015, -2.65);
     compassGroup.add(labelEast);
 
     const labelWest = createCompassFloorLabel('TÂY', '270° (Hoàng hôn)', '#fb923c');
-    labelWest.position.set(0, 0.015, 2.65); // DƯỚI (+Z) = TÂY
+    labelWest.position.set(0, 0.015, 2.65);
     compassGroup.add(labelWest);
 
     const labelSouth = createCompassFloorLabel('NAM', '180° (Hướng chuẩn)', '#38bdf8');
-    labelSouth.position.set(4.35, 0.015, 0); // PHẢI (+X) = NAM
+    labelSouth.position.set(4.35, 0.015, 0);
     compassGroup.add(labelSouth);
 
     const labelNorth = createCompassFloorLabel('BẮC', '0° / 360°', '#94a3b8');
-    labelNorth.position.set(-4.35, 0.015, 0); // TRÁI (-X) = BẮC
+    labelNorth.position.set(-4.35, 0.015, 0);
     compassGroup.add(labelNorth);
 
-    // Vẽ đường cong Quỹ đạo Mặt trời NOAA trong ngày (Từ 06:00 Đông -> 12:00 Nam -> 17:30 Tây)
+    // Quỹ đạo Mặt trời NOAA trong ngày (Từ Đông -> Nam -> Tây)
     const arcPoints = [];
     const sampleDate = new Date();
     for (let h = 6.0; h <= 17.5; h += 0.5) {
@@ -657,15 +612,16 @@ export default function CompactInteractiveTwin({
       scene.add(arcLine);
     }
 
-    // Quả cầu Mặt trời NOAA + Vòng hào quang mỏng + Tia chiếu xuống giàn pin
+    // Quả cầu Mặt trời NOAA
     const sunGroup = new THREE.Group();
+    sunGroup.name = 'noaaSun';
     const sunSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.22, 28, 28),
+      new THREE.SphereGeometry(0.24, 28, 28),
       new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
     );
     const sunHalo = new THREE.Mesh(
-      new THREE.SphereGeometry(0.32, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.28 })
+      new THREE.SphereGeometry(0.36, 24, 24),
+      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.3 })
     );
     sunGroup.add(sunSphere, sunHalo);
     const initSunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
@@ -891,7 +847,7 @@ export default function CompactInteractiveTwin({
     });
 
     // =========================================================================
-    // 2. CỤM BÊN TRÁI: HỆ THỐNG PIN TRACKING 2 TRỤC (trackerRootGroup để click chọn)
+    // 2. CỤM BÊN TRÁI: HỆ THỐNG PIN TRACKING 2 TRỤC
     // =========================================================================
     const trackerRootGroup = new THREE.Group();
     trackerRootGroup.name = 'trackerSystem';
@@ -1054,7 +1010,7 @@ export default function CompactInteractiveTwin({
     belt2Right.rotation.z = -0.26;
     azimuthGroup.add(belt2Right);
 
-    // Nhóm nghiêng Độ ngửa Trục 2 (Nghiêng mặt sang TRÁI -X đúng theo Hình 2)
+    // Nhóm nghiêng Độ ngửa Trục 2
     const elevationGroup = new THREE.Group();
     elevationGroup.position.set(0, topPivotY + 0.06, 0);
     elevationGroup.rotation.z = THREE.MathUtils.degToRad(30);
@@ -1086,13 +1042,12 @@ export default function CompactInteractiveTwin({
 
     addVSlotBar(elevationGroup, 1.75, 0.075, 0.08, 0, 0.18, 0);
 
-    // Tấm pin Tracker đặt dọc (Xoay dọc đồng bộ, hướng mặt sang bên trái)
     const trackerPanel = createIndustrialSolarPanel(1.56, 2.04, true);
     trackerPanel.position.set(0, 0.245, 0);
     elevationGroup.add(trackerPanel);
 
     // =========================================================================
-    // 3. CHÍNH GIỮA: HỘP ĐIỆN TRẮNG (ĐÃ XÓA TẤM CHE ĐỂ LỘ RÕ TOÀN BỘ LINH KIỆN BÊN TRONG)
+    // 3. CHÍNH GIỮA: HỘP ĐIỆN TRẮNG
     // =========================================================================
     const boxGroup = new THREE.Group();
     boxGroup.position.set(0.08, frameY + 0.04, 0.05);
@@ -1104,7 +1059,6 @@ export default function CompactInteractiveTwin({
     const boxD = 1.24;
     const wallT = 0.045;
 
-    // Đáy hộp và 4 thành hộp nhựa ABS trắng (RỖNG HOÀN TOÀN PHÍA TRÊN ĐỂ NHÌN THẤY MẠCH ĐIỆN)
     const boxFloor = new THREE.Mesh(new RoundedBoxGeometry(boxW, wallT, boxD, 2, 0.01), enclosureAbsMat);
     boxFloor.position.set(0, wallT / 2, 0);
     boxGroup.add(boxFloor);
@@ -1129,7 +1083,6 @@ export default function CompactInteractiveTwin({
     wallRight.castShadow = true;
     boxGroup.add(wallRight);
 
-    // 4 thanh gioăng cao su mỏng chỉ chạy dọc trên đỉnh 4 mép tường (Không che lòng hộp!)
     const rimF = new THREE.Mesh(new THREE.BoxGeometry(boxW, 0.012, wallT * 0.7), matteBlackPrintMat);
     rimF.position.set(0, boxH + 0.005, boxD / 2 - wallT / 2);
     const rimB = new THREE.Mesh(new THREE.BoxGeometry(boxW, 0.012, wallT * 0.7), matteBlackPrintMat);
@@ -1140,7 +1093,6 @@ export default function CompactInteractiveTwin({
     rimR.position.set(boxW / 2 - wallT / 2, boxH + 0.005, 0);
     boxGroup.add(rimF, rimB, rimL, rimR);
 
-    // 2 Khóa gài mặt trước hộp điện
     [-0.38, 0.38].forEach((lx) => {
       const latchBase = new THREE.Mesh(new RoundedBoxGeometry(0.15, 0.22, 0.045, 2, 0.008), whitePrintMat);
       latchBase.position.set(lx, boxH - 0.11, boxD / 2 + 0.018);
@@ -1149,7 +1101,6 @@ export default function CompactInteractiveTwin({
       boxGroup.add(latchBase, latchClip);
     });
 
-    // Ăng-ten WiFi màu đen mặt trước
     const smaNut = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.05, 6), brassMat);
     smaNut.rotation.x = Math.PI / 2;
     smaNut.position.set(0.26, boxH * 0.46, boxD / 2 + 0.02);
@@ -1166,8 +1117,7 @@ export default function CompactInteractiveTwin({
     antWhip.castShadow = true;
     boxGroup.add(antWhip);
 
-    // LINH KIỆN BÊN TRONG HỘP ĐIỆN (Nâng cao độ chi tiết & dễ quan sát khi mở nắp)
-    // 1. Bộ điều khiển sạc Solar PWM (Xanh dương - đen, có màn hình LCD, tem trắng CE & 3 nút bấm)
+    // Linh kiện bên trong hộp điện
     const pwmBody = new THREE.Mesh(new RoundedBoxGeometry(0.84, 0.26, 0.36, 2, 0.01), matteBlackPrintMat);
     pwmBody.position.set(-0.16, 0.22, -0.34);
     boxGroup.add(pwmBody);
@@ -1187,7 +1137,6 @@ export default function CompactInteractiveTwin({
     pwmLcd.position.set(-0.16, 0.358, -0.33);
     boxGroup.add(pwmLcd);
 
-    // 2. Bảng mạch đục lỗ trắng góc trái dưới + ESP32-S3 + 2x INA226 + DS3231 + Quạt tản nhiệt
     const perfBoard = new THREE.Mesh(new RoundedBoxGeometry(0.64, 0.03, 0.64, 2, 0.005), whitePrintMat);
     perfBoard.position.set(-0.32, 0.12, 0.18);
     boxGroup.add(perfBoard);
@@ -1200,7 +1149,6 @@ export default function CompactInteractiveTwin({
     espShield.position.set(-0.22, 0.218, 0.24);
     boxGroup.add(espBreakout, espModule, espShield);
 
-    // 2 module INA226 màu xanh dương + RTC DS3231 có pin CR2032
     const ina1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.10), pcbBlueMat);
     ina1.position.set(-0.48, 0.155, 0.05);
     const ina2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.10), pcbBlueMat);
@@ -1211,7 +1159,6 @@ export default function CompactInteractiveTwin({
     cr2032.position.set(-0.38, 0.18, -0.09);
     boxGroup.add(ina1, ina2, rtcPcb, cr2032);
 
-    // Quạt tản nhiệt đen góc dưới trái
     const fanFrame = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.12, 0.22, 2, 0.008), matteBlackPrintMat);
     fanFrame.position.set(-0.50, 0.18, 0.35);
     boxGroup.add(fanFrame);
@@ -1224,7 +1171,6 @@ export default function CompactInteractiveTwin({
     fanBladesGroup.add(fanHub, blade1, blade2);
     boxGroup.add(fanBladesGroup);
 
-    // 3. 2 Bộ Driver động cơ bước màu đen bên phải hộp + Domino xanh lá + ốc vặn
     [0.18, 0.48].forEach((dx) => {
       const drvBody = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.26, 0.64, 2, 0.01), blackAnodizedMat);
       drvBody.position.set(dx, 0.20, 0.16);
@@ -1233,7 +1179,6 @@ export default function CompactInteractiveTwin({
       boxGroup.add(drvBody, drvTerm);
     });
 
-    // Dây điện nội bộ màu đỏ & xanh nối giữa sạc PWM, ESP32-S3 và 2 Driver (Giống Ảnh 4)
     const intWire1 = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-0.22, 0.22, 0.20),
       new THREE.Vector3(-0.05, 0.42, 0.10),
@@ -1248,7 +1193,6 @@ export default function CompactInteractiveTwin({
     ]);
     boxGroup.add(new THREE.Mesh(new THREE.TubeGeometry(intWire2, 16, 0.01, 6, false), wireBlueMat));
 
-    // NẮP HỘP ĐIỆN 3D CÓ BẢN LỀ BÊN PHẢI
     const lidGroup = new THREE.Group();
     lidGroup.position.set(boxW / 2, boxH, 0);
     boxGroup.add(lidGroup);
@@ -1259,7 +1203,7 @@ export default function CompactInteractiveTwin({
     lidGroup.add(lidMesh);
 
     // =========================================================================
-    // 4. CỤM BÊN PHẢI: TẤM PIN CỐ ĐỊNH (XOAY DỌC & QUAY MẶT VỀ BÊN PHẢI +X = HƯỚNG NAM 180°)
+    // 4. CỤM BÊN PHẢI: TẤM PIN CỐ ĐỊNH (XOAY DỌC & QUAY MẶT VỀ BÊN PHẢI +X = NAM 180°)
     // =========================================================================
     const staticRootGroup = new THREE.Group();
     staticRootGroup.name = 'staticSystem';
@@ -1274,17 +1218,15 @@ export default function CompactInteractiveTwin({
     const staColH = 1.65;
     addVSlotBar(staticRootGroup, 0.12, staColH, 0.12, staticX, frameY + 0.12 + staColH / 2, 0);
 
-    // Cụm gá trắng cố định nghiêng 15° QUAY MẶT VỀ BÊN PHẢI (+X, tức hướng Nam 180° theo Hình 2)
     const staTopGroup = new THREE.Group();
     staTopGroup.position.set(staticX, frameY + 0.12 + staColH, 0);
-    staTopGroup.rotation.z = -THREE.MathUtils.degToRad(15); // Nghiêng 15° hướng mặt sang phải (+X = Nam 180°)
+    staTopGroup.rotation.z = -THREE.MathUtils.degToRad(15);
     staticRootGroup.add(staTopGroup);
 
     const staBracket = new THREE.Mesh(new RoundedBoxGeometry(0.68, 0.09, 0.68, 2, 0.012), whitePrintMat);
     staBracket.position.set(0, 0.03, 0);
     staTopGroup.add(staBracket);
 
-    // Tấm pin cố định xoay dọc (Chiều rộng X = 1.56, Chiều dài dọc Z = 2.04) và nghiêng mặt về bên phải (+X)
     const staticPanel = createIndustrialSolarPanel(1.56, 2.04, false);
     staticPanel.position.set(0, 0.10, 0);
     staTopGroup.add(staticPanel);
@@ -1319,12 +1261,11 @@ export default function CompactInteractiveTwin({
       sw2LedMat,
       camera,
       controls,
-      scene,
-      gridHelper
+      scene
     };
 
     // =========================================================================
-    // 6. XỬ LÝ CLICK TRỰC TIẾP VÀO TỪNG TẤM PIN HOẶC HỘP ĐIỆN TRONG 3D
+    // 6. TƯƠNG TÁC: NHẤN VÀO ĐÂU ZOOM VÀO ĐÓ — CUỘN CHUỘT ĐỂ ZOOM TRỞ LẠI
     // =========================================================================
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -1343,27 +1284,66 @@ export default function CompactInteractiveTwin({
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
 
-      const hitTracker = raycaster.intersectObjects(trackerRootGroup.children, true);
-      if (hitTracker.length > 0) {
+      // 1. Nhấn vào Tấm Tracker -> Zoom cận cảnh vào Tấm Tracker & Hiện bảng thông số Tracker
+      if (raycaster.intersectObjects(trackerRootGroup.children, true).length > 0) {
         setSelectedPanel('tracker');
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(-2.05, 2.55, 3.45);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(-2.05, 1.55, 0);
         return;
       }
 
-      const hitStatic = raycaster.intersectObjects(staticRootGroup.children, true);
-      if (hitStatic.length > 0) {
+      // 2. Nhấn vào Tấm Cố định -> Zoom cận cảnh vào Tấm Cố định & Hiện bảng thông số Cố định
+      if (raycaster.intersectObjects(staticRootGroup.children, true).length > 0) {
         setSelectedPanel('static');
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(2.15, 2.55, 3.45);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(2.15, 1.55, 0);
         return;
       }
 
-      const hitBox = raycaster.intersectObjects(boxGroup.children, true);
-      if (hitBox.length > 0) {
-        setIsBoxOpen((prev) => !prev);
+      // 3. Nhấn vào Hộp điện -> Mở nắp hộp, Zoom vào bên trong Hộp điện & Hiện thông số Hộp điện
+      if (raycaster.intersectObjects(boxGroup.children, true).length > 0) {
+        setIsBoxOpen(true);
         setSelectedPanel('box');
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.08, 3.15, 1.75);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(0.08, 0.55, 0.05);
+        return;
+      }
+
+      // 4. Nhấn vào Mặt trời NOAA -> Zoom nhìn Mặt trời & Hiện thông số NOAA
+      if (raycaster.intersectObjects(sunGroup.children, true).length > 0) {
+        setSelectedPanel('sun');
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 4.5, 8.6);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.8, 0);
+        return;
+      }
+
+      // 5. Nhấn ra ngoài khoảng trống -> Thu phóng trở lại toàn cảnh & Đóng bảng thông số
+      setSelectedPanel(null);
+      setIsBoxOpen(false);
+      targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
+      targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
+    };
+
+    // Khi người dùng cuộn chuột lùi (deltaY > 0) để zoom ra -> Tự động đưa tâm nhìn về lại toàn cảnh và đóng popup
+    const handleWheel = (e) => {
+      if (e.deltaY > 0) {
+        targetAnglesRef.current.camTargetPos = null;
+        targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
+        const dist = camera.position.distanceTo(controls.target);
+        if (dist > 4.2) {
+          setSelectedPanel(null);
+          setIsBoxOpen(false);
+        }
+      } else {
+        // Nếu người dùng tự cuộn zoom in bằng chuột thì dừng nội suy preset để nhường quyền cho con lăn
+        targetAnglesRef.current.camTargetPos = null;
+        targetAnglesRef.current.camLookAt = null;
       }
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointerup', handlePointerUp);
+    renderer.domElement.addEventListener('wheel', handleWheel, { passive: true });
 
     // Vòng lặp Render 3D
     let animId;
@@ -1377,11 +1357,15 @@ export default function CompactInteractiveTwin({
       lidGroup.rotation.z += (-lidRad - lidGroup.rotation.z) * 0.12;
       fanBladesGroup.rotation.y += 0.14;
 
-      if (camTargetPos && camLookAt) {
+      if (camTargetPos) {
         camera.position.lerp(camTargetPos, 0.08);
-        controls.target.lerp(camLookAt, 0.08);
         if (camera.position.distanceTo(camTargetPos) < 0.05) {
           targetAnglesRef.current.camTargetPos = null;
+        }
+      }
+      if (camLookAt) {
+        controls.target.lerp(camLookAt, 0.08);
+        if (controls.target.distanceTo(camLookAt) < 0.03) {
           targetAnglesRef.current.camLookAt = null;
         }
       }
@@ -1393,8 +1377,8 @@ export default function CompactInteractiveTwin({
 
     const handleResize = () => {
       if (!container) return;
-      const newW = container.clientWidth || 1080;
-      const newH = container.clientHeight || 560;
+      const newW = container.clientWidth || window.innerWidth;
+      const newH = container.clientHeight || window.innerHeight - 110;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
@@ -1405,6 +1389,7 @@ export default function CompactInteractiveTwin({
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
+      renderer.domElement.removeEventListener('wheel', handleWheel);
       cancelAnimationFrame(animId);
       pmremGenerator.dispose();
       controls.dispose();
@@ -1412,550 +1397,231 @@ export default function CompactInteractiveTwin({
     };
   }, []);
 
-  const toggleSandbox = () => {
-    if (!isInteractiveSim) {
-      setSimPhi(Math.round((livePhi ?? 2.3) * 10) / 10);
-      setSimEps(Math.round((liveEps ?? 9.3) * 10) / 10);
-      const now = new Date();
-      setSimHourFloat(Math.round((now.getHours() + now.getMinutes() / 60) * 10) / 10);
-      setIsInteractiveSim(true);
-    } else {
-      setIsInteractiveSim(false);
-    }
-  };
-
   return (
-    <div className="lab-card p-4 sm:p-5 space-y-3">
-      {/* 1. TIÊU ĐỀ KHỐI & CÁC NÚT CHỨC NĂNG (ĐỒNG BỘ FONT CHỮ VỚI MODE THƯỜNG, KHÔNG DÙNG ICON) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 dark:border-slate-800">
-        <div>
-          <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-            Mô hình 3D đối chứng hai tấm pin & Quỹ đạo Mặt trời NOAA (Compact Mode)
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-slate-300 font-medium mt-0.5">
-            Nhấn trực tiếp vào [Tấm Tracker], [Tấm Cố định] hoặc [Hộp điện] trên mô hình 3D để xem bảng thông số đo đạc của từng khối
-          </p>
-        </div>
+    <div className="relative w-full h-[calc(100vh-115px)] min-h-[540px] select-none overflow-hidden">
+      {/* KHUNG CANVAS 3D TRONG SUỐT HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT */}
+      <div
+        ref={mountRef}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
+      />
 
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {isAdmin && (
-            <>
-              <button
-                onClick={onOpenEmergencyModal}
-                className={`sm:hidden px-2.5 py-1.5 text-xs font-bold rounded-sm cursor-pointer transition-colors ${
-                  system?.emergencyActive
-                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-                    : 'bg-red-700 hover:bg-red-800 text-white'
-                }`}
-              >
-                {system?.emergencyActive ? 'MỞ KHÓA' : 'DỪNG KHẨN CẤP'}
-              </button>
-              <button
-                onClick={onOpenManualModal}
-                className="sm:hidden px-2.5 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors"
-              >
-                Điều khiển
-              </button>
-              <button
-                onClick={onOpenSettingsModal}
-                className="sm:hidden px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
-              >
-                Cài đặt
-              </button>
-            </>
+      {/* BẢNG THÔNG SỐ NỔI KHI NHẤN VÀO TẤM PIN / HỘP ĐIỆN / MẶT TRỜI NOAA */}
+      {selectedPanel && (
+        <div className="absolute top-4 right-4 z-20 w-[92%] sm:w-[410px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-700 rounded-sm shadow-2xl p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-800 pb-2">
+            <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
+              {selectedPanel === 'tracker'
+                ? 'Tấm tracker (Trục kép)'
+                : selectedPanel === 'static'
+                ? 'Tấm cố định (Nam, ngửa 75°)'
+                : selectedPanel === 'box'
+                ? 'Hộp điện điều khiển trung tâm'
+                : 'Vị trí Mặt trời thiên văn NOAA'}
+            </h3>
+            <button
+              onClick={zoomBackToOverview}
+              className="px-2 py-0.5 text-xs font-semibold text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-slate-800 border border-zinc-300 dark:border-slate-700 rounded-xs cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+
+          {selectedPanel === 'tracker' && (
+            <table className="lab-table text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
+                  <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
+                  <th className="text-left font-bold py-2 px-2.5 text-blue-700 dark:text-sky-300">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
+                      <span>Giá trị thực tế</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
+                  <td className="py-2 px-2.5 font-bold text-base text-blue-700 dark:text-sky-300">
+                    {formatValueOrDash(tracking.power, 1, 'W')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {formatValueOrDash(tracking.voltage, 2, 'V')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {formatValueOrDash(tracking.current, 2, 'A')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
+                  <td className="py-2 px-2.5 font-bold text-blue-700 dark:text-sky-300">
+                    {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng hiện tại</td>
+                  <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
+                    <div>
+                      <span>Quay φ: </span>
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {formatSignedNumber(livePhi, 1, '°')}
+                      </span>
+                      <span className="mx-1.5 text-zinc-400">|</span>
+                      <span>Ngửa ε: </span>
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {formatValueOrDash(liveEps, 1, '°')}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
+                      {compassAzimuth !== null
+                        ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})`
+                        : '(Zenith nằm ngang = 50°, CTHT = 90°)'}
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc Mặt trời NOAA</td>
+                  <td className="py-2 px-2.5 font-semibold text-amber-700 dark:text-amber-300">
+                    Az: {formatValueOrDash(noaaSun.azimuthDeg, 1, '°')} | El: {formatSignedNumber(noaaSun.elevationDeg, 1, '°')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           )}
 
-          <button
-            onClick={onOpenDetails}
-            className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
-          >
-            Xem thông số chi tiết
-          </button>
-        </div>
-      </div>
-
-      {/* 2. DẢI TỌA ĐỘ THIÊN VĂN MẶT TRỜI NOAA THỜI GIAN THỰC */}
-      <div className="px-3.5 py-2 bg-zinc-100/90 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-sm flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <div>
-            <span className="text-zinc-600 dark:text-slate-300">Vị trí Mặt trời (NOAA): </span>
-            <span className="font-bold text-amber-700 dark:text-amber-400">
-              Phương vị Az = {formatValueOrDash(noaaSun.azimuthDeg, 1, '°')} ({getCompassDirectionName(noaaSun.azimuthDeg)})
-            </span>
-          </div>
-          <div>
-            <span className="text-zinc-600 dark:text-slate-300">Độ cao El: </span>
-            <span className="font-bold text-zinc-900 dark:text-white">
-              {formatSignedNumber(noaaSun.elevationDeg, 1, '°')}
-            </span>
-            <span className="text-zinc-500 dark:text-slate-400 ml-1">
-              (Zenith: {formatValueOrDash(noaaSun.zenithDeg, 1, '°')} — {noaaSun.isDaylight ? 'Ban ngày' : 'Ban đêm'})
-            </span>
-          </div>
-          <div>
-            <span className="text-zinc-600 dark:text-slate-300">Chu kỳ ngày NOAA: </span>
-            <span className="font-semibold text-zinc-900 dark:text-white">
-              Bình minh {noaaSun.sunriseStr} – Hoàng hôn {noaaSun.sunsetStr}
-            </span>
-          </div>
-        </div>
-
-        <div className="text-[11px] text-zinc-500 dark:text-slate-400 font-medium">
-          Quy ước hướng: Trên = Đông (90°) | Phải = Nam (180°) | Dưới = Tây (270°) | Trái = Bắc (0°)
-        </div>
-      </div>
-
-      {/* 3. KHUNG MÔ HÌNH 3D HIỂN THỊ TOÀN TAB (100% WIDTH) */}
-      <div className="w-full border border-zinc-200 dark:border-slate-700 rounded-sm bg-zinc-50 dark:bg-slate-900/90 overflow-hidden flex flex-col">
-        {/* Thanh công cụ điều khiển góc nhìn 3D & Chọn nhanh đối tượng */}
-        <div className="px-3 py-2 bg-zinc-100/80 dark:bg-slate-800/90 border-b border-zinc-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-zinc-500 dark:text-slate-400 font-medium mr-1">Góc nhìn:</span>
-            <button
-              onClick={() => applyCameraPreset('overview')}
-              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                cameraPreset === 'overview'
-                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-              }`}
-            >
-              Toàn cảnh 3D
-            </button>
-            <button
-              onClick={() => applyCameraPreset('top')}
-              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                cameraPreset === 'top'
-                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-              }`}
-            >
-              Nhìn từ trên (Đông-Tây-Nam-Bắc)
-            </button>
-            <button
-              onClick={() => applyCameraPreset('mechanism')}
-              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                cameraPreset === 'mechanism'
-                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-              }`}
-            >
-              Cận cảnh Trục & Đai răng
-            </button>
-            <button
-              onClick={() => applyCameraPreset('box')}
-              className={`px-2.5 py-1 rounded-xs cursor-pointer transition-colors ${
-                cameraPreset === 'box'
-                  ? 'bg-white dark:bg-slate-700 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-slate-600'
-                  : 'text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white font-medium'
-              }`}
-            >
-              Bên trong Hộp điện
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={() => setSelectedPanel((prev) => (prev === 'tracker' ? null : 'tracker'))}
-              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                selectedPanel === 'tracker'
-                  ? 'bg-blue-700 text-white border-blue-600'
-                  : 'bg-white dark:bg-slate-800 text-blue-700 dark:text-sky-300 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Thông số Tấm Tracker
-            </button>
-            <button
-              onClick={() => setSelectedPanel((prev) => (prev === 'static' ? null : 'static'))}
-              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                selectedPanel === 'static'
-                  ? 'bg-amber-700 text-white border-amber-600'
-                  : 'bg-white dark:bg-slate-800 text-amber-800 dark:text-amber-300 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Thông số Tấm Cố định
-            </button>
-            <button
-              onClick={() => setSelectedPanel((prev) => (prev === 'both' ? null : 'both'))}
-              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                selectedPanel === 'both'
-                  ? 'bg-zinc-800 text-white border-zinc-700 dark:bg-slate-200 dark:text-slate-900'
-                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              So sánh cả 2 tấm
-            </button>
-            <button
-              onClick={() => setIsBoxOpen((prev) => !prev)}
-              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                isBoxOpen
-                  ? 'bg-zinc-800 text-white border-zinc-700 dark:bg-slate-200 dark:text-slate-900'
-                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              {isBoxOpen ? 'Đóng nắp hộp điện' : 'Mở nắp hộp điện'}
-            </button>
-            <button
-              onClick={toggleSandbox}
-              className={`px-2.5 py-1 rounded-xs border cursor-pointer font-semibold transition-colors ${
-                isInteractiveSim
-                  ? 'bg-blue-700 text-white border-blue-600'
-                  : 'bg-white dark:bg-slate-800 text-zinc-800 dark:text-slate-200 border-zinc-300 dark:border-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              {isInteractiveSim ? 'Đang thử góc & giờ NOAA (Về thực tế)' : 'Thử góc 3D & Giờ NOAA'}
-            </button>
-          </div>
-        </div>
-
-        {/* Thanh trượt thử nghiệm xoay 2 trục 3D & Giờ Mặt trời NOAA */}
-        {isInteractiveSim && (
-          <div className="px-4 py-2.5 bg-zinc-100 dark:bg-slate-800/70 border-b border-zinc-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div>
-              <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
-                <span>Góc quay Trục 1 (Phương vị φ):</span>
-                <span>{formatSignedNumber(simPhi, 1, '°')}</span>
-              </div>
-              <input
-                type="range"
-                min="-90"
-                max="150"
-                step="1"
-                value={simPhi}
-                onChange={(e) => setSimPhi(Number(e.target.value))}
-                className="w-full accent-blue-700 cursor-pointer h-1.5"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between font-semibold text-zinc-800 dark:text-slate-200 mb-1">
-                <span>Góc ngửa Trục 2 (Độ ngửa ε):</span>
-                <span>{formatValueOrDash(simEps, 1, '°')}</span>
-              </div>
-              <input
-                type="range"
-                min="9"
-                max="90"
-                step="1"
-                value={simEps}
-                onChange={(e) => setSimEps(Number(e.target.value))}
-                className="w-full accent-blue-700 cursor-pointer h-1.5"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-300 mb-1">
-                <span>Giờ Mặt trời NOAA trong ngày:</span>
-                <span>
-                  {Math.floor(simHourFloat).toString().padStart(2, '0')}:
-                  {Math.round((simHourFloat % 1) * 60).toString().padStart(2, '0')}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="5.5"
-                max="18.0"
-                step="0.25"
-                value={simHourFloat}
-                onChange={(e) => setSimHourFloat(Number(e.target.value))}
-                className="w-full accent-amber-600 cursor-pointer h-1.5"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Khung Canvas 3D Toàn Tab */}
-        <div className="relative w-full h-[500px] sm:h-[580px]">
-          <div
-            ref={mountRef}
-            className="w-full h-full cursor-grab active:cursor-grabbing"
-            title="Nhấn vào Tấm Tracker (Trái), Tấm Cố định (Phải) hoặc Hộp điện (Giữa) để xem thông số"
-          />
-
-          {/* BẢNG THÔNG SỐ NỔI KHI NHẤN VÀO TẤM PIN HOẶC HỘP ĐIỆN TRONG 3D (SỬ DỤNG ĐÚNG LAB-TABLE CỦA MODE THƯỜNG) */}
-          {selectedPanel && (
-            <div className="absolute top-3 right-3 z-20 w-[94%] sm:w-[430px] max-h-[92%] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-600 rounded-sm shadow-2xl p-3.5 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-700 pb-2">
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
-                    {selectedPanel === 'tracker'
-                      ? 'Thông số Tấm tracker (Trục kép)'
-                      : selectedPanel === 'static'
-                      ? 'Thông số Tấm cố định (Nam, ngửa 75°)'
-                      : selectedPanel === 'box'
-                      ? 'Thông số Hộp điện điều khiển trung tâm'
-                      : 'Bảng so sánh đối chứng hai tấm pin'}
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-slate-400">
-                    Nhấn trực tiếp vào tấm pin khác trên mô hình 3D để chuyển đổi
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedPanel(null)}
-                  className="px-2 py-1 text-xs font-semibold text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-slate-800 border border-zinc-300 dark:border-slate-700 rounded-xs cursor-pointer"
-                >
-                  Đóng
-                </button>
-              </div>
-
-              {selectedPanel === 'tracker' && (
-                <table className="lab-table text-xs sm:text-sm">
-                  <thead>
-                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
-                      <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
-                      <th className="text-left font-bold py-2 px-2.5 text-blue-700 dark:text-sky-300">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
-                          <span>Tấm tracker (Trục kép)</span>
-                        </div>
-                        <span className={`text-[11px] font-semibold block mt-0.5 ${trkBadge.textColor}`}>
-                          {trkBadge.text}
-                        </span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
-                      <td className="py-2 px-2.5 font-bold text-base text-blue-700 dark:text-sky-300">
-                        {formatValueOrDash(tracking.power, 1, 'W')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(tracking.voltage, 2, 'V')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(tracking.current, 2, 'A')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
-                      <td className="py-2 px-2.5 font-bold text-blue-700 dark:text-sky-300">
-                        {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng hiện tại</td>
-                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
-                        <div>
-                          <span>Quay φ: </span>
-                          <span className="font-bold text-zinc-900 dark:text-white">
-                            {formatSignedNumber(effectivePhi, 1, '°')}
-                          </span>
-                          <span className="mx-1.5 text-zinc-400">|</span>
-                          <span>Ngửa ε: </span>
-                          <span className="font-bold text-zinc-900 dark:text-white">
-                            {formatValueOrDash(effectiveEps, 1, '°')}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
-                          {compassAzimuth !== null
-                            ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})`
-                            : '(Zenith nằm ngang = 50°, CTHT = 90°)'}
-                        </span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công tắc hành trình</td>
-                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
-                        SW1: <span className="font-semibold">{az.limitHome ? 'Chạm' : 'Hở'}</span> | SW2:{' '}
-                        <span className="font-semibold">{el.limitSwitch90 ? 'Chạm' : 'Hở'}</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {selectedPanel === 'static' && (
-                <table className="lab-table text-xs sm:text-sm">
-                  <thead>
-                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
-                      <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
-                      <th className="text-left font-bold py-2 px-2.5 text-amber-800 dark:text-amber-300">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
-                          <span>Tấm cố định (Nam, ngửa 75°)</span>
-                        </div>
-                        <span className={`text-[11px] font-semibold block mt-0.5 ${staBadge.textColor}`}>
-                          {staBadge.text}
-                        </span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
-                      <td className="py-2 px-2.5 font-bold text-base text-amber-800 dark:text-amber-300">
-                        {formatValueOrDash(stat.power, 1, 'W')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(stat.voltage, 2, 'V')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(stat.current, 2, 'A')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
-                      <td className="py-2 px-2.5 font-bold text-amber-800 dark:text-amber-300">
-                        {formatValueOrDash(stat.energyWh, 1, 'Wh')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng cố định</td>
-                      <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
-                        <div className="font-semibold text-zinc-900 dark:text-white">Hướng Nam 180°, ngửa 75°</div>
-                        <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
-                          (Đặt dọc, nghiêng cố định 15° về hướng Nam / Phải)
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {selectedPanel === 'both' && (
-                <table className="lab-table text-xs">
-                  <thead>
-                    <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
-                      <th className="text-left font-bold py-2 px-2 text-zinc-900 dark:text-white">Thông số</th>
-                      <th className="text-left font-bold py-2 px-2 text-blue-700 dark:text-sky-300">Tấm tracker</th>
-                      <th className="text-left font-bold py-2 px-2 text-amber-800 dark:text-amber-300">Tấm cố định</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
-                    <tr>
-                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Công suất (P)</td>
-                      <td className="py-2 px-2 font-bold text-blue-700 dark:text-sky-300">
-                        {formatValueOrDash(tracking.power, 1, 'W')}
-                      </td>
-                      <td className="py-2 px-2 font-bold text-amber-800 dark:text-amber-300">
-                        {formatValueOrDash(stat.power, 1, 'W')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Điện áp (V)</td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(tracking.voltage, 2, 'V')}
-                      </td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(stat.voltage, 2, 'V')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Dòng điện (I)</td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(tracking.current, 2, 'A')}
-                      </td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        {formatValueOrDash(stat.current, 2, 'A')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Sản lượng (ΣE)</td>
-                      <td className="py-2 px-2 font-bold text-blue-700 dark:text-sky-300">
-                        {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
-                      </td>
-                      <td className="py-2 px-2 font-bold text-amber-800 dark:text-amber-300">
-                        {formatValueOrDash(stat.energyWh, 1, 'Wh')}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2 font-medium text-zinc-700 dark:text-slate-200">Góc hiện tại</td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        φ: {formatSignedNumber(effectivePhi, 1, '°')} | ε: {formatValueOrDash(effectiveEps, 1, '°')}
-                      </td>
-                      <td className="py-2 px-2 font-semibold text-zinc-800 dark:text-slate-100">
-                        Nam 180°, ngửa 75°
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {selectedPanel === 'box' && (
-                <table className="lab-table text-xs sm:text-sm">
-                  <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Trạng thái vận hành</td>
-                      <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">
-                        {system?.displayState || 'Bình thường'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Vi điều khiển & Cảm biến</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        ESP32-S3 + 2x INA226 + DS3231 RTC
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Nhiệt độ hộp điện (RTC)</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {system?.rtcTemp !== null && system?.rtcTemp !== undefined
-                          ? `${Number(system.rtcTemp).toFixed(1).replace('.', ',')} °C`
-                          : '--'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Độ lệch đồng hồ RTC</td>
-                      <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
-                        {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
-                          ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
-                          : '--'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Nắp hộp điện 3D</td>
-                      <td className="py-2 px-2.5">
-                        <button
-                          onClick={() => setIsBoxOpen((prev) => !prev)}
-                          className="px-2.5 py-1 text-xs font-semibold bg-blue-700 text-white rounded-xs cursor-pointer"
-                        >
-                          {isBoxOpen ? 'Đóng nắp hộp' : 'Mở nắp hộp'}
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {/* Dòng kết luận Chênh lệch năng lượng % Gain */}
-              <div className="p-2.5 bg-zinc-50 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-xs flex items-center justify-between gap-2 text-xs">
-                <span className="font-semibold text-zinc-800 dark:text-slate-200">
-                  Chênh lệch năng lượng (k = 1,018):
-                </span>
-                {hasValidGain ? (
-                  <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-                    {formatSignedNumber(comparison.percentGain, 1, '%')}
-                  </span>
-                ) : (
-                  <span className="text-zinc-500 dark:text-slate-400 italic">
-                    Chờ đủ ngưỡng 5,0 Wh
-                  </span>
-                )}
-              </div>
-            </div>
+          {selectedPanel === 'static' && (
+            <table className="lab-table text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-zinc-50/80 dark:bg-slate-800/90">
+                  <th className="text-left font-bold py-2 px-2.5 text-zinc-900 dark:text-white">Thông số đo đạc</th>
+                  <th className="text-left font-bold py-2 px-2.5 text-amber-800 dark:text-amber-300">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
+                      <span>Giá trị thực tế</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
+                  <td className="py-2 px-2.5 font-bold text-base text-amber-800 dark:text-amber-300">
+                    {formatValueOrDash(stat.power, 1, 'W')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Điện áp (V)</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {formatValueOrDash(stat.voltage, 2, 'V')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Dòng điện (I)</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {formatValueOrDash(stat.current, 2, 'A')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
+                  <td className="py-2 px-2.5 font-bold text-amber-800 dark:text-amber-300">
+                    {formatValueOrDash(stat.energyWh, 1, 'Wh')}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Góc định hướng cố định</td>
+                  <td className="py-2 px-2.5 text-zinc-800 dark:text-slate-100">
+                    <div className="font-semibold text-zinc-900 dark:text-white">Hướng Nam 180°, ngửa 75°</div>
+                    <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
+                      (Nghiêng cố định 15° về hướng Nam / Phải)
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           )}
 
-          {/* Nhãn hướng dẫn thao tác chuột dưới góc khung 3D */}
-          <div className="absolute bottom-2.5 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none text-[11px] text-zinc-600 dark:text-slate-300">
-            <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700">
-              Nhấn vào [Tấm Tracker], [Tấm Cố định] hoặc [Hộp điện] để hiện bảng thông số | Chuột trái: Xoay 360° | Con lăn: Thu phóng
+          {selectedPanel === 'box' && (
+            <table className="lab-table text-xs sm:text-sm">
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Trạng thái vận hành</td>
+                  <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">
+                    {system?.displayState || 'Bình thường'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Cấu hình phần cứng</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    ESP32-S3 + 2x INA226 + DS3231 RTC + Sạc PWM
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Nhiệt độ hộp điện (RTC)</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {system?.rtcTemp !== null && system?.rtcTemp !== undefined
+                      ? `${Number(system.rtcTemp).toFixed(1).replace('.', ',')} °C`
+                      : '--'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Độ lệch đồng hồ RTC</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
+                      ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
+                      : '--'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {selectedPanel === 'sun' && (
+            <table className="lab-table text-xs sm:text-sm">
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Phương vị Mặt trời (Az)</td>
+                  <td className="py-2 px-2.5 font-bold text-amber-700 dark:text-amber-300">
+                    {formatValueOrDash(noaaSun.azimuthDeg, 1, '°')} ({getCompassDirectionName(noaaSun.azimuthDeg)})
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Độ cao Mặt trời (El)</td>
+                  <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">
+                    {formatSignedNumber(noaaSun.elevationDeg, 1, '°')} (Zenith: {formatValueOrDash(noaaSun.zenithDeg, 1, '°')})
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Chu kỳ ngày NOAA</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">
+                    Bình minh {noaaSun.sunriseStr} – Hoàng hôn {noaaSun.sunsetStr}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div className="p-2 bg-zinc-50 dark:bg-slate-800/90 border border-zinc-200 dark:border-slate-700 rounded-xs flex items-center justify-between gap-2 text-xs">
+            <span className="font-semibold text-zinc-800 dark:text-slate-200">
+              Chênh lệch năng lượng (k = 1,018):
             </span>
-            <span className="bg-white/85 dark:bg-slate-900/85 px-2.5 py-1 rounded-xs border border-zinc-200 dark:border-slate-700 font-semibold text-zinc-800 dark:text-slate-100">
-              Trạng thái: {system?.displayState || 'Bình thường'}
-            </span>
+            {hasValidGain ? (
+              <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                {formatSignedNumber(comparison.percentGain, 1, '%')}
+              </span>
+            ) : (
+              <span className="text-zinc-500 dark:text-slate-400 italic">
+                Chờ đủ ngưỡng 5,0 Wh
+              </span>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
