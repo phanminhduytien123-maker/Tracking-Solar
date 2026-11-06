@@ -171,6 +171,15 @@ export default function App() {
 
   // Chế độ hiển thị Compact trực quan (Digital Twin): Độc lập hoàn toàn với giao diện tiêu chuẩn
   const [compactMode, setCompactMode] = useState(false);
+  const [hasOpenedCompact, setHasOpenedCompact] = useState(false);
+
+  const toggleCompactMode = () => {
+    setCompactMode((prev) => {
+      const next = !prev;
+      if (next) setHasOpenedCompact(true);
+      return next;
+    });
+  };
 
   // Engine instances
   const mockEngineRef = useRef(new MockTelemetryEngine());
@@ -945,54 +954,69 @@ export default function App() {
         onOpenMapModal={() => openSettingsTab('location')}
       />
 
-      {/* 2. MAIN STREAMLINED DASHBOARD */}
-      <main className={compactMode ? 'w-full flex-1 relative z-10' : 'max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 flex-1 relative z-10'}>
+      {/* 2. MAIN STREAMLINED DASHBOARD (CHUYỂN CẢNH MƯỢT MÀ GIỮA CHẾ ĐỘ TIÊU CHUẨN & MODE COMPACT 3D) */}
+      <main className="w-full flex-1 relative z-10 overflow-hidden grid grid-cols-1">
+        {/* LỚP 1: CHẾ ĐỘ BÌNH THƯỜNG HIỆN TẠI (GIỮ NGUYÊN 100%) */}
+        <div
+          aria-hidden={compactMode}
+          className={`col-start-1 row-start-1 max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-6 space-y-4 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] origin-top ${
+            compactMode
+              ? 'opacity-0 scale-[0.96] -translate-y-4 blur-[4px] pointer-events-none select-none max-h-[calc(100vh-115px)] overflow-hidden'
+              : 'opacity-100 scale-100 translate-y-0 blur-0 pointer-events-auto'
+          }`}
+        >
+          {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
+          <section aria-label="So sánh đối chứng hai tấm pin">
+            <VisualPanelsComparison
+              INA226={telemetry.INA226}
+              motors={telemetry.motors}
+              system={telemetry.system}
+              isAdmin={authSession?.role === 'admin'}
+              onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+              onOpenManualModal={() => setIsManualModalOpen(true)}
+              onOpenSettingsModal={() => openSettingsTab('config')}
+              onOpenDetails={() => setIsDetailsModalOpen(true)}
+            />
+          </section>
 
-        {compactMode ? (
-          /* CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN 3D HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT */
-          <CompactInteractiveTwin
-            telemetry={telemetry}
-            location={selectedLocation}
-          />
-        ) : (
-          /* CHẾ ĐỘ BÌNH THƯỜNG HIỆN TẠI (GIỮ NGUYÊN 100%) */
-          <>
-            {/* BẢNG SO SÁNH ĐỐI CHỨNG HAI TẤM PIN + SƠ ĐỒ GÓC CƠ CẤU */}
-            <section aria-label="So sánh đối chứng hai tấm pin">
-              <VisualPanelsComparison
-                INA226={telemetry.INA226}
-                motors={telemetry.motors}
-                system={telemetry.system}
-                isAdmin={authSession?.role === 'admin'}
-                onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
-                onOpenManualModal={() => setIsManualModalOpen(true)}
-                onOpenSettingsModal={() => openSettingsTab('config')}
-                onOpenDetails={() => setIsDetailsModalOpen(true)}
-              />
-            </section>
+          {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN ĐỐI CHỨNG (HÔM NAY & 30 NGÀY) */}
+          <section aria-label="Biểu đồ sản lượng điện">
+            <ChartsSection
+              intradayData={intradayData}
+              history30Days={history30Days}
+              onClearCharts={handleClearCharts}
+              isAdmin={authSession?.role === 'admin'}
+              themeMode={themeMode}
+              availableDates={availableHistoryDates}
+              selectedIntradayDate={selectedIntradayDate}
+              onSelectIntradayDate={(dateStr) => {
+                setSelectedIntradayDate(dateStr);
+                if (allIntradayProfiles[dateStr]) {
+                  setIntradayData(allIntradayProfiles[dateStr]);
+                }
+              }}
+              onOpenDataSettings={handleOpenDataSettings}
+            />
+          </section>
+        </div>
 
-            {/* BIỂU ĐỒ SẢN LƯỢNG ĐIỆN ĐỐI CHỨNG (HÔM NAY & 30 NGÀY) */}
-            <section aria-label="Biểu đồ sản lượng điện">
-              <ChartsSection
-                intradayData={intradayData}
-                history30Days={history30Days}
-                onClearCharts={handleClearCharts}
-                isAdmin={authSession?.role === 'admin'}
-                themeMode={themeMode}
-                availableDates={availableHistoryDates}
-                selectedIntradayDate={selectedIntradayDate}
-                onSelectIntradayDate={(dateStr) => {
-                  setSelectedIntradayDate(dateStr);
-                  if (allIntradayProfiles[dateStr]) {
-                    setIntradayData(allIntradayProfiles[dateStr]);
-                  }
-                }}
-                onOpenDataSettings={handleOpenDataSettings}
-              />
-            </section>
-          </>
+        {/* LỚP 2: CHẾ ĐỘ COMPACT TƯƠNG TÁC TRỰC QUAN 3D HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT */}
+        {(hasOpenedCompact || compactMode) && (
+          <div
+            aria-hidden={!compactMode}
+            className={`col-start-1 row-start-1 w-full transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] origin-center ${
+              compactMode
+                ? 'opacity-100 scale-100 translate-y-0 blur-0 pointer-events-auto'
+                : 'opacity-0 scale-[1.04] translate-y-4 blur-[6px] pointer-events-none select-none'
+            }`}
+          >
+            <CompactInteractiveTwin
+              telemetry={telemetry}
+              location={selectedLocation}
+              isActive={compactMode}
+            />
+          </div>
         )}
-
       </main>
 
       {/* 3. MODALS */}
@@ -1094,7 +1118,7 @@ export default function App() {
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
         compactMode={compactMode}
-        onToggleCompactMode={() => setCompactMode((prev) => !prev)}
+        onToggleCompactMode={toggleCompactMode}
       />
 
       {/* 6. DISCRETE WEATHER PRESET DEMO PILL & DARK/LIGHT MODE TOGGLE & COMPACT MODE SWITCH (Bottom Right corner) */}
@@ -1167,8 +1191,8 @@ export default function App() {
             {/* Nút Mode Compact (Mô hình 3D trực quan tương tác) đặt cạnh nút Chế độ Sáng/Tối */}
             <button
               id="btn-toggle-compact-mode"
-              onClick={() => setCompactMode((prev) => !prev)}
-              className={`px-3 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-all cursor-pointer flex items-center text-xs font-semibold ${
+              onClick={toggleCompactMode}
+              className={`px-3 py-2 rounded-lg backdrop-blur-md border shadow-lg transition-all duration-300 active:scale-95 cursor-pointer flex items-center text-xs font-semibold ${
                 compactMode
                   ? 'bg-blue-700 hover:bg-blue-800 border-blue-500 text-white'
                   : 'bg-white/90 dark:bg-slate-900/90 hover:bg-zinc-100 dark:hover:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-800 dark:text-slate-100'
