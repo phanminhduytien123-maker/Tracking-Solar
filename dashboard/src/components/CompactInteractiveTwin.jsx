@@ -389,18 +389,21 @@ function createSculptedTBracketGeometry() {
   });
 }
 
-// Góc nhìn tổng quan mặc định
+// Góc nhìn tổng quan mặc định & góc xuất phát khi chuyển cảnh (Cinematic Camera Fly-in)
 const DEFAULT_CAM_POS = new THREE.Vector3(0, 4.1, 7.9);
+const INTRO_CAM_POS = new THREE.Vector3(0, 7.2, 13.8);
 const DEFAULT_LOOK_AT = new THREE.Vector3(0, 1.25, 0);
 
 /**
  * COMPACT MODE: HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT (KHÔNG KHUNG, KHÔNG TIÊU ĐỀ, KHÔNG NÚT Rườm Rà)
+ * - Có hiệu ứng Camera Fly-in mượt mà khi kích hoạt Compact Mode và Fly-out khi trở về giao diện tiêu chuẩn.
  * - Nhấn vào bộ phận nào (Tấm Tracker, Tấm Cố định, Hộp điện, Mặt trời NOAA) thì tự động Zoom vào bộ phận đó và hiện thông số.
  * - Cuộn chuột lùi (Zoom out) để tự động thu phóng trở lại toàn cảnh và đóng bảng thông số.
  */
 export default function CompactInteractiveTwin({
   telemetry,
-  location = null
+  location = null,
+  isActive = false
 }) {
   const INA226 = telemetry?.INA226 || {};
   const motors = telemetry?.motors || {};
@@ -533,6 +536,25 @@ export default function CompactInteractiveTwin({
     targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
     targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
   };
+
+  // Hiệu ứng Camera Fly-in mượt mà khi bật sang Mode Compact và Fly-out khi trở về Mode tiêu chuẩn
+  useEffect(() => {
+    const { camera, controls } = sceneObjectsRef.current;
+    if (isActive) {
+      if (camera && controls) {
+        camera.position.copy(INTRO_CAM_POS);
+        controls.target.set(0, 1.85, 0);
+        controls.update();
+      }
+      targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
+      targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
+    } else {
+      setSelectedPanel(null);
+      setIsBoxOpen(false);
+      targetAnglesRef.current.camTargetPos = INTRO_CAM_POS.clone();
+      targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.85, 0);
+    }
+  }, [isActive]);
 
   // Khởi tạo không gian 3D Trong Suốt Ngay Trên Nền Thời Tiết
   useEffect(() => {
@@ -1935,7 +1957,7 @@ export default function CompactInteractiveTwin({
 
       {/* BẢNG THÔNG SỐ NỔI KHI NHẤN VÀO TẤM PIN / HỘP ĐIỆN / MẶT TRỜI NOAA */}
       {selectedPanel && (
-        <div className="absolute top-4 right-4 z-20 w-[92%] sm:w-[410px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-700 rounded-sm shadow-2xl p-3.5 space-y-2.5">
+        <div className="absolute top-4 right-4 z-20 w-[92%] sm:w-[410px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-zinc-300 dark:border-slate-700 rounded-sm shadow-2xl p-3.5 space-y-2.5 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-slate-800 pb-2">
             <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
               {selectedPanel === 'tracker'
