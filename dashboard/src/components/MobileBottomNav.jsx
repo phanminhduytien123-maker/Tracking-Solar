@@ -1,6 +1,5 @@
 import React from 'react';
 import { LayoutDashboard, Sliders, BarChart3, Activity, Settings, LogOut, Sun, Moon } from 'lucide-react';
-import { TbSolarPanel } from 'react-icons/tb';
 
 export default function MobileBottomNav({
   currentUser,
@@ -79,19 +78,19 @@ export default function MobileBottomNav({
           <span className="text-[11px] font-medium">Thông số</span>
         </button>
 
-        {/* 5. Mode Compact (Mô hình trực quan) */}
+        {/* 5. Mode Compact (Mô hình 3D trực quan) */}
         {onToggleCompactMode && (
           <button
             onClick={onToggleCompactMode}
             className="flex flex-col items-center justify-center gap-1 text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors py-1 px-1.5 cursor-pointer"
-            title="Chuyển đổi Mode Compact trực quan"
+            title="Chuyển đổi Mode Compact 3D trực quan"
           >
-            <div className={`w-8 h-8 rounded flex items-center justify-center border ${
+            <div className={`w-8 h-8 rounded flex items-center justify-center border text-[11px] font-bold ${
               compactMode
                 ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-zinc-100 dark:bg-slate-800 border-zinc-300 dark:border-slate-700 text-blue-600 dark:text-sky-400'
+                : 'bg-zinc-100 dark:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-700 dark:text-slate-200'
             }`}>
-              <TbSolarPanel className="w-4 h-4" />
+              3D
             </div>
             <span className="text-[11px] font-medium">Compact</span>
           </button>

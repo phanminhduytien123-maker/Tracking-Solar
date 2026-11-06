@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { CloudSun } from 'lucide-react';
-import { TbAlertOctagon, TbAdjustmentsHorizontal, TbSettings, TbLogout } from 'react-icons/tb';
 import { formatSignedNumber } from '../utils/formatters';
 
 export default function Header({
@@ -95,14 +94,13 @@ export default function Header({
             <button
               id="btn-emergency-cover"
               onClick={onOpenEmergencyModal}
-              className={`px-3 py-1 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1.5 shadow-xs ${system?.emergencyActive
+              className={`px-3 py-1 text-xs font-bold rounded-sm cursor-pointer transition-all flex items-center gap-1 shadow-xs ${system?.emergencyActive
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse border border-amber-300'
                   : 'bg-red-700 hover:bg-red-800 text-white font-bold'
                 }`}
               title={system?.emergencyActive ? "Nhấn để nhập mật khẩu mở khóa hệ thống" : "Nhấn để dừng khẩn cấp & hạ góc Max phủ bạt che mưa bão"}
             >
-              <TbAlertOctagon className="w-3.5 h-3.5 shrink-0" />
-              <span>{system?.emergencyActive ? 'MỞ KHÓA HOẠT ĐỘNG' : 'DỪNG KHẨN CẤP'}</span>
+              {system?.emergencyActive ? 'MỞ KHÓA HOẠT ĐỘNG' : 'DỪNG KHẨN CẤP'}
             </button>
           )}
 
@@ -111,10 +109,9 @@ export default function Header({
             <button
               id="btn-open-manual-control"
               onClick={onOpenManualModal}
-              className="px-3 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-sm cursor-pointer transition-colors"
             >
-              <TbAdjustmentsHorizontal className="w-3.5 h-3.5 shrink-0" />
-              <span>Điều khiển</span>
+              Điều khiển
             </button>
           )}
 
@@ -123,10 +120,9 @@ export default function Header({
             <button
               id="btn-open-settings"
               onClick={onOpenSettingsModal}
-              className="px-3 py-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
+              className="px-3 py-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
             >
-              <TbSettings className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
-              <span>Cài đặt</span>
+              Cài đặt
             </button>
           )}
 
@@ -135,11 +131,10 @@ export default function Header({
             <button
               id="btn-logout"
               onClick={onLogout}
-              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-700 dark:hover:text-red-400 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+              className="px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-700 dark:hover:text-red-400 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-200 dark:border-slate-700 rounded-sm cursor-pointer transition-colors"
               title="Đăng xuất"
             >
-              <TbLogout className="w-3.5 h-3.5 shrink-0" />
-              <span>Đăng xuất</span>
+              Đăng xuất
             </button>
           )}
         </div>
