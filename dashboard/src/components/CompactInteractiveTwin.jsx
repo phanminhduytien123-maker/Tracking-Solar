@@ -830,8 +830,9 @@ export default function CompactInteractiveTwin({
     addVSlotBar(frameGroup, barT, barT, 2.04, -3.14, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, -0.96, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, 1.05, frameY, 0);
-    addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, 0.18);
-    addVSlotBar(frameGroup, 2.06, barT, barT, -2.05, frameY, -0.18);
+    // 2 thanh giằng đỡ cụm trục xoay đặt dọc (theo trục Z, xoay 90 độ so với thanh dài)
+    addVSlotBar(frameGroup, barT, barT, 2.04, -2.05 - 0.18, frameY, 0);
+    addVSlotBar(frameGroup, barT, barT, 2.04, -2.05 + 0.18, frameY, 0);
     addVSlotBar(frameGroup, barT, barT, 2.04, 2.15, frameY, 0);
 
     const legCoords = [
@@ -870,61 +871,67 @@ export default function CompactInteractiveTwin({
     hubBeltGroove.position.set(trackerX, frameY + 0.20, 0);
     trackerRootGroup.add(hubBeltGroove);
 
+    // Xoay cụm Motor M1, Encoder 1, dây đai và công tắc hành trình Trục 1 một góc 90 độ để nằm dọc theo 2 thanh đỡ
+    const baseAxis1MechGroup = new THREE.Group();
+    baseAxis1MechGroup.position.set(trackerX, 0, 0);
+    baseAxis1MechGroup.rotation.y = -Math.PI / 2;
+    trackerRootGroup.add(baseAxis1MechGroup);
+
     const m1Plate = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.06, 0.44, 2, 0.01), whitePrintMat);
-    m1Plate.position.set(trackerX + 0.58, frameY + 0.08, 0);
-    trackerRootGroup.add(m1Plate);
+    m1Plate.position.set(0.58, frameY + 0.08, 0);
+    baseAxis1MechGroup.add(m1Plate);
 
     [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]].forEach(([bx, bz]) => {
       const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.02, 12), chromeSteelMat);
-      screw.position.set(trackerX + 0.58 + bx, frameY + 0.115, bz);
-      trackerRootGroup.add(screw);
+      screw.position.set(0.58 + bx, frameY + 0.115, bz);
+      baseAxis1MechGroup.add(screw);
     });
 
     const nema1 = createDetailedNema17();
-    nema1.position.set(trackerX + 0.58, frameY - 0.12, 0);
-    trackerRootGroup.add(nema1);
+    nema1.position.set(0.58, frameY - 0.12, 0);
+    baseAxis1MechGroup.add(nema1);
 
     const pulley1 = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.11, 24), aluFrameMat);
-    pulley1.position.set(trackerX + 0.58, frameY + 0.18, 0);
-    trackerRootGroup.add(pulley1);
+    pulley1.position.set(0.58, frameY + 0.18, 0);
+    baseAxis1MechGroup.add(pulley1);
 
     const belt1Front = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.055, 0.018), rubberBeltMat);
-    belt1Front.position.set(trackerX + 0.29, frameY + 0.19, 0.12);
+    belt1Front.position.set(0.29, frameY + 0.19, 0.12);
     belt1Front.rotation.y = 0.12;
-    trackerRootGroup.add(belt1Front);
+    baseAxis1MechGroup.add(belt1Front);
 
     const belt1Back = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.055, 0.018), rubberBeltMat);
-    belt1Back.position.set(trackerX + 0.29, frameY + 0.19, -0.12);
+    belt1Back.position.set(0.29, frameY + 0.19, -0.12);
     belt1Back.rotation.y = -0.12;
-    trackerRootGroup.add(belt1Back);
+    baseAxis1MechGroup.add(belt1Back);
 
     const enc1Plate = new THREE.Mesh(new RoundedBoxGeometry(0.40, 0.06, 0.38, 2, 0.01), whitePrintMat);
-    enc1Plate.position.set(trackerX - 0.56, frameY + 0.08, 0);
-    trackerRootGroup.add(enc1Plate);
+    enc1Plate.position.set(-0.56, frameY + 0.08, 0);
+    baseAxis1MechGroup.add(enc1Plate);
 
     const enc1Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.24, 28), matteBlackPrintMat);
-    enc1Housing.position.set(trackerX - 0.56, frameY - 0.08, 0);
-    trackerRootGroup.add(enc1Housing);
+    enc1Housing.position.set(-0.56, frameY - 0.08, 0);
+    baseAxis1MechGroup.add(enc1Housing);
 
     const enc1Pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.09, 20), whitePrintMat);
-    enc1Pulley.position.set(trackerX - 0.56, frameY + 0.16, 0);
-    trackerRootGroup.add(enc1Pulley);
+    enc1Pulley.position.set(-0.56, frameY + 0.16, 0);
+    baseAxis1MechGroup.add(enc1Pulley);
 
     const belt1Enc = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.045, 0.016), rubberBeltMat);
-    belt1Enc.position.set(trackerX - 0.28, frameY + 0.17, 0.08);
-    trackerRootGroup.add(belt1Enc);
+    belt1Enc.position.set(-0.28, frameY + 0.17, 0.08);
+    baseAxis1MechGroup.add(belt1Enc);
 
     const sw1Body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.04), matteBlackPrintMat);
-    sw1Body.position.set(trackerX - 0.42, frameY + 0.13, 0.16);
-    trackerRootGroup.add(sw1Body);
+    sw1Body.position.set(-0.42, frameY + 0.13, 0.16);
+    baseAxis1MechGroup.add(sw1Body);
     const sw1Lever = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.008, 0.025), chromeSteelMat);
-    sw1Lever.position.set(trackerX - 0.39, frameY + 0.15, 0.14);
+    sw1Lever.position.set(-0.39, frameY + 0.15, 0.14);
     sw1Lever.rotation.y = -0.35;
-    trackerRootGroup.add(sw1Lever);
+    baseAxis1MechGroup.add(sw1Lever);
     const sw1LedMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
     const sw1Led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 12), sw1LedMat);
-    sw1Led.position.set(trackerX - 0.42, frameY + 0.165, 0.16);
-    trackerRootGroup.add(sw1Led);
+    sw1Led.position.set(-0.42, frameY + 0.165, 0.16);
+    baseAxis1MechGroup.add(sw1Led);
 
     // Nhóm xoay Phương vị Trục 1
     const azimuthGroup = new THREE.Group();
