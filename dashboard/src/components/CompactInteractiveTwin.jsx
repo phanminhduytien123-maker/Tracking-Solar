@@ -309,6 +309,54 @@ function createVSlotExtrusionTexture() {
 }
 
 /**
+ * Tạo texture bề mặt nhôm đục lỗ tổ ong (Honeycomb SMPS 12V)
+ */
+function createHoneycombPsuTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  // Nền nhôm phay xước bạc
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  for (let i = 0; i < 256; i += 3) {
+    ctx.fillRect(i, 0, 1, 256);
+  }
+
+  // Các lỗ tản nhiệt tổ ong (lục giác / tròn xếp lệch hàng)
+  const r = 7;
+  const dx = 20;
+  const dy = 17;
+  for (let row = 1; row < 14; row++) {
+    for (let col = 1; col < 12; col++) {
+      const cx = col * dx + (row % 2 === 0 ? dx / 2 : 0);
+      const cy = row * dy;
+      if (cx > 22 && cx < 234 && cy > 20 && cy < 236) {
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        for (let s = 0; s < 6; s++) {
+          const ang = (s * Math.PI) / 3;
+          const hx = cx + r * Math.cos(ang);
+          const hy = cy + r * Math.sin(ang);
+          if (s === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/**
  * Tạo hình học gá chữ T in 3D màu trắng
  */
 function createSculptedTBracketGeometry() {
@@ -1253,6 +1301,53 @@ export default function CompactInteractiveTwin({
     // =========================================================================
     // 5. HỆ THỐNG DÂY CÁP, BÌNH ẮC QUY 12V VÀ DÒNG NĂNG LƯỢNG / TÍN HIỆU 3D
     // =========================================================================
+    // Cụm Nguồn Tổ Ong 12V (SMPS 12V Honeycomb Power Supply) đặt ngay dưới hộp điện
+    const psuTex = createHoneycombPsuTexture();
+    const psuMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      map: psuTex,
+      metalness: 0.78,
+      roughness: 0.28
+    });
+
+    const psuGroup = new THREE.Group();
+    psuGroup.position.set(0.08, 0.02, 0.05);
+    scene.add(psuGroup);
+
+    // Vỏ kim loại đục lỗ tổ ong của Nguồn 12V
+    const psuBody = new THREE.Mesh(
+      new RoundedBoxGeometry(1.12, 0.22, 0.68, 2, 0.01),
+      psuMat
+    );
+    psuBody.position.set(-0.06, 0.11, 0);
+    psuBody.castShadow = true;
+    psuBody.receiveShadow = true;
+    psuGroup.add(psuBody);
+
+    // Dãy domino đấu dây (Screw Terminal Block) ở đầu nguồn tổ ong + Đèn LED báo nguồn xanh lá
+    const psuTermBase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.16, 0.62),
+      matteBlackPrintMat
+    );
+    psuTermBase.position.set(0.54, 0.09, 0);
+    psuGroup.add(psuTermBase);
+
+    for (let t = -3; t <= 3; t++) {
+      const screw = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.016, 0.016, 0.025, 12),
+        chromeSteelMat
+      );
+      screw.position.set(0.54, 0.175, t * 0.075);
+      psuGroup.add(screw);
+    }
+
+    const psuLed = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0x22c55e })
+    );
+    psuLed.position.set(0.45, 0.225, 0.24);
+    psuGroup.add(psuLed);
+
     // Cụm Bình Ắc quy 12V đặt dọc (xoay 90 độ) bên cạnh/dưới tủ điện để nhận dòng sạc từ mạch sạc PWM
     const batteryGroup = new THREE.Group();
     batteryGroup.position.set(1.56, 0.02, -0.45);
@@ -1453,7 +1548,38 @@ export default function CompactInteractiveTwin({
       'battery_neg'
     );
 
-    // --- B. TƯƠNG TÁC NỘI BỘ TRONG TỦ ĐIỆN (LUÔN HOẠT ĐỘNG KHI HỆ THỐNG BẬT) ---
+    // --- B. TƯƠNG TÁC NỘI BỘ TRONG TỦ ĐIỆN & NGUỒN TỔ ONG 12V DƯỚI HỘP ĐIỆN ---
+    // B0. Mạch 2 dây (Dương Đỏ V+ và Âm Đen V-) từ Nguồn Tổ Ong 12V dưới gầm -> Cấp lên hộp điện (nuôi Driver & Hệ thống)
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(0.62, 0.19, 0.16),            // Cọc V+ trên domino Nguồn tổ ong 12V
+        new THREE.Vector3(0.68, frameY + 0.02, 0.22),
+        new THREE.Vector3(0.42, frameY + 0.28, 0.22)    // Lên cụm Driver & mạch nguồn trong hộp điện
+      ],
+      0xdc2626, // Dây Dương (+) màu đỏ từ nguồn tổ ong 12V
+      0xf43f5e,
+      0.011,
+      3,
+      0.34,
+      'internal_power'
+    );
+
+    createAnimatedFlowPath(
+      scene,
+      [
+        new THREE.Vector3(0.42, frameY + 0.26, 0.14),   // Từ mass chung trong hộp điện
+        new THREE.Vector3(0.68, frameY + 0.01, 0.08),
+        new THREE.Vector3(0.62, 0.19, 0.04)             // Về cọc V- (COM) trên domino Nguồn tổ ong 12V
+      ],
+      0x18181b, // Dây Âm (-) màu đen về nguồn tổ ong 12V
+      0x38bdf8,
+      0.011,
+      3,
+      0.34,
+      'internal_power'
+    );
+
     // B1. Cấp nguồn từ Bình Ắc quy / Mạch PWM -> ESP32-S3 & 2 Driver Động cơ Stepper
     createAnimatedFlowPath(
       boxGroup,
@@ -1637,9 +1763,10 @@ export default function CompactInteractiveTwin({
         return;
       }
 
-      // 3. Nhấn vào Hộp điện hoặc Bình Ắc quy -> Mở nắp hộp, Zoom vào bên trong Hộp điện & Hiện thông số Hộp điện
+      // 3. Nhấn vào Hộp điện, Nguồn tổ ong 12V hoặc Bình Ắc quy -> Mở nắp hộp, Zoom vào bên trong Hộp điện & Hiện thông số Hộp điện
       if (
         raycaster.intersectObjects(boxGroup.children, true).length > 0 ||
+        raycaster.intersectObjects(psuGroup.children, true).length > 0 ||
         raycaster.intersectObjects(batteryGroup.children, true).length > 0
       ) {
         setIsBoxOpen(true);
