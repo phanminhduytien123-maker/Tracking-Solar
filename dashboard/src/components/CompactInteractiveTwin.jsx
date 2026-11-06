@@ -1255,30 +1255,30 @@ export default function CompactInteractiveTwin({
     // =========================================================================
     // Cụm Bình Ắc quy 12V đặt dọc (xoay 90 độ) bên cạnh/dưới tủ điện để nhận dòng sạc từ mạch sạc PWM
     const batteryGroup = new THREE.Group();
-    batteryGroup.position.set(1.52, 0.02, -0.45);
+    batteryGroup.position.set(1.56, 0.02, -0.45);
     batteryGroup.rotation.y = Math.PI / 2;
     scene.add(batteryGroup);
 
     const batBody = new THREE.Mesh(
-      new RoundedBoxGeometry(0.56, 0.36, 0.34, 2, 0.012),
+      new RoundedBoxGeometry(0.76, 0.48, 0.46, 2, 0.015),
       matteBlackPrintMat
     );
-    batBody.position.set(0, 0.18, 0);
+    batBody.position.set(0, 0.24, 0);
     batBody.castShadow = true;
     batteryGroup.add(batBody);
 
     const batCap = new THREE.Mesh(
-      new RoundedBoxGeometry(0.57, 0.05, 0.35, 2, 0.008),
+      new RoundedBoxGeometry(0.78, 0.06, 0.48, 2, 0.01),
       pcbBlueMat
     );
-    batCap.position.set(0, 0.37, 0);
+    batCap.position.set(0, 0.49, 0);
     batteryGroup.add(batCap);
 
     // Cọc dương (+) đỏ và Cọc âm (-) đen của Ắc quy
-    const termPos = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 16), wireRedMat);
-    termPos.position.set(-0.18, 0.41, 0.08);
-    const termNeg = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 16), blackAnodizedMat);
-    termNeg.position.set(0.18, 0.41, 0.08);
+    const termPos = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.06, 16), wireRedMat);
+    termPos.position.set(-0.24, 0.54, 0.10);
+    const termNeg = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.06, 16), blackAnodizedMat);
+    termNeg.position.set(0.24, 0.54, 0.10);
     batteryGroup.add(termPos, termNeg);
 
     // Hàm tạo đường cáp kèm hạt xung năng lượng chạy dọc theo chiều dài dây
@@ -1427,8 +1427,8 @@ export default function CompactInteractiveTwin({
       scene,
       [
         new THREE.Vector3(0.08, frameY + 0.36, -0.26), // Cổng BATT (+) của mạch sạc Solar PWM
-        new THREE.Vector3(0.88, frameY + 0.26, -0.26),
-        new THREE.Vector3(1.60, 0.43, -0.27)           // Cọc Dương (+) màu đỏ của Bình Ắc quy 12V
+        new THREE.Vector3(0.88, frameY + 0.30, -0.22),
+        new THREE.Vector3(1.66, 0.56, -0.21)           // Cọc Dương (+) màu đỏ của Bình Ắc quy 12V
       ],
       0xdc2626, // Dây Dương (+) màu đỏ
       0x22c55e,
@@ -1441,8 +1441,8 @@ export default function CompactInteractiveTwin({
     createAnimatedFlowPath(
       scene,
       [
-        new THREE.Vector3(1.60, 0.43, -0.63),          // Cọc Âm (-) màu đen của Bình Ắc quy 12V
-        new THREE.Vector3(0.88, frameY + 0.24, -0.58),
+        new THREE.Vector3(1.66, 0.56, -0.69),          // Cọc Âm (-) màu đen của Bình Ắc quy 12V
+        new THREE.Vector3(0.88, frameY + 0.28, -0.62),
         new THREE.Vector3(0.16, frameY + 0.34, -0.32)  // Cổng BATT (-) / GND của mạch sạc Solar PWM
       ],
       0x18181b, // Dây Âm (-) màu đen nối vào cọc đen ắc quy
