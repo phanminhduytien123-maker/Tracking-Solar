@@ -859,6 +859,44 @@ export default function App() {
     }));
   };
 
+  const handleSetLampAutoDisabled = (disabled) => {
+    const disBool = Boolean(disabled);
+    localStorage.setItem('solar_lamp_auto_disabled', disBool ? 'true' : 'false');
+    localStorage.setItem('solar_lamp_manual_state', 'false');
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setLampAutoDisabled(disBool);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        lampAutoDisabled: disBool,
+        lampManualState: false,
+        lamp12vOn: false,
+        lampRemainSec: disBool ? null : (prev.system?.isSleeping && !prev.system?.sleepDisabled ? 900 : null)
+      }
+    }));
+  };
+
+  const handleSetLampManualState = (on) => {
+    const onBool = Boolean(on);
+    localStorage.setItem('solar_lamp_auto_disabled', 'true');
+    localStorage.setItem('solar_lamp_manual_state', onBool ? 'true' : 'false');
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setLampManualState(onBool);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        lampAutoDisabled: true,
+        lampManualState: onBool,
+        lamp12vOn: onBool,
+        lampRemainSec: null
+      }
+    }));
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -1110,6 +1148,8 @@ export default function App() {
         onTestWake={handleTestWake}
         onResumeReal={handleResumeReal}
         onSetSleepDisabled={handleSetSleepDisabled}
+        onSetLampAutoDisabled={handleSetLampAutoDisabled}
+        onSetLampManualState={handleSetLampManualState}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
       />
@@ -1155,6 +1195,8 @@ export default function App() {
         targetEditDate={targetEditDate}
         onSetSleepDisabled={handleSetSleepDisabled}
         onSetRelayInterval={handleSetRelayInterval}
+        onSetLampAutoDisabled={handleSetLampAutoDisabled}
+        onSetLampManualState={handleSetLampManualState}
       />
 
       {/* 4. FOOTER */}

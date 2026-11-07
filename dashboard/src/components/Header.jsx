@@ -190,8 +190,41 @@ export default function Header({
             </div>
 
             {/* Đồng hồ thực địa */}
-            <div className="hidden lg:block text-zinc-600 dark:text-slate-300 font-medium">
+            <div className="text-zinc-600 dark:text-slate-300 font-medium">
               <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
+            </div>
+
+            {/* Trạng thái Đèn 12V (Relay Kênh 5 - Relay E) đặt ngay cạnh Đồng hồ */}
+            <div className="flex items-center gap-1.5">
+              <span>Đèn 12V:</span>
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs font-bold border ${
+                  system?.lamp12vOn
+                    ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+                    : 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block w-2 h-2 rounded-full ${
+                    system?.lamp12vOn
+                      ? 'bg-amber-500 dark:bg-amber-400 animate-pulse'
+                      : 'bg-zinc-400 dark:bg-slate-500'
+                  }`}
+                />
+                <span>{system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}</span>
+                {system?.lampAutoDisabled ? (
+                  <span className="font-normal text-[11px] opacity-85">(Thủ công)</span>
+                ) : (
+                  system?.lampRemainSec !== null &&
+                  system?.lampRemainSec !== undefined &&
+                  system?.lampRemainSec > 0 && (
+                    <span className="font-mono font-semibold text-[11px] opacity-90">
+                      ({Math.floor(Number(system.lampRemainSec) / 60).toString().padStart(2, '0')}:
+                      {(Number(system.lampRemainSec) % 60).toString().padStart(2, '0')})
+                    </span>
+                  )
+                )}
+              </span>
             </div>
 
             {/* Nhiệt độ RTC DS3231 */}

@@ -35,7 +35,9 @@ export default function SettingsModal({
   onLoadRealisticDataset = null,
   targetEditDate = null,
   onSetSleepDisabled = null,
-  onSetRelayInterval = null
+  onSetRelayInterval = null,
+  onSetLampAutoDisabled = null,
+  onSetLampManualState = null
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
@@ -676,6 +678,118 @@ void loop() {
                         >
                           Lưu &amp; Áp dụng chu kỳ
                         </button>
+                      </div>
+                    </div>
+
+                    {/* 3. Đèn 12V (Relay Kênh 5 - Relay E): Vô hiệu hóa tự động & Bật/Tắt đèn bằng tay */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-zinc-900 block">
+                            3. Điều khiển Đèn 12V (Relay Kênh 5 / Kênh E - GPIO 42)
+                          </span>
+                          <span className="text-[11px] text-zinc-600 block">
+                            {latestTelemetry?.system?.lampAutoDisabled
+                              ? 'Đang BẬT vô hiệu hóa tự động: Đèn tự động tắt khi mới kích hoạt; cho phép bật/tắt đèn 12V bằng tay bên dưới.'
+                              : 'Đang ở chế độ Tự động: Khi tắt vô hiệu hóa tự động, đèn TẮT ngay và đếm 15 phút để BẬT, tiếp tục chu kỳ 15p Bật / 15p Tắt khi hệ thống ngủ.'}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-sm border text-xs font-bold ${
+                            latestTelemetry?.system?.lamp12vOn
+                              ? 'bg-amber-100 border-amber-300 text-amber-900'
+                              : 'bg-zinc-100 border-zinc-300 text-zinc-700'
+                          }`}
+                        >
+                          Đèn 12V: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                        </span>
+                      </div>
+
+                      {/* Nút Bật / Tắt Vô hiệu hóa bật tắt đèn tự động */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-zinc-100">
+                        <span className="text-xs font-semibold text-zinc-800">
+                          Chế độ Vô hiệu hóa bật/tắt đèn tự động:
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetLampAutoDisabled && onSetLampAutoDisabled(true);
+                              setHwConfigFeedback('Đã BẬT vô hiệu hóa đèn tự động: Đèn 12V đã chuyển về TẮT và mở khóa nút Bật/Tắt bằng tay!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                              latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
+                            }`}
+                          >
+                            BẬT Vô hiệu hóa (Chỉnh tay)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetLampAutoDisabled && onSetLampAutoDisabled(false);
+                              setHwConfigFeedback('Đã TẮT vô hiệu hóa tự động: Đèn 12V đã TẮT và bắt đầu đếm lại 15 phút để BẬT theo chu kỳ!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
+                            }`}
+                          >
+                            TẮT Vô hiệu hóa (Tự động 15p)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Nút Bật / Tắt Đèn 12V bằng tay (chỉ khả dụng khi đã BẬT Vô hiệu hóa tự động) */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-zinc-100">
+                        <div>
+                          <span className="text-xs font-semibold text-zinc-800 block">
+                            Bật / Tắt Đèn 12V bằng tay:
+                          </span>
+                          <span className="text-[11px] text-zinc-500">
+                            {latestTelemetry?.system?.lampAutoDisabled
+                              ? 'Đang mở khóa điều khiển tay — Nhấn để Bật hoặc Tắt đèn 12V ngay lập tức.'
+                              : 'Cần nhấn [BẬT Vô hiệu hóa (Chỉnh tay)] ở trên để bật/tắt đèn bằng tay.'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
+                            onClick={() => {
+                              onSetLampManualState && onSetLampManualState(true);
+                              setHwConfigFeedback('Đã gửi lệnh BẬT ĐÈN 12V (Relay Kênh 5) bằng tay!');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                                : latestTelemetry?.system?.lamp12vOn
+                                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs cursor-pointer'
+                                  : 'bg-white text-zinc-800 hover:bg-emerald-50 border-zinc-300 cursor-pointer'
+                            }`}
+                          >
+                            BẬT ĐÈN 12V
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
+                            onClick={() => {
+                              onSetLampManualState && onSetLampManualState(false);
+                              setHwConfigFeedback('Đã gửi lệnh TẮT ĐÈN 12V (Relay Kênh 5) bằng tay!');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                                : !latestTelemetry?.system?.lamp12vOn
+                                  ? 'bg-zinc-800 text-white border-zinc-900 shadow-xs cursor-pointer'
+                                  : 'bg-white text-zinc-800 hover:bg-zinc-100 border-zinc-300 cursor-pointer'
+                            }`}
+                          >
+                            TẮT ĐÈN 12V
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
