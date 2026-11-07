@@ -1899,12 +1899,13 @@ void runPsoOptimization() {
 
   for (int iter = 0; iter < PSO_MAX_ITER; iter++) {
     for (int i = 0; i < PSO_SWARM_SIZE; i++) {
+      const float gBestArr[3] = {gBestAz.kp, gBestAz.ki, gBestAz.kd};
       for (int d = 0; d < 3; d++) {
         float r1 = (float)random(0, 1000) / 1000.0f;
         float r2 = (float)random(0, 1000) / 1000.0f;
         pVel[i][d] = PSO_W_INERTIA * pVel[i][d] +
                      PSO_C1_COG * r1 * (pBestPos[i][d] - pPos[i][d]) +
-                     PSO_C2_SOC * r2 * (gBestAz.kp - pPos[i][d]);
+                     PSO_C2_SOC * r2 * (gBestArr[d] - pPos[i][d]);
         pPos[i][d] += pVel[i][d];
       }
 
@@ -4103,13 +4104,12 @@ void setup() {
   Serial.println(">> [OTA OK] San sang nhan nap firmware qua WiFi (Port 3232, "
                  "Host: esp32-solar-tracker.local)!");
 
-  // 10. TỰ ĐỘNG DUAL AUTO HOMING KHI CẤP ĐIỆN (CHỐT SWITCH -> VỀ VỊ TRÍ MẶC
-  // ĐỊNH -> HANDS-FREE 30 NGÀY)
+  // 10. TỰ ĐỘNG DUAL HOMING VỀ CÔNG TẮC HÀNH TRÌNH KHI CẤP ĐIỆN (CHỐT SWITCH 0° -> HANDS-FREE 30 NGÀY)
   Serial.println("\n=======================================================");
   Serial.println(
-      ">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU DUAL AUTO HOMING...");
+      ">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU DUAL HOMING TO SWITCHES...");
   Serial.println("=======================================================");
-  runDualAutoHoming();
+  runDualHomingToSwitches();
 
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
@@ -5789,10 +5789,10 @@ void loop() {
 
               // ĐÁNH GIÁ ĐIỀU KIỆN ỔN ĐỊNH CÂN BẰNG:
               if (m1Reached && m2Reached && motorsStopped) {
-                if (azHitMax) {
+                if (azHitMax && azSun > 180.0f && elSun < 15.0f) {
                   isMaxAzimuthReached = true;
                   Serial.printf("\n>> [MAX ANGLE REACHED] Gian pin da dat goc "
-                                "toi da cho phep (Phi=%+.1f° >= %+.1f°). DUNG "
+                                "toi da cho phep cuoi chieu (Phi=%+.1f° >= %+.1f°). DUNG "
                                 "IM GIU BUOC DEN %02d:00!\n",
                                 getAngleDeg1(), maxAzLimit, NIGHT_SLEEP_START_HOUR);
                 } else {
@@ -5833,11 +5833,11 @@ void loop() {
         // Khi motor đang quay RA XA Home (tăng góc phi >= currentPos hoặc rampState COUNT_UP), TUYỆT ĐỐI KHÔNG PHANH!
         bool movingTowardHome1 = (stepper1->targetPos() < stepper1->getCurrentPosition()) ||
                                  ((stepper1->rampState() & RAMP_DIRECTION_MASK) == RAMP_DIRECTION_COUNT_DOWN);
-        if (stepper1->isRunning() && movingTowardHome1) {
+        if (stepper1->isRunning() && movingTowardHome1 && getAngleDeg1() <= 20.0f) {
           stepper1->forceStopAndNewPosition(0);
           resetEncoder1(0);
           stateM1 = STATE_IDLE;
-          Serial.println("\n>> [HOME TRIGGER TRUC 1] Dang quay ve Home va cham CTHT 1 -> DUNG KHAN CAP & SET GOC 0.0°!");
+          Serial.println("\n>> [HOME TRIGGER TRUC 1] Dang quay ve Home (<=20°) va cham CTHT 1 -> DUNG KHAN CAP & SET GOC 0.0°!");
         }
       }
     }

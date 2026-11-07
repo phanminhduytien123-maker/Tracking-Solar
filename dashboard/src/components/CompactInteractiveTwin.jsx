@@ -165,9 +165,12 @@ function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.666
 function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 4.5) {
   const azRad = THREE.MathUtils.degToRad(azimuthDeg);
   const elRad = THREE.MathUtils.degToRad(Math.max(2, elevationDeg));
-  const x = -radius * Math.cos(elRad) * Math.cos(azRad);
-  const y = radius * Math.sin(elRad) + 0.35;
-  const z = -radius * Math.cos(elRad) * Math.sin(azRad);
+  const sinEl = Math.sin(elRad);
+  const horizRadius = radius * Math.cos(elRad) * (1 - 0.16 * sinEl);
+  const centerXOffset = -1.55 * sinEl;
+  const x = centerXOffset - horizRadius * Math.cos(azRad);
+  const y = radius * sinEl + 0.75 * sinEl + 0.35;
+  const z = -horizRadius * Math.sin(azRad);
   return new THREE.Vector3(x, y, z);
 }
 
@@ -506,16 +509,27 @@ export default function CompactInteractiveTwin({
     const validEps = !isNaN(epsDeg) ? epsDeg : 9.3;
 
     // Góc nghiêng mặt pin quanh trục Z cục bộ (Zenith nằm ngang = 50°):
-    // - validEps < 50° (buổi sáng / ngủ đêm): tiltLeftDeg > 0 -> mặt pin nghiêng hướng về phía -X cục bộ
-    // - validEps > 50° (buổi chiều ngửa sau): tiltLeftDeg < 0 -> mặt pin nghiêng hướng về phía +X cục bộ
-    const tiltLeftDeg = Math.max(-48, Math.min(48, (50 - validEps) * 0.75));
+    // - Khi ngủ đêm hoặc về sát giới hạn mềm (validEps <= 12°): giữ nguyên góc nghiêng chuẩn (~30° về hướng Bắc)
+    // - Khi bám mặt trời ban ngày: tính góc nghiêng vuông góc (90°) với tia bức xạ Mặt trời NOAA
+    let tiltLeftDeg = 0;
+    const rawDelta = 50 - validEps;
+    if (system?.isSleeping || validEps <= 12) {
+      tiltLeftDeg = Math.max(-42, Math.min(42, rawDelta * 0.75));
+    } else if (Math.abs(rawDelta) > 0.8) {
+      const tiltSign = rawDelta >= 0 ? 1 : -1;
+      if (noaaSun?.isDaylight && !system?.isManualMode) {
+        const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
+        const rayHorizDist = Math.hypot(sunPos.x - (-2.05), sunPos.z);
+        const rayVertDist = Math.max(0.5, sunPos.y - 2.35);
+        const rayZenithDeg = THREE.MathUtils.radToDeg(Math.atan2(rayHorizDist, rayVertDist));
+        tiltLeftDeg = tiltSign * Math.min(41, Math.max(90 - noaaSun.elevationDeg, rayZenithDeg));
+      } else {
+        tiltLeftDeg = Math.max(-41, Math.min(41, rawDelta));
+      }
+    }
     targetAnglesRef.current.tiltRad = THREE.MathUtils.degToRad(tiltLeftDeg);
 
     // Xác định hướng xoay Trục 1 (azimuthGroup.rotation.y) sao cho Pháp tuyến mặt pin hướng đúng về Phương vị địa lý (Đông Nam buổi sáng / Tây Nam buổi chiều):
-    // Trong hệ 3D: Vector hướng theo góc la bàn Az là ( -cos(Az), 0, -sin(Az) ).
-    // Nếu mặt pin đang nghiêng về -X cục bộ (tiltLeftDeg >= 0), vector pháp tuyến chiếu xuống sàn của -X cục bộ khi xoay góc Y là ( -cos(Y), 0, sin(Y) ).
-    // Để ( -cos(Y), 0, sin(Y) ) trùng với ( -cos(Az), 0, -sin(Az) ) => Y = -Az (rad)!
-    // Ngược lại buổi chiều khi mặt pin ngửa sang +X cục bộ (tiltLeftDeg < 0), pháp tuyến chiếu xuống sàn là ( cos(Y), 0, -sin(Y) ) => Y = π - Az (rad).
     const azDeg = compassAzimuth !== null ? Number(compassAzimuth) : (180 - (Number(livePhi) || 0));
     const azRad = THREE.MathUtils.degToRad(azDeg);
     if (tiltLeftDeg >= 0) {
@@ -523,7 +537,7 @@ export default function CompactInteractiveTwin({
     } else {
       targetAnglesRef.current.phiRad = Math.PI - azRad;
     }
-  }, [livePhi, liveEps, compassAzimuth]);
+  }, [livePhi, liveEps, compassAzimuth, noaaSun, system?.isSleeping, system?.isManualMode]);
 
   // Đồng bộ vị trí Mặt trời NOAA trong không gian 3D
   useEffect(() => {
@@ -535,8 +549,9 @@ export default function CompactInteractiveTwin({
 
     const posAttr = sunRayLine.geometry.attributes.position;
     posAttr.setXYZ(0, sunPos.x, sunPos.y, sunPos.z);
-    posAttr.setXYZ(1, -2.05, 1.85, 0);
+    posAttr.setXYZ(1, -2.05, 2.35, 0);
     posAttr.needsUpdate = true;
+    sunRayLine.computeLineDistances();
 
     sunGroup.visible = true;
     sunRayLine.visible = noaaSun.isDaylight;
@@ -739,7 +754,7 @@ export default function CompactInteractiveTwin({
 
     const rayGeom = new THREE.BufferGeometry().setFromPoints([
       initSunPos,
-      new THREE.Vector3(-2.05, 1.85, 0)
+      new THREE.Vector3(-2.05, 2.35, 0)
     ]);
     const sunRayLine = new THREE.Line(
       rayGeom,
