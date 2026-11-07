@@ -179,8 +179,32 @@ export class FirebaseSolarService {
     this.lastStaticRawUpdate = null;
     this.lastStaticReceivedTime = 0;
     this.lastStaticUpdateCount = 0;
+    this.lastVocNodeRawUpdate = null;
+    this.lastVocNodeReceivedTime = 0;
     this.latestRawData = null;
     this.watchdogTimer = null;
+    this.pingTimer = null;
+    this.livePingMs = null;
+  }
+
+  async measureNetworkPing() {
+    if (!this.config || !this.config.databaseURL || !this.isConnected) return;
+    try {
+      const baseUrl = this.config.databaseURL.replace(/\/$/, '');
+      const t0 = performance.now();
+      const res = await fetch(`${baseUrl}/solar/config/site/rev.json?t=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const rtt = Math.max(1, Math.round(performance.now() - t0));
+        this.livePingMs = this.livePingMs !== null
+          ? Math.round(0.6 * this.livePingMs + 0.4 * rtt)
+          : rtt;
+      }
+    } catch (e) {
+      // Ignore transient fetch errors
+    }
   }
 
   init(config, callbacks = {}) {
@@ -235,6 +259,13 @@ export class FirebaseSolarService {
       }
     }, 500);
 
+    // 3b. Đo Ping thực tế định kỳ 3 giây/lần tới Firebase Cloud
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    setTimeout(() => this.measureNetworkPing(), 300);
+    this.pingTimer = setInterval(() => {
+      this.measureNetworkPing();
+    }, 3000);
+
     // 4. Lắng nghe node telemetry chính /solar
     this.solarRef = ref(this.db, 'solar');
 
@@ -274,6 +305,21 @@ export class FirebaseSolarService {
               this.lastTrackingRawUpdate = trkUpdate;
               this.lastTrackingReceivedTime = now;
               this.lastTrackingUpdateCount = (this.lastTrackingUpdateCount || 0) + 1;
+              if (data.tracking.server_time && Number(data.tracking.server_time) > 1700000000000) {
+                const wsLatency = Math.max(5, Math.min(999, Math.round(Math.abs((now + this.serverTimeOffset) - Number(data.tracking.server_time)))));
+                if (this.livePingMs === null) {
+                  this.livePingMs = wsLatency;
+                }
+              }
+            }
+          }
+
+          // Cập nhật mốc thời gian nhận dữ liệu mới cho Node Voc/Isc (ESP32 #2)
+          if (data.voc_isc_node) {
+            let vocUpdate = data.voc_isc_node.updated_at || data.voc_isc_node.cycles_count || now;
+            if (vocUpdate !== this.lastVocNodeRawUpdate || !this.lastVocNodeReceivedTime) {
+              this.lastVocNodeRawUpdate = vocUpdate;
+              this.lastVocNodeReceivedTime = now;
             }
           }
 
@@ -326,6 +372,10 @@ export class FirebaseSolarService {
     if (this.watchdogTimer) {
       clearInterval(this.watchdogTimer);
       this.watchdogTimer = null;
+    }
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
     }
     this.isConnected = false;
     this.onStatusChange({ connected: false, connecting: false });
@@ -928,6 +978,20 @@ export class FirebaseSolarService {
       }
     }
 
+    // Trạng thái kết nối của ESP32 #1 (Tracker + INA226) và ESP32 #2 (Node Voc/Isc & Đèn 12V)
+    const esp1Online = (trkConnStatus === 'LIVE');
+    let vocNodeAgeMs = Infinity;
+    if (this.lastVocNodeReceivedTime > 0) {
+      vocNodeAgeMs = Math.max(0, now - this.lastVocNodeReceivedTime);
+    } else if (vocIscNode.updated_at && Number(vocIscNode.updated_at) > 1700000000000) {
+      vocNodeAgeMs = Math.max(0, serverTimeNow - Number(vocIscNode.updated_at));
+    }
+    const esp2Online = Boolean(vocIscNode.online && vocNodeAgeMs <= 45000);
+
+    const computedPingMs = isSystemOnline
+      ? (this.livePingMs !== null ? this.livePingMs : 22)
+      : null;
+
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
       rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || now,
@@ -936,6 +1000,9 @@ export class FirebaseSolarService {
         source: sourceStatus, // 'device' | 'mock' | 'unknown'
         isMock: sourceStatus === 'mock',
         connStatus: trkConnStatus,
+        esp1Online,
+        esp2Online,
+        packetAgeMs: Number.isFinite(trkAgeMs) ? Math.round(trkAgeMs) : null,
         mode: tracking.mode || '--',
         state: rawState,
         displayState: resolvedSleepDisabled && isSleeping ? 'GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)' : displayState,
@@ -956,7 +1023,7 @@ export class FirebaseSolarService {
         isEmergencyCover: Boolean(tracking.emergencyActive),
         nightMode: Boolean(tracking.nightMode || isSleeping),
         rainWindSafeMode: Boolean(tracking.safeMode),
-        pingMs: isSystemOnline ? 15 : null,
+        pingMs: computedPingMs,
         ip: isSystemOnline ? 'Firebase Cloud' : 'Chưa kết nối',
         firmware: tracking.firmware || 'ESP32 Live Telemetry',
         uptimeSeconds: tracking.uptimeSeconds !== undefined ? Number(tracking.uptimeSeconds) : null,
