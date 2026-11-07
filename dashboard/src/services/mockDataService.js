@@ -9,11 +9,9 @@ export function generate30DaysHistory() {
     d.setDate(d.getDate() - i);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 
-    // Giả lập mẫu 1 ngày bị can thiệp tay và 1 ngày bị mất RTC để kiểm thử loại ngày
-    const isDayInvalid = (i === 4 || i === 12);
-    const reasons = i === 4 
-      ? ["MANUAL_JOG_AZ", "SITE_CHANGED_IN_EXPERIMENT"]
-      : (i === 12 ? ["RTC_LOST", "OSF_FLAG_TRIGGERED"] : []);
+    // Không tự động đánh dấu lỗi giả lập trên dữ liệu thật
+    const isDayInvalid = false;
+    const reasons = [];
 
     history.push({
       date: dateStr,

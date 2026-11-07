@@ -199,14 +199,21 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           let changed = false;
           parsed.forEach((item) => {
-            if (item && item.date === '03/11' && item.trackingWh > 100) {
-              item.trackingWh = parseFloat((item.trackingWh / 10).toFixed(1));
-              item.staticWh = parseFloat((item.staticWh / 10).toFixed(1));
-              item.trackingKwh = parseFloat((item.trackingWh / 1000).toFixed(3));
-              item.staticKwh = parseFloat((item.staticWh / 1000).toFixed(3));
-              item.diffWh = parseFloat((item.trackingWh - item.staticWh).toFixed(1));
-              item.diffKwh = parseFloat(((item.trackingWh - item.staticWh) / 1000).toFixed(3));
-              changed = true;
+            if (item && item.date === '03/11') {
+              if (item.severe_invalid) {
+                item.severe_invalid = false;
+                item.invalid_reasons = [];
+                changed = true;
+              }
+              if (item.trackingWh > 100) {
+                item.trackingWh = parseFloat((item.trackingWh / 10).toFixed(1));
+                item.staticWh = parseFloat((item.staticWh / 10).toFixed(1));
+                item.trackingKwh = parseFloat((item.trackingWh / 1000).toFixed(3));
+                item.staticKwh = parseFloat((item.staticWh / 1000).toFixed(3));
+                item.diffWh = parseFloat((item.trackingWh - item.staticWh).toFixed(1));
+                item.diffKwh = parseFloat(((item.trackingWh - item.staticWh) / 1000).toFixed(3));
+                changed = true;
+              }
             }
           });
           if (changed) {
