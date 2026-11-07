@@ -510,6 +510,15 @@ export class FirebaseSolarService {
       historyList = historyList.map(item => {
         if (customMap.has(item.date)) {
           const c = customMap.get(item.date);
+          // Nếu ngày đó đã có dữ liệu đo thật từ cảm biến (sample_count > 0):
+          // Luôn ưu tiên dữ liệu thật đã tính chuẩn, bỏ qua các giá trị lỗi cũ từ cache localStorage
+          if (item.sample_count > 0) {
+            const isStaleMockError = c.severe_invalid && !item.severe_invalid;
+            const isStaleLowWh = (c.trackingWh < 5.0 && item.trackingWh >= 5.0);
+            if (isStaleMockError || isStaleLowWh) {
+              return item;
+            }
+          }
           return { ...item, ...c };
         }
         return item;
