@@ -32,16 +32,18 @@ export default function VisualPanelsComparison({
   // - Sáng (Trước 12h): Heading = 180.0° - φ (Đón nắng Đông -> Nam).
   // - Chiều (Sau 12h): Heading = 360.0° - φ (Trục 1 quay Đông Bắc ~100°, Trục 2 ngửa sau đón nắng Tây).
   const compassAzimuth = (() => {
+    if (phiAngle !== null && phiAngle !== undefined && !isNaN(phiAngle)) {
+      const hour = new Date().getHours();
+      const isAfternoon = hour >= 12;
+      let azVal = isAfternoon ? (360.0 - Number(phiAngle)) : (180.0 - Number(phiAngle));
+      while (azVal < 0) azVal += 360.0;
+      while (azVal >= 360.0) azVal -= 360.0;
+      return Math.round(azVal * 10) / 10;
+    }
     if (az.currentAngle !== null && az.currentAngle !== undefined && !isNaN(az.currentAngle)) {
       return Number(az.currentAngle);
     }
-    if (phiAngle === null || phiAngle === undefined) return null;
-    const hour = new Date().getHours();
-    const isAfternoon = hour >= 12;
-    let azVal = isAfternoon ? (360.0 - phiAngle) : (180.0 - phiAngle);
-    while (azVal < 0) azVal += 360.0;
-    while (azVal >= 360.0) azVal -= 360.0;
-    return Math.round(azVal * 10) / 10;
+    return null;
   })();
 
   // Chỉ báo kết nối 2 tấm

@@ -436,18 +436,22 @@ export default function CompactInteractiveTwin({
     return calculateNoaaSolarPosition(new Date(), siteLat, siteLon, 7);
   }, [siteLat, siteLon, clockTick]);
 
-  // Phương vị địa lý thực tế (Compass Azimuth)
+  // Phương vị địa lý thực tế (Compass Azimuth):
+  // - Switch Home 1 đặt tại Nam (180°). Sáng (trước 12h): 180° - φ (Đông -> Đông Nam -> Nam).
+  // - Chiều (sau 12h): 360° - φ (kết hợp Trục 2 ngửa sau đón nắng Tây Nam -> Tây).
   const compassAzimuth = (() => {
+    if (livePhi !== null && livePhi !== undefined && !isNaN(livePhi)) {
+      const hour = new Date().getHours();
+      const isAfternoon = hour >= 12;
+      let azVal = isAfternoon ? (360.0 - livePhi) : (180.0 - livePhi);
+      while (azVal < 0) azVal += 360.0;
+      while (azVal >= 360.0) azVal -= 360.0;
+      return Math.round(azVal * 10) / 10;
+    }
     if (az.currentAngle !== null && az.currentAngle !== undefined && !isNaN(az.currentAngle)) {
       return Number(az.currentAngle);
     }
-    if (livePhi === null || livePhi === undefined) return null;
-    const hour = new Date().getHours();
-    const isAfternoon = hour >= 12;
-    let azVal = isAfternoon ? (360.0 - livePhi) : (180.0 - livePhi);
-    while (azVal < 0) azVal += 360.0;
-    while (azVal >= 360.0) azVal -= 360.0;
-    return Math.round(azVal * 10) / 10;
+    return null;
   })();
 
   const trkBadge = getConnectionStatusBadge(tracking.connStatus, tracking.staleDurationMs);
@@ -491,16 +495,35 @@ export default function CompactInteractiveTwin({
     targetAnglesRef.current.staPower = Math.max(0, Number(stat.power) || 0);
   }, [tracking.power, stat.power]);
 
-  // Đồng bộ góc quay 2 trục của tấm Tracker
+  // Đồng bộ góc quay 2 trục của tấm Tracker theo đúng hệ tọa độ La bàn 3D:
+  // - Trên (-Z) = Đông (90°), Phải (+X) = Nam (180°), Dưới (+Z) = Tây (270°), Trái (-X) = Bắc (0° / 360°)
+  // - Khi buổi sáng / ngủ đêm (ε < 50°): Mặt pin nghiêng về phía -X lokal (elevationGroup.rotation.z > 0),
+  //   do đó để hướng mặt tấm pin nhìn về góc phương vị Az (ví dụ Đông Nam ~130°), trục đứng cần xoay:
+  //   azimuthGroup.rotation.y = (90° - Az) hoặc khi tính trực tiếp từ cơ cấu (φ, ε):
+  //   Khi φ = 0° (Home Nam 180°) -> trục +X hướng về Bắc (-X thế giới), mặt nghiêng -X hướng về Nam (+X thế giới) -> phiRad = π - φ (hoặc +φ từ gốc Bắc).
   useEffect(() => {
-    const phiDeg = Number(livePhi) || 0;
-    targetAnglesRef.current.phiRad = THREE.MathUtils.degToRad(-phiDeg * 0.85);
-
     const epsDeg = Number(liveEps);
     const validEps = !isNaN(epsDeg) ? epsDeg : 9.3;
+
+    // Góc nghiêng mặt pin quanh trục Z cục bộ (Zenith nằm ngang = 50°):
+    // - validEps < 50° (buổi sáng / ngủ đêm): tiltLeftDeg > 0 -> mặt pin nghiêng hướng về phía -X cục bộ
+    // - validEps > 50° (buổi chiều ngửa sau): tiltLeftDeg < 0 -> mặt pin nghiêng hướng về phía +X cục bộ
     const tiltLeftDeg = Math.max(-48, Math.min(48, (50 - validEps) * 0.75));
     targetAnglesRef.current.tiltRad = THREE.MathUtils.degToRad(tiltLeftDeg);
-  }, [livePhi, liveEps]);
+
+    // Xác định hướng xoay Trục 1 (azimuthGroup.rotation.y) sao cho Pháp tuyến mặt pin hướng đúng về Phương vị địa lý (Đông Nam buổi sáng / Tây Nam buổi chiều):
+    // Trong hệ 3D: Vector hướng theo góc la bàn Az là ( -cos(Az), 0, -sin(Az) ).
+    // Nếu mặt pin đang nghiêng về -X cục bộ (tiltLeftDeg >= 0), vector pháp tuyến chiếu xuống sàn của -X cục bộ khi xoay góc Y là ( -cos(Y), 0, sin(Y) ).
+    // Để ( -cos(Y), 0, sin(Y) ) trùng với ( -cos(Az), 0, -sin(Az) ) => Y = -Az (rad)!
+    // Ngược lại buổi chiều khi mặt pin ngửa sang +X cục bộ (tiltLeftDeg < 0), pháp tuyến chiếu xuống sàn là ( cos(Y), 0, -sin(Y) ) => Y = π - Az (rad).
+    const azDeg = compassAzimuth !== null ? Number(compassAzimuth) : (180 - (Number(livePhi) || 0));
+    const azRad = THREE.MathUtils.degToRad(azDeg);
+    if (tiltLeftDeg >= 0) {
+      targetAnglesRef.current.phiRad = -azRad;
+    } else {
+      targetAnglesRef.current.phiRad = Math.PI - azRad;
+    }
+  }, [livePhi, liveEps, compassAzimuth]);
 
   // Đồng bộ vị trí Mặt trời NOAA trong không gian 3D
   useEffect(() => {
