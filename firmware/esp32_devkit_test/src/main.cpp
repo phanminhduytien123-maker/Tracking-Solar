@@ -2765,8 +2765,7 @@ void checkRemoteFirebaseCommands() {
 
     // 1. Kiểm tra ID lệnh - Bắt buộc phải có ID (Yêu cầu 3: bỏ lệnh thiếu ID)
     String cmdId = "";
-    json.get(jsonData, "id");
-    if (jsonData.success)
+    if (json.get(jsonData, "id"))
       cmdId = jsonData.stringValue;
 
     if (cmdId.length() == 0) {
@@ -2775,8 +2774,7 @@ void checkRemoteFirebaseCommands() {
 
     // 2. Kiểm tra cờ ack - Bỏ qua nếu lệnh đã ack xong (Yêu cầu 3)
     bool isAck = false;
-    json.get(jsonData, "ack");
-    if (jsonData.success)
+    if (json.get(jsonData, "ack"))
       isAck = jsonData.boolValue;
 
     if (isAck) {
@@ -2790,14 +2788,12 @@ void checkRemoteFirebaseCommands() {
 
     // 4. Kiểm tra thời hạn sống của lệnh (TTL - Time to Live, Yêu cầu 3)
     uint64_t cmdTimestamp = 0;
-    json.get(jsonData, "timestamp");
-    if (jsonData.success) {
+    if (json.get(jsonData, "timestamp")) {
       cmdTimestamp = (uint64_t)jsonData.doubleValue;
     }
 
     uint32_t ttlMs = 60000; // Mặc định 60 giây
-    json.get(jsonData, "ttl");
-    if (jsonData.success && jsonData.intValue > 0) {
+    if (json.get(jsonData, "ttl") && jsonData.intValue > 0) {
       ttlMs = (uint32_t)jsonData.intValue;
     }
 
@@ -2815,9 +2811,8 @@ void checkRemoteFirebaseCommands() {
     bool shouldAck = false;
     uint64_t newEmgTs = 0;
 
-    // 5. Kiểm tra cờ Dừng Khẩn Cấp (Chỉ kích hoạt khi cờ mới hơn lần xử lý trước - Yêu cầu 3)
-    json.get(jsonData, "emergency");
-    if (jsonData.success) {
+    // 5. Kiểm tra cờ Dừng Khẩn Cấp (CHỈ kích hoạt khi field "emergency" thực sự tồn tại trong JSON)
+    if (json.get(jsonData, "emergency")) {
       bool emgVal = jsonData.boolValue;
       if (cmdTimestamp > lastHandledEmergencyTs || lastHandledEmergencyTs == 0) {
         if (emgVal && !isEmergencyCoverActive) {
@@ -2832,15 +2827,16 @@ void checkRemoteFirebaseCommands() {
       }
     }
 
-    json.get(jsonData, "cmd");
-    if (jsonData.success) {
+    if (json.get(jsonData, "cmd")) {
       String cmd = jsonData.stringValue;
 
       // 1. DỪNG KHẨN CẤP / PHỦ BẠT & MỞ KHÓA
       if (cmd.equalsIgnoreCase("emergency_cover") ||
           cmd.equalsIgnoreCase("estop")) {
-        json.get(jsonData, "state");
-        bool st = jsonData.success ? jsonData.boolValue : true;
+        bool st = true;
+        if (json.get(jsonData, "state")) {
+          st = jsonData.boolValue;
+        }
         if (st && !isEmergencyCoverActive) {
           remoteEmergencyTrigger = true;
           shouldAck = true;
@@ -3077,6 +3073,10 @@ void checkRemoteFirebaseCommands() {
           executeCloudFOTA(fotaUrl, fotaVer);
           return;
         }
+      }
+      else {
+        Serial.printf(">> [REMOTE] Bo qua lenh khong thuoc Tracker (ESP32 #1): '%s'\n", cmd.c_str());
+        shouldAck = true;
       }
     }
 
