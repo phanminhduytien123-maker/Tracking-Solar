@@ -186,6 +186,31 @@ export default function VisualPanelsComparison({
                 </td>
               </tr>
 
+              {/* 3B. Áp hở mạch (Voc) & Dòng ngắn mạch (Isc) từ ESP32-S3 #2 */}
+              {(tracking.voc !== null || tracking.isc !== null || stat.voc !== null || stat.isc !== null) && (
+                <tr>
+                  <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">
+                    Áp hở mạch (V<sub>oc</sub>) / Dòng ngắn mạch (I<sub>sc</sub>)
+                  </td>
+                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
+                    <span>{formatValueOrDash(tracking.voc, 2, 'V')}</span>
+                    <span className="mx-1.5 text-zinc-400">/</span>
+                    <span>{formatValueOrDash(tracking.isc, 2, 'A')}</span>
+                    {tracking.panelTemp !== null && tracking.panelTemp !== undefined && (
+                      <span className="ml-2 text-xs text-zinc-500">({formatValueOrDash(tracking.panelTemp, 1, '°C')})</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-slate-100">
+                    <span>{formatValueOrDash(stat.voc, 2, 'V')}</span>
+                    <span className="mx-1.5 text-zinc-400">/</span>
+                    <span>{formatValueOrDash(stat.isc, 2, 'A')}</span>
+                    {stat.panelTemp !== null && stat.panelTemp !== undefined && (
+                      <span className="ml-2 text-xs text-zinc-500">({formatValueOrDash(stat.panelTemp, 1, '°C')})</span>
+                    )}
+                  </td>
+                </tr>
+              )}
+
               {/* 4. Năng lượng tích lũy hôm nay */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>

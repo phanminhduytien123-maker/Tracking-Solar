@@ -33,11 +33,22 @@ export default function SettingsModal({
   onAddDayData = null,
   onResetHistoryData = null,
   onLoadRealisticDataset = null,
-  targetEditDate = null
+  targetEditDate = null,
+  onSetSleepDisabled = null,
+  onSetRelayInterval = null
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
   const [isExperimentLocked, setIsExperimentLocked] = useState(() => localStorage.getItem('solar_experiment_locked') === 'true');
+  const [relaySecInput, setRelaySecInput] = useState(() => Number(latestTelemetry?.system?.relayIntervalSec || localStorage.getItem('solar_relay_interval_sec') || 10));
+  const [hwConfigFeedback, setHwConfigFeedback] = useState(null);
+
+  useEffect(() => {
+    const liveRelaySec = latestTelemetry?.system?.relayIntervalSec;
+    if (liveRelaySec && !isNaN(liveRelaySec)) {
+      setRelaySecInput(Number(liveRelaySec));
+    }
+  }, [latestTelemetry?.system?.relayIntervalSec]);
 
   // Sync initialTab if passed dynamically
   useEffect(() => {
@@ -516,6 +527,156 @@ void loop() {
                       >
                         {isExperimentLocked ? 'Đang khóa' : 'Đang mở'}
                       </button>
+                    </div>
+                  </div>
+
+                  {/* CẤU HÌNH PHẦN CỨNG: VÔ HIỆU HÓA NGỦ ĐÊM & TẦN SUẤT NHẢY RELAY ĐO VOC/ISC */}
+                  <div className="p-3.5 rounded-sm bg-blue-50/40 border border-blue-200 space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-blue-200/80 pb-2">
+                      <div>
+                        <span className="text-xs font-bold text-blue-950 block">
+                          Cấu hình Vận hành Ngủ đêm &amp; Chu kỳ Relay đo Voc / Isc
+                        </span>
+                        <span className="text-[11px] text-zinc-600 block">
+                          Đồng bộ trực tiếp xuống ESP32-S3 #1 (Tracker) và ESP32-S3 #2 (Node đo Voc/Isc)
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-sm text-[11px] font-bold border ${
+                        latestTelemetry?.system?.sleepDisabled
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      }`}>
+                        {latestTelemetry?.system?.sleepDisabled ? '● Đã tắt ngủ đêm (Giữ bước chiều)' : '● Ngủ tự động 18:00'}
+                      </span>
+                    </div>
+
+                    {hwConfigFeedback && (
+                      <div className="p-2 rounded-sm bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center justify-between">
+                        <span>{hwConfigFeedback}</span>
+                        <button
+                          type="button"
+                          onClick={() => setHwConfigFeedback(null)}
+                          className="text-emerald-700 hover:text-emerald-950 px-1.5 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 1. Nút bật/tắt vô hiệu hóa khả năng ngủ */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-zinc-900 block">
+                            1. Vô hiệu hóa khả năng ngủ trên hệ thống
+                          </span>
+                          <span className="text-[11px] text-zinc-600 block leading-relaxed">
+                            • Khi <b>BẬT</b>: Nếu đang trời tối, tấm pin lập tức quay về <b>giữ bước ở vị trí cuối cùng buổi chiều</b>; nếu đang trời sáng thì dù tới <b>18h vẫn không ngủ</b>.<br />
+                            • Khi <b>TẮT</b>: Hệ thống tự động về vị trí ngủ đêm an toàn từ 18:00 đến 04:00 sáng.
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetSleepDisabled && onSetSleepDisabled(true);
+                              setHwConfigFeedback('Đã BẬT vô hiệu hóa ngủ đêm: Tấm pin sẽ giữ bước ở vị trí cuối buổi chiều và không ngủ lúc 18h!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
+                              latestTelemetry?.system?.sleepDisabled
+                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
+                            }`}
+                          >
+                            BẬT (Không ngủ)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetSleepDisabled && onSetSleepDisabled(false);
+                              setHwConfigFeedback('Đã TẮT vô hiệu hóa ngủ đêm: Hệ thống sẽ tự động ngủ đêm lúc 18:00 như bình thường.');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
+                              !latestTelemetry?.system?.sleepDisabled
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
+                            }`}
+                          >
+                            TẮT (Ngủ 18h)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Điều chỉnh tần suất nhảy 1 chu kỳ Relay (Mặc định 10s) */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-zinc-900 block">
+                            2. Tần suất nhảy 1 chu kỳ Relay đo Voc &amp; Isc (Mặc định: 10s)
+                          </span>
+                          <span className="text-[11px] text-zinc-600 block">
+                            Relay chỉ nhảy khi <b>không trong giờ ngủ</b>. Trong giờ ngủ đêm, cả 4 Relay tự động khóa hoàn toàn (không nhảy).
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-sm bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
+                          Chu kỳ hiện tại: {latestTelemetry?.system?.relayIntervalSec || relaySecInput || 10} giây
+                        </span>
+                      </div>
+
+                      {/* Các mức chọn nhanh */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] text-zinc-500 mr-1">Chọn nhanh:</span>
+                        {[5, 10, 15, 30, 60, 120].map((sec) => {
+                          const isCurrent = Number(relaySecInput) === sec;
+                          return (
+                            <button
+                              key={sec}
+                              type="button"
+                              onClick={() => {
+                                setRelaySecInput(sec);
+                                onSetRelayInterval && onSetRelayInterval(sec);
+                                setHwConfigFeedback(`Đã cập nhật tần suất nhảy 1 chu kỳ Relay = ${sec} giây!`);
+                              }}
+                              className={`px-2.5 py-1 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-blue-700 text-white border-blue-800'
+                                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                              }`}
+                            >
+                              {sec}s{sec === 10 ? ' (Mặc định)' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Ô nhập tùy chỉnh + Nút Lưu */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <label className="text-xs font-semibold text-zinc-700 shrink-0">
+                          Tùy chỉnh (3 – 3600 giây):
+                        </label>
+                        <input
+                          type="number"
+                          min="3"
+                          max="3600"
+                          step="1"
+                          value={relaySecInput}
+                          onChange={(e) => setRelaySecInput(e.target.value)}
+                          className="w-24 bg-white border border-zinc-300 rounded-sm px-2.5 py-1 text-xs font-bold text-zinc-900 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const validSec = Math.max(3, Math.min(3600, Math.round(Number(relaySecInput) || 10)));
+                            setRelaySecInput(validSec);
+                            onSetRelayInterval && onSetRelayInterval(validSec);
+                            setHwConfigFeedback(`Đã lưu và áp dụng chu kỳ nhảy Relay = ${validSec} giây xuống hệ thống!`);
+                          }}
+                          className="px-3 py-1 rounded-sm text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
+                        >
+                          Lưu &amp; Áp dụng chu kỳ
+                        </button>
+                      </div>
                     </div>
                   </div>
 

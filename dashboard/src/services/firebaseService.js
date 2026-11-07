@@ -881,6 +881,10 @@ export class FirebaseSolarService {
         displayState,
         wakeAt,
         isSleeping,
+        sleepDisabled: Boolean(tracking.sleepDisabled),
+        relayIntervalSec: (tracking.relayIntervalSec !== undefined && tracking.relayIntervalSec !== null && !isNaN(tracking.relayIntervalSec))
+          ? Math.max(3, Number(tracking.relayIntervalSec))
+          : 10,
         holdRemainSec: (tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec))
           ? Number(tracking.holdRemainSec)
           : (rawState === 'HOLD_15M' ? (this._fallbackRemainSec || 900) : null),
@@ -913,6 +917,9 @@ export class FirebaseSolarService {
           voltage: trkVolt,
           current: trkCurr,
           power: trkPower,
+          voc: tracking.voc_trk !== undefined ? Number(tracking.voc_trk) : null,
+          isc: tracking.isc_trk !== undefined ? Number(tracking.isc_trk) : null,
+          panelTemp: tracking.temp_trk !== undefined ? Number(tracking.temp_trk) : null,
           energyWh: trkEnergyWh,
           energyKwh: trkEnergyWh !== null ? Number((trkEnergyWh / 1000).toFixed(3)) : null,
           online: isTrackingLive,
@@ -927,6 +934,9 @@ export class FirebaseSolarService {
           voltage: staVolt,
           current: staCurr,
           power: staPower,
+          voc: staticPanel.voc_sta !== undefined ? Number(staticPanel.voc_sta) : null,
+          isc: staticPanel.isc_sta !== undefined ? Number(staticPanel.isc_sta) : null,
+          panelTemp: staticPanel.temp_sta !== undefined ? Number(staticPanel.temp_sta) : null,
           energyWh: staEnergyWh,
           energyKwh: staEnergyWh !== null ? Number((staEnergyWh / 1000).toFixed(3)) : null,
           fixedAzimuth: fixedAz,
@@ -1100,6 +1110,50 @@ export class FirebaseSolarService {
 
   async resumeReal() {
     return this.sendCommand({ cmd: 'resume_real' });
+  }
+
+  async setSleepDisabled(disabled) {
+    const disBool = Boolean(disabled);
+    if (this.db) {
+      try {
+        await update(ref(this.db, 'solar/config/voc_isc'), {
+          sleep_disabled: disBool,
+          updated_at: Date.now()
+        });
+        await update(ref(this.db, 'solar/tracking'), {
+          sleepDisabled: disBool
+        });
+      } catch (e) {
+        console.warn('[Firebase setSleepDisabled update node warn]', e);
+      }
+    }
+    return this.sendCommand({
+      cmd: 'set_sleep_disabled',
+      disabled: disBool,
+      state: disBool
+    });
+  }
+
+  async setRelayInterval(intervalSec) {
+    const sec = Math.max(3, Math.min(3600, Math.round(Number(intervalSec) || 10)));
+    if (this.db) {
+      try {
+        await update(ref(this.db, 'solar/config/voc_isc'), {
+          relay_interval_sec: sec,
+          updated_at: Date.now()
+        });
+        await update(ref(this.db, 'solar/tracking'), {
+          relayIntervalSec: sec
+        });
+      } catch (e) {
+        console.warn('[Firebase setRelayInterval update node warn]', e);
+      }
+    }
+    return this.sendCommand({
+      cmd: 'set_relay_interval',
+      interval_sec: sec,
+      value: sec
+    });
   }
 
   async setEstop(enabled) {
