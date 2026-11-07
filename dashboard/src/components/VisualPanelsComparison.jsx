@@ -52,9 +52,16 @@ export default function VisualPanelsComparison({
 
   const hasValidGain = comparison.hasValidGain && comparison.percentGain !== null;
 
-  // Góc nghiêng mặt pin so với phương ngang (Horizontal Tilt β = 90° - ε) để vẽ sơ đồ mặt cắt nghiêng
-  const tiltDegFromHorizontal = epsAngle !== null && !isNaN(epsAngle) ? (90 - Number(epsAngle)) : 15;
-  const clampedTiltSvg = Math.max(-55, Math.min(55, tiltDegFromHorizontal));
+  // Góc nghiêng mặt pin so với phương ngang (Zenith nằm ngang = 50°) để vẽ sơ đồ mặt cắt nghiêng vuông góc 90° với tia nắng
+  const tiltDegFromHorizontal = (() => {
+    if (epsAngle === null || isNaN(epsAngle)) return 25;
+    const rawDelta = Math.abs(Number(epsAngle) - 50);
+    if (system?.isSleeping || Number(epsAngle) <= 12) return 30;
+    // Nếu firmware cũ đang nén tỷ lệ 40/90 (rawDelta ~ 13.5° lúc 10h40), khôi phục góc nghiêng thực tế
+    const effectiveTilt = rawDelta > 0 && rawDelta < 20 ? rawDelta * (90 / 40) : rawDelta;
+    return Math.max(8, Math.min(42, effectiveTilt));
+  })();
+  const clampedTiltSvg = Math.max(-45, Math.min(45, tiltDegFromHorizontal));
 
   return (
     <div className="lab-card p-4 sm:p-5 space-y-4">
@@ -321,16 +328,9 @@ export default function VisualPanelsComparison({
               </svg>
             </div>
 
-            {/* SVG 2: Minh họa góc ngửa mặt cắt nghiêng (Side-view Elevation ε & Tia nắng) */}
+            {/* SVG 2: Minh họa góc ngửa mặt cắt nghiêng (Side-view Elevation ε & Tia nắng vuông góc 90°) */}
             <div className="flex flex-col items-center w-full">
               <svg viewBox="0 0 160 72" className="w-36 h-16">
-                {/* Mặt trời nhỏ & tia bức xạ chuyển động nhẹ */}
-                <g className="animate-pulse-slow">
-                  <circle cx="24" cy="16" r="6" className="fill-amber-400/90 stroke-amber-500" strokeWidth="1" />
-                </g>
-                <line x1="34" y1="20" x2="66" y2="32" className="stroke-amber-400/70 dark:stroke-amber-300/60 animate-solar-ray" strokeWidth="1.2" strokeDasharray="3,3" />
-                <line x1="30" y1="26" x2="62" y2="38" className="stroke-amber-400/50 dark:stroke-amber-300/40 animate-solar-ray" strokeWidth="1" strokeDasharray="3,3" />
-
                 {/* Mặt đất và trụ đỡ cơ khí */}
                 <line x1="20" y1="64" x2="140" y2="64" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="1.5" />
                 <path d="M76 64 L80 38 L84 64 Z" className="fill-slate-300 dark:fill-slate-600" />
@@ -340,11 +340,22 @@ export default function VisualPanelsComparison({
                   <line x1="-28" y1="0" x2="28" y2="0" stroke="#ea580c" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.75" />
                 </g>
 
-                {/* Tấm pin Tracker nghiêng theo góc thực tế ε */}
+                {/* Tấm pin Tracker & Tia nắng chiếu vuông góc 90° với bề mặt tấm pin */}
                 <g
                   transform={`translate(80, 38) rotate(${-clampedTiltSvg})`}
                   style={{ transition: 'transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)' }}
                 >
+                  {!system?.isSleeping && (
+                    <g>
+                      <g className="animate-pulse-slow">
+                        <circle cx="0" cy="-27" r="5.5" className="fill-amber-400/90 stroke-amber-500" strokeWidth="1" />
+                      </g>
+                      <line x1="-5" y1="-19" x2="-5" y2="-4" className="stroke-amber-400/80 dark:stroke-amber-300/70 animate-solar-ray" strokeWidth="1.2" strokeDasharray="2.5,2.5" />
+                      <line x1="5" y1="-19" x2="5" y2="-4" className="stroke-amber-400/60 dark:stroke-amber-300/50 animate-solar-ray" strokeWidth="1" strokeDasharray="2.5,2.5" />
+                      {/* Ký hiệu góc vuông 90° giữa tia bức xạ và mặt tấm pin */}
+                      <polyline points="0,-7.5 5,-7.5 5,-2.5" fill="none" className="stroke-amber-500/80 dark:stroke-amber-300/80" strokeWidth="0.9" />
+                    </g>
+                  )}
                   <rect x="-30" y="-2.5" width="60" height="5" rx="1.5" className="fill-blue-600 dark:fill-sky-400" />
                   <line x1="-15" y1="-2.5" x2="-15" y2="2.5" className="stroke-white/40 dark:stroke-slate-900/50" strokeWidth="0.8" />
                   <line x1="0" y1="-2.5" x2="0" y2="2.5" className="stroke-white/40 dark:stroke-slate-900/50" strokeWidth="0.8" />

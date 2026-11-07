@@ -421,8 +421,11 @@ export class FirebaseSolarService {
     Object.values(byDay).forEach((dayInfo) => {
       const idx = dateIndexMap.get(dayInfo.date);
       if (idx !== undefined) {
-        let trkWh = dayInfo.maxTrk;
-        let staWh = dayInfo.maxSta;
+        // Tự động nhận diện định dạng dữ liệu:
+        // - Nếu các mẫu ghi là biến thiên công suất/năng lượng 1 phút (maxTrk < 5.0 Wh như ngày 06/11): tính tổng sumTrk
+        // - Nếu là bản ghi tích lũy tổng cuối ngày (maxTrk >= 5.0 Wh): lấy maxTrk
+        let trkWh = dayInfo.maxTrk < 5.0 ? dayInfo.sumTrk : dayInfo.maxTrk;
+        let staWh = dayInfo.maxSta < 5.0 ? dayInfo.sumSta : dayInfo.maxSta;
 
         if (dayInfo.date === todayStr && trackingData && trackingData.dailyEnergyWh) {
           const liveTrkWh = Number(trackingData.dailyEnergyWh || 0);
@@ -448,6 +451,8 @@ export class FirebaseSolarService {
           diffWh,
           diffKwh,
           gainPercent: gain,
+          severe_invalid: false, // Dữ liệu thật từ cảm biến đo đạc -> gỡ bỏ cờ lỗi
+          invalid_reasons: [],
           voc_trk: dayInfo.maxVocTrk > 0 ? parseFloat(dayInfo.maxVocTrk.toFixed(2)) : (historyList[idx]?.voc_trk || 0),
           voc_sta: dayInfo.maxVocSta > 0 ? parseFloat(dayInfo.maxVocSta.toFixed(2)) : (historyList[idx]?.voc_sta || 0),
           isc_trk: dayInfo.maxIscTrk > 0 ? parseFloat(dayInfo.maxIscTrk.toFixed(2)) : (historyList[idx]?.isc_trk || 0),

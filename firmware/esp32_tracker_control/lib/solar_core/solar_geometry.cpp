@@ -51,21 +51,21 @@ bool SolarGeometry::computeAxisTargets(const SolarPosition& sun_pos,
     if (zenith_el_deg > 70.0f) zenith_el_deg = 70.0f;
 
     if (az_s <= base_az_deg) {
-        // Buổi sáng: Trục 1 đón nắng Đông -> Nam, Trục 2 nghiêng sườn trước đón Đông (tiến về phía switch 90°)
+        // Buổi sáng: Trục 1 đón nắng Đông -> Nam, Trục 2 nghiêng vuông góc 1:1 (90°) với tia nắng (tiến về phía switch 90°)
         phi_raw = base_az_deg - az_s;
-        eps_raw = zenith_el_deg + delta_zenith * ((CFG_J_EL_HOME_SW_DEG - zenith_el_deg) / 90.0f);
+        eps_raw = zenith_el_deg + delta_zenith;
     } else {
-        // Buổi chiều: Trục 1 quay sang Đông Bắc, Trục 2 NGỬA LẬT RA SAU đón nắng Tây (tiến về phía 10°)
+        // Buổi chiều: Trục 1 quay sang Đông Bắc, Trục 2 NGỬA LẬT RA SAU vuông góc 1:1 (90°) đón nắng Tây (tiến về phía 10°)
         phi_raw = 360.0f - az_s;
-        eps_raw = zenith_el_deg - delta_zenith * ((zenith_el_deg - CFG_L_EL_MIN_SOFT_LIMIT_DEG) / 90.0f);
+        eps_raw = zenith_el_deg - delta_zenith;
     }
     out_target_az.feedforward_deg = phi_raw;
     out_target_el.feedforward_deg = eps_raw;
 
-    // 2. Kẹp góc mềm trục Azimuth (Trục 1): [0.0°, CFG_I_AZ_MAX_SOFT_LIMIT_DEG]
+    // 2. Kẹp góc mềm trục Azimuth (Trục 1): [0.0°, min(CFG_I_AZ_MAX_SOFT_LIMIT_DEG, 300.0°)]
     // Nếu góc nằm ngoài phạm vi hành trình trục, kẹp lại an toàn chống xoắn cáp
     float min_az_allowed = 0.0f;
-    float max_az_allowed = CFG_I_AZ_MAX_SOFT_LIMIT_DEG;
+    float max_az_allowed = std::min(CFG_I_AZ_MAX_SOFT_LIMIT_DEG, 300.0f);
     float phi_clamped = phi_raw;
     if (phi_raw < min_az_allowed) {
         phi_clamped = min_az_allowed;
