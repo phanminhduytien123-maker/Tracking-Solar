@@ -760,9 +760,21 @@ export class FirebaseSolarService {
       : 90.0;
     const softLimitStatus = tracking.soft_limit_status || 'VALID';
 
-    // AZ la bàn: G + H + φ do firmware gửi
-    const compassAzimuth = tracking.azimuthAngle !== undefined ? Number(tracking.azimuthAngle) : (curPhi !== null ? Number((180.0 + curPhi).toFixed(1)) : null);
-    const compassTarget = tracking.targetAzimuth !== undefined ? Number(tracking.targetAzimuth) : (tgtPhi !== null ? Number((180.0 + tgtPhi).toFixed(1)) : null);
+    // AZ la bàn địa lý thực tế (Compass Azimuth):
+    // - Switch Home 1 đặt tại Nam (180.0°). Khi φ tăng (0° -> 90°), giàn pin quay ngược chiều KĐH từ Nam (180°) về phía Đông (90°).
+    // - Buổi sáng (trước 12h): Phương vị thực tế = 180.0° - φ (ví dụ φ = 50° -> 130° Đông Nam).
+    // - Buổi chiều (sau 12h): Trục 1 giữ hướng Đông Bắc (360° - φ) và Trục 2 ngửa về sau đón nắng Tây Nam.
+    const calcCompassFromPhi = (phiVal) => {
+      if (phiVal === null || phiVal === undefined || isNaN(phiVal)) return null;
+      const hour = new Date().getHours();
+      const isAfternoon = hour >= 12;
+      let azVal = isAfternoon ? (360.0 - Number(phiVal)) : (180.0 - Number(phiVal));
+      while (azVal < 0) azVal += 360.0;
+      while (azVal >= 360.0) azVal -= 360.0;
+      return Number(azVal.toFixed(1));
+    };
+    const compassAzimuth = tracking.azimuthAngle !== undefined ? Number(tracking.azimuthAngle) : calcCompassFromPhi(curPhi);
+    const compassTarget = tracking.targetAzimuth !== undefined ? Number(tracking.targetAzimuth) : calcCompassFromPhi(tgtPhi);
     const compassCalibrated = Boolean(tracking.compass_calibrated || (tracking.g_verified && tracking.h_verified));
 
     // 7. CẢM BIẾN QUANG TEMT6000 & TRẠNG THÁI ÁNH SÁNG
