@@ -165,17 +165,69 @@ export default function Header({
               </span>
             </div>
 
-            {/* Trạng thái kết nối */}
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                {isOnline && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            {/* Trạng thái kết nối & Đo Ping thời gian thực */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span>Kết nối:</span>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xs font-bold border ${
+                  isOnline
+                    ? system?.connStatus === 'STALE'
+                      ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40'
+                    : 'bg-red-100 text-red-800 border-red-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40'
+                }`}
+              >
+                <span className="relative flex h-2 w-2">
+                  {isOnline && (
+                    <span
+                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        system?.connStatus === 'STALE' ? 'bg-amber-400' : 'bg-emerald-400'
+                      }`}
+                    />
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      isOnline
+                        ? system?.connStatus === 'STALE'
+                          ? 'bg-amber-500 dark:bg-amber-400'
+                          : 'bg-emerald-600 dark:bg-emerald-400'
+                        : 'bg-red-600 dark:bg-rose-400'
+                    }`}
+                  />
+                </span>
+                <span>
+                  {isOnline
+                    ? system?.connStatus === 'STALE'
+                      ? 'TRỄ TÍN HIỆU'
+                      : 'TRỰC TUYẾN'
+                    : 'MẤT KẾT NỐI'}
+                </span>
+                {dataSource === 'firebase' && (
+                  <span className="font-mono font-semibold text-[11px] opacity-90">
+                    (ESP1:{system?.esp1Online !== false && isOnline ? 'ON' : 'OFF'} | ESP2:{system?.esp2Online ? 'ON' : 'OFF'})
+                  </span>
                 )}
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-red-600 dark:bg-rose-400'}`} />
               </span>
-              <span>Kết nối: </span>
-              <span className={`font-semibold ${isOnline ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-rose-400'}`}>
-                {isOnline ? 'Trực tiếp' : 'Mất kết nối'}
+
+              {/* Chỉ số Ping mạng thực tế */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs font-mono font-bold border ${
+                  !isOnline || system?.pingMs === null || system?.pingMs === undefined
+                    ? 'bg-zinc-100 text-zinc-500 border-zinc-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                    : Number(system.pingMs) <= 80
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                      : Number(system.pingMs) <= 200
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60'
+                }`}
+                title="Độ trễ phản hồi thực tế (Ping RTT) giữa trình duyệt và hệ thống Cloud/ESP32"
+              >
+                <span>Ping:</span>
+                <span>
+                  {isOnline && system?.pingMs !== null && system?.pingMs !== undefined
+                    ? `${Math.round(Number(system.pingMs))} ms`
+                    : '-- ms'}
+                </span>
               </span>
             </div>
 
