@@ -73,13 +73,20 @@ volatile bool remoteWakeTrigger = false;
 volatile bool remoteTestSleepTrigger = false;
 volatile bool remoteTestWakeTrigger = false;
 volatile bool remoteResumeRealTrigger = false;
+volatile bool remoteDisableSleepTrigger = false;
+volatile bool remoteEnableSleepTrigger = false;
 bool isTestSleepMode = false;
+bool disableNightSleep = false;        // Cờ vô hiệu hóa chế độ ngủ đêm (Giữ bước vị trí chiều)
+uint32_t relayIntervalSec = 10;        // Chu kỳ đóng ngắt Relay đo Voc/Isc (mặc định 10s)
+float lastAfternoonPhi = 147.15f;      // Góc phương vị cuối buổi chiều lưu trong NVS
+float lastAfternoonEps = 10.0f;        // Góc ngửa cuối buổi chiều lưu trong NVS
 volatile bool m1MovingAwayFromHome = false;
 volatile bool m2MovingAwayFromHome = false;
 
 void executeTestSleepNow();
 void executeTestWakeNow();
 void executeResumeRealState();
+void moveToAfternoonHoldPosition();
 String lastHandledCmdId = "";
 uint64_t lastHandledEmergencyTs = 0;
 
@@ -1393,10 +1400,79 @@ void executeResumeRealState() {
       Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &realJson);
     }
   } else {
-    // Ban đêm: Cho giàn pin ngủ đêm an toàn
-    enterNightSleepUntil4AM();
+    // Ban đêm: Nếu đã vô hiệu hóa ngủ đêm thì về giữ bước vị trí cuối buổi chiều
+    if (disableNightSleep) {
+      moveToAfternoonHoldPosition();
+    } else {
+      enterNightSleepUntil4AM();
+    }
   }
   Serial.println(">> [BUOC 3/3] He thong da hoan toan khoi phuc theo gio RTC thuc te 100%!\n");
+}
+
+// -------------------------------------------------------------------------
+// DI CHUYỂN TẤM PIN VỀ TRẠNG THÁI GIỮ BƯỚC CUỐI BUỔI CHIỀU KHI TẮT NGỦ ĐÊM
+// -------------------------------------------------------------------------
+void moveToAfternoonHoldPosition() {
+  Serial.println("\n>> =======================================================");
+  Serial.println(">> [NO-SLEEP HOLD] VO HIEU HOA CHE DO NGU DEM -> DUA TAM PIN VE VI TRI GIU BUOC CUOI BUOI CHIEU!");
+  Serial.println(">> =======================================================");
+
+  isTestSleepMode = false;
+  isEmergencyCoverActive = false;
+
+  if (!systemHomed || !homedAz || !homedEl) {
+    Serial.println("   [1/3] He thong chua Homed -> Dang chay Dual Homing 2 truc...");
+    runDualHomingToSwitches();
+  }
+
+  float maxAzLimit = CFG_I_AZ_MAX_SOFT_LIMIT_DEG;
+  float minElLimit = CFG_L_EL_MIN_SOFT_LIMIT_DEG;
+  float holdPhi = (lastAfternoonPhi >= 45.0f && lastAfternoonPhi <= maxAzLimit)
+                      ? lastAfternoonPhi
+                      : (maxAzLimit - 0.2f);
+  float holdEps = (lastAfternoonEps >= minElLimit && lastAfternoonEps <= 60.0f)
+                      ? lastAfternoonEps
+                      : (minElLimit + 0.2f);
+
+  Serial.printf("   [2/3] Dang dua gian pin ve vi tri giu buoc cuoi chieu: Phi = %+.2f°, Epsilon = %+.2f°...\n",
+                holdPhi, holdEps);
+
+  systemFsmState = FSM_STATE_MOVING;
+  isMaxAzimuthReached = false;
+  stepPositionControl(1, holdPhi, autoSpeedHz);
+  stepPositionControl(2, holdEps, autoSpeedHz);
+
+  unsigned long startWait = millis();
+  while (((stepper1 && stepper1->isRunning()) || (stepper2 && stepper2->isRunning())) &&
+         (millis() - startWait < 35000)) {
+    vTaskDelay(pdMS_TO_TICKS(50));
+    esp_task_wdt_reset();
+    updateHardwareEncoders();
+  }
+  if (stepper1) stepper1->stopMove();
+  if (stepper2) stepper2->stopMove();
+
+  currentTrackSource = TRACK_SRC_HYBRID;
+  autoOpticalTracking = true;
+  isMaxAzimuthReached = true;
+  systemFsmState = FSM_STATE_TRACKING;
+
+  Serial.printf("   [3/3] Da chot GIU BUOC vi tri chieu: Phi = %+.2f°, Epsilon = %+.2f° (Khong ngu dem)!\n",
+                getAngleDeg1(), getElevationEpsilon());
+
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    FirebaseJson holdJson;
+    holdJson.set("state", "MAX_HOLD");
+    holdJson.set("status", "TRACKING_ACTIVE");
+    holdJson.set("wake_at", "AWAKE");
+    holdJson.set("isSleeping", false);
+    holdJson.set("isTestSleep", false);
+    holdJson.set("sleepDisabled", true);
+    holdJson.set("displayState", "GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)");
+    holdJson.set("source", "device");
+    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &holdJson);
+  }
 }
 
 // Giám sát phát hiện kẹt động cơ (Stall Detection) & mất nguồn 24V (Mục 8)
@@ -2403,6 +2479,8 @@ void pushTelemetryToFirebase() {
                            systemFsmState == FSM_STATE_LIGHT_SLEEP);
   trk.set("isSleeping", isDeviceSleeping);
   trk.set("isTestSleep", (bool)isTestSleepMode);
+  trk.set("sleepDisabled", (bool)disableNightSleep);
+  trk.set("relayIntervalSec", (int)relayIntervalSec);
 
   trk.set("state", stStr);
   trk.set("status", isEmergencyCoverActive
@@ -2431,8 +2509,12 @@ void pushTelemetryToFirebase() {
       trk.set("displayState", "KHẨN CẤP (Góc Max phủ bạt)");
       trk.set("holdRemainSec", 0);
     } else if (isMaxAzimuthReached) {
-      char maxBuf[32];
-      snprintf(maxBuf, sizeof(maxBuf), "GÓC MAX (GIỮ ĐẾN %02dH)", NIGHT_SLEEP_START_HOUR);
+      char maxBuf[48];
+      if (disableNightSleep) {
+        snprintf(maxBuf, sizeof(maxBuf), "GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)");
+      } else {
+        snprintf(maxBuf, sizeof(maxBuf), "GÓC MAX (GIỮ ĐẾN %02dH)", NIGHT_SLEEP_START_HOUR);
+      }
       trk.set("displayState", maxBuf);
       trk.set("holdRemainSec", 0);
     } else if (trackCyclePhase == TRACK_CYCLE_HOLD) {
@@ -2933,6 +3015,51 @@ void checkRemoteFirebaseCommands() {
       // 8. LỆNH KÍCH HOẠT TỐI ƯU HÓA PSO
       else if (cmd.equalsIgnoreCase("trigger_pso")) {
         remotePsoTrigger = true;
+        shouldAck = true;
+      }
+      // 8B. LỆNH BẬT/TẮT VÔ HIỆU HÓA CHẾ ĐỘ NGỦ ĐÊM (GIỮ BƯỚC VỊ TRÍ CHIỀU)
+      else if (cmd.equalsIgnoreCase("set_sleep_disabled") || cmd.equalsIgnoreCase("toggle_sleep_disabled")) {
+        bool dis = false;
+        json.get(jsonData, "disabled");
+        if (jsonData.success) {
+          dis = jsonData.boolValue;
+        } else {
+          json.get(jsonData, "state");
+          if (jsonData.success) dis = jsonData.boolValue;
+        }
+        disableNightSleep = dis;
+        prefs.putBool("no_sleep", disableNightSleep);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/config/voc_isc/sleep_disabled", disableNightSleep);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/tracking/sleepDisabled", disableNightSleep);
+        if (disableNightSleep) {
+          remoteDisableSleepTrigger = true;
+          remoteEnableSleepTrigger = false;
+          Serial.println(">> [REMOTE] DA BAT VO HIEU HOA NGU DEM (He thong se giu buoc o vi tri cuoi buoi chieu)!");
+        } else {
+          remoteEnableSleepTrigger = true;
+          remoteDisableSleepTrigger = false;
+          Serial.println(">> [REMOTE] DA TAT VO HIEU HOA NGU DEM (He thong se ngu dem binh thuong luc 18:00)!");
+        }
+        shouldAck = true;
+      }
+      // 8C. LỆNH CÀI ĐẶT CHU KỲ ĐÓNG NGẮT RELAY ĐO VOC/ISC (MẶC ĐỊNH 10 GIÂY)
+      else if (cmd.equalsIgnoreCase("set_relay_interval")) {
+        int sec = 10;
+        json.get(jsonData, "interval_sec");
+        if (jsonData.success && jsonData.intValue > 0) {
+          sec = jsonData.intValue;
+        } else {
+          json.get(jsonData, "value");
+          if (jsonData.success && jsonData.intValue > 0) sec = jsonData.intValue;
+        }
+        if (sec < 3) sec = 3;
+        if (sec > 3600) sec = 3600;
+        relayIntervalSec = (uint32_t)sec;
+        prefs.putUInt("rly_sec", relayIntervalSec);
+        Firebase.RTDB.setInt(&cmdFbdo, "/solar/config/voc_isc/relay_interval_sec", (int)relayIntervalSec);
+        Firebase.RTDB.setInt(&cmdFbdo, "/solar/tracking/relayIntervalSec", (int)relayIntervalSec);
+        Serial.printf(">> [REMOTE] Da cap nhat chu ky nhay Relay do Voc/Isc = %lu giay (Luu NVS & dong bo ESP32 #2)!\n",
+                      (unsigned long)relayIntervalSec);
         shouldAck = true;
       }
       // 9. LỆNH CẬP NHẬT FIRMWARE TỪ XA QUA CLOUD (FOTA)
@@ -3926,6 +4053,16 @@ void setup() {
   defaultDeg2 = (float)defaultCount2 * getDegPerCount();
   prefs.putFloat("def_deg2", defaultDeg2);
 
+  // Khôi phục cấu hình Vô hiệu hóa ngủ đêm & Chu kỳ đóng ngắt Relay đo Voc/Isc
+  disableNightSleep = prefs.getBool("no_sleep", false);
+  relayIntervalSec = prefs.getUInt("rly_sec", 10);
+  if (relayIntervalSec < 3 || relayIntervalSec > 3600) relayIntervalSec = 10;
+  lastAfternoonPhi = prefs.getFloat("aft_phi", CFG_I_AZ_MAX_SOFT_LIMIT_DEG - 0.2f);
+  lastAfternoonEps = prefs.getFloat("aft_eps", CFG_L_EL_MIN_SOFT_LIMIT_DEG + 0.2f);
+  Serial.printf(">> [NVS CONFIG] disableNightSleep = %s | relayIntervalSec = %lu s | AfternoonHold = (%+.1f°, %+.1f°)\n",
+                disableNightSleep ? "ON (Khong ngu dem)" : "OFF (Ngu 18h-04h)",
+                (unsigned long)relayIntervalSec, lastAfternoonPhi, lastAfternoonEps);
+
   if (isHome1Triggered())
     resetEncoder1(0);
   if (isHome2Triggered())
@@ -4118,10 +4255,15 @@ void setup() {
         "\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d ngay %02d/%02d/%04d\n",
         curH, curMin, curS, curD, curM, curY);
     if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
-      Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%02d:00 - "
-                    "%02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
-                    NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
-      enterNightSleepUntil4AM();
+      if (disableNightSleep) {
+        Serial.println(">> [BOOT NIGHT - NO SLEEP] Cap nguon ban dem nhung da BAT VO HIEU HOA NGU -> Dua ve giu buoc cuoi chieu!");
+        moveToAfternoonHoldPosition();
+      } else {
+        Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%02d:00 - "
+                      "%02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
+                      NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
+        enterNightSleepUntil4AM();
+      }
     } else {
       Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 22:00) -> Chay "
                      "PSO va bat dau bam Hybrid!");
@@ -5321,9 +5463,50 @@ void loop() {
     remoteResumeRealTrigger = false;
     executeResumeRealState();
   }
+  // XỬ LÝ LỆNH BẬT/TẮT VÔ HIỆU HÓA CHẾ ĐỘ NGỦ ĐÊM TỪ WEB DASHBOARD
+  if (remoteDisableSleepTrigger) {
+    remoteDisableSleepTrigger = false;
+    int curY = 0, curM = 0, curD = 0, curH = 12, curMin = 0, curS = 0;
+    float curTemp = 25.0f;
+    readDS3231(curY, curM, curD, curH, curMin, curS, curTemp);
+    float tAz = 0.0f, tEl = 0.0f, azS = 0.0f, elS = 10.0f, zenS = 0.0f, ws = 0.0f;
+    bool isDay = true;
+    computeSolarTrackingTargets(tAz, tEl, azS, elS, zenS, ws, isDay);
+
+    bool isCurrentlySleeping = isTestSleepMode ||
+                               (systemFsmState == FSM_STATE_LIGHT_SLEEP) ||
+                               (systemFsmState == FSM_STATE_PREP_SLEEP);
+    bool isCurrentlyDark = (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) ||
+                           (!isDay || elS < 0.0f);
+
+    if (isCurrentlySleeping || isCurrentlyDark) {
+      // Nếu đang trời tối hoặc đang ngủ: về trạng thái giữ bước cuối cùng ở buổi chiều ngay lập tức
+      moveToAfternoonHoldPosition();
+    } else {
+      // Nếu đang trời sáng: tiếp tục bám bình thường và khi tới 18h vẫn không ngủ
+      isTestSleepMode = false;
+      currentTrackSource = TRACK_SRC_HYBRID;
+      autoOpticalTracking = true;
+      systemFsmState = FSM_STATE_TRACKING;
+      Serial.println(">> [NO-SLEEP ACTIVE] Troi dang sang -> Tiep tuc bam binh thuong, toi 18h se GIU BUOC KHONG NGU!");
+    }
+    requestTelemetryPrint();
+  }
+  if (remoteEnableSleepTrigger) {
+    remoteEnableSleepTrigger = false;
+    int curY = 0, curM = 0, curD = 0, curH = 12, curMin = 0, curS = 0;
+    float curTemp = 25.0f;
+    if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
+      if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
+        Serial.println(">> [SLEEP RE-ENABLED] Dang trong gio dem -> Kich hoat quy trinh ngu dem ngay!");
+        enterNightSleepUntil4AM();
+      }
+    }
+    requestTelemetryPrint();
+  }
 
   // 0. TỰ ĐỘNG QUẢN LÝ NGỦ ĐÊM / THỨC DẬY (TỪ 18:00 TỐI ĐẾN 04:00 SÁNG) THEO
-  // ĐỒNG HỒ RTC DS3231 (BỎ QUA KHI ĐANG Ở CHẾ ĐỘ TEST NGỦ isTestSleepMode)
+  // ĐỒNG HỒ RTC DS3231 (BỎ QUA KHI ĐANG Ở CHẾ ĐỘ TEST NGỦ HOẶC KHI ĐÃ BẬT VÔ HIỆU HÓA NGỦ)
   static unsigned long lastNightCheckMs = 0;
   if (!isTestSleepMode && !isEmergencyCoverActive && (millis() - lastNightCheckMs >= 3000)) {
     lastNightCheckMs = millis();
@@ -5334,15 +5517,27 @@ void loop() {
           (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR);
 
       if (isNightWindow) {
-        // Trong khung giờ ngủ đêm (19:00 - 04:00)
-        if (systemFsmState != FSM_STATE_LIGHT_SLEEP &&
-            systemFsmState != FSM_STATE_PREP_SLEEP) {
-          if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE &&
-              (millis() - lastSerialCharMs >= 15000)) {
-            Serial.printf("\n>> [AUTO NIGHT] Da den gio ngu dem "
-                          "(%02d:%02d:%02d). Kich hoat ngu dem giu WiFi!\n",
-                          curH, curMin, curS);
-            enterNightSleepUntil4AM();
+        // Trong khung giờ ngủ đêm (18:00 - 04:00)
+        if (!disableNightSleep) {
+          if (systemFsmState != FSM_STATE_LIGHT_SLEEP &&
+              systemFsmState != FSM_STATE_PREP_SLEEP) {
+            if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE &&
+                (millis() - lastSerialCharMs >= 15000)) {
+              Serial.printf("\n>> [AUTO NIGHT] Da den gio ngu dem "
+                            "(%02d:%02d:%02d). Kich hoat ngu dem giu WiFi!\n",
+                            curH, curMin, curS);
+              enterNightSleepUntil4AM();
+            }
+          }
+        } else {
+          // Khi đã bật Vô hiệu hóa ngủ đêm (disableNightSleep == true):
+          // Tấm pin giữ nguyên vị trí cuối buổi chiều (isMaxAzimuthReached = true), tuyệt đối không ngủ!
+          if (systemFsmState == FSM_STATE_LIGHT_SLEEP ||
+              systemFsmState == FSM_STATE_PREP_SLEEP) {
+            moveToAfternoonHoldPosition();
+          } else {
+            isMaxAzimuthReached = true;
+            systemFsmState = FSM_STATE_TRACKING;
           }
         }
       } else {
@@ -5789,6 +5984,12 @@ void loop() {
 
               // ĐÁNH GIÁ ĐIỀU KIỆN ỔN ĐỊNH CÂN BẰNG:
               if (m1Reached && m2Reached && motorsStopped) {
+                if (azSun > 180.0f && getAngleDeg1() >= 45.0f) {
+                  lastAfternoonPhi = getAngleDeg1();
+                  lastAfternoonEps = getElevationEpsilon();
+                  prefs.putFloat("aft_phi", lastAfternoonPhi);
+                  prefs.putFloat("aft_eps", lastAfternoonEps);
+                }
                 if (azHitMax && azSun > 180.0f && elSun < 15.0f) {
                   isMaxAzimuthReached = true;
                   Serial.printf("\n>> [MAX ANGLE REACHED] Gian pin da dat goc "

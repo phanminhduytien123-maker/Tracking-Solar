@@ -21,6 +21,7 @@ export default function ManualControlModal({
   onTestSleep,
   onTestWake,
   onResumeReal,
+  onSetSleepDisabled,
   motors,
   isExperimentLocked = false
 }) {
@@ -435,6 +436,44 @@ export default function ManualControlModal({
                   Home 2 trục ➔ Bám mặt trời theo giờ RTC
                 </div>
               </button>
+            </div>
+
+            {/* Tắt / Bật Vô hiệu hóa khả năng ngủ đêm */}
+            <div className="pt-2 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold text-zinc-900 block">
+                  Vô hiệu hóa khả năng ngủ đêm (Giữ bước vị trí chiều)
+                </span>
+                <span className="text-[11px] text-zinc-500 block">
+                  {system?.sleepDisabled
+                    ? 'Đang BẬT: Tới 18h vẫn không ngủ; nếu đang trời tối sẽ giữ bước ở vị trí cuối buổi chiều.'
+                    : 'Đang TẮT: Hệ thống tự động ngủ đêm từ 18:00 đến 04:00 (Relay tự ngắt khi ngủ).'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(true)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                    system?.sleepDisabled
+                      ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                      : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
+                  }`}
+                >
+                  Bật (Tắt ngủ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(false)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                    !system?.sleepDisabled
+                      ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                      : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
+                  }`}
+                >
+                  Tắt (Ngủ 18h)
+                </button>
+              </div>
             </div>
           </div>
 

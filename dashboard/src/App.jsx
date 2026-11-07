@@ -825,6 +825,40 @@ export default function App() {
     alert('Đã gửi lệnh [Quay về trạng thái thật]: Hệ thống sẽ Homing 2 trục rồi bám mặt trời thực tế theo giờ RTC.');
   };
 
+  const handleSetSleepDisabled = (disabled) => {
+    const disBool = Boolean(disabled);
+    localStorage.setItem('solar_sleep_disabled', disBool ? 'true' : 'false');
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setSleepDisabled(disBool);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        sleepDisabled: disBool,
+        isSleeping: disBool ? false : prev.system.isSleeping,
+        displayState: disBool
+          ? 'GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)'
+          : prev.system.displayState
+      }
+    }));
+  };
+
+  const handleSetRelayInterval = (intervalSec) => {
+    const validSec = Math.max(3, Math.min(3600, Math.round(Number(intervalSec) || 10)));
+    localStorage.setItem('solar_relay_interval_sec', String(validSec));
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setRelayInterval(validSec);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        relayIntervalSec: validSec
+      }
+    }));
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -1075,6 +1109,7 @@ export default function App() {
         onTestSleep={handleTestSleep}
         onTestWake={handleTestWake}
         onResumeReal={handleResumeReal}
+        onSetSleepDisabled={handleSetSleepDisabled}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
       />
@@ -1118,6 +1153,8 @@ export default function App() {
         onResetHistoryData={handleResetHistoryData}
         onLoadRealisticDataset={handleLoadRealisticDataset}
         targetEditDate={targetEditDate}
+        onSetSleepDisabled={handleSetSleepDisabled}
+        onSetRelayInterval={handleSetRelayInterval}
       />
 
       {/* 4. FOOTER */}
