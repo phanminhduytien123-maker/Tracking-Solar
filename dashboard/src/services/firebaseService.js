@@ -538,6 +538,8 @@ export class FirebaseSolarService {
     const tracking = fbData.tracking || {};
     const staticPanel = fbData.static || {};
     const algo = fbData.algorithm || {};
+    const vocIscCfg = (fbData.config && fbData.config.voc_isc) ? fbData.config.voc_isc : {};
+    const vocIscNode = fbData.voc_isc_node || {};
     const now = Date.now();
     const serverTimeNow = now + this.serverTimeOffset;
 
@@ -868,6 +870,64 @@ export class FirebaseSolarService {
       };
     }
 
+    const resolvedSleepDisabled = vocIscCfg.sleep_disabled !== undefined
+      ? Boolean(vocIscCfg.sleep_disabled)
+      : Boolean(tracking.sleepDisabled);
+    const resolvedRelayIntervalSec = (vocIscCfg.relay_interval_sec !== undefined && vocIscCfg.relay_interval_sec !== null && !isNaN(vocIscCfg.relay_interval_sec))
+      ? Math.max(3, Number(vocIscCfg.relay_interval_sec))
+      : ((tracking.relayIntervalSec !== undefined && tracking.relayIntervalSec !== null && !isNaN(tracking.relayIntervalSec))
+        ? Math.max(3, Number(tracking.relayIntervalSec))
+        : 10);
+
+    // Trạng thái Đèn 12V (Relay Kênh 5 - Relay E trên GPIO 42 của ESP32 #2)
+    const lampAutoDisabled = vocIscCfg.lamp_auto_disabled !== undefined
+      ? Boolean(vocIscCfg.lamp_auto_disabled)
+      : (vocIscNode.lamp_auto_disabled !== undefined
+        ? Boolean(vocIscNode.lamp_auto_disabled)
+        : Boolean(tracking.lampAutoDisabled));
+    const lampManualState = vocIscCfg.lamp_manual_state !== undefined
+      ? Boolean(vocIscCfg.lamp_manual_state)
+      : (vocIscNode.lamp_manual_state !== undefined
+        ? Boolean(vocIscNode.lamp_manual_state)
+        : Boolean(tracking.lampManualState));
+
+    let lamp12vOn = false;
+    let lampRemainSec = null;
+    const LAMP_PHASE_MS = 15 * 60 * 1000; // 15 phút = 900.000 ms
+
+    if (lampAutoDisabled) {
+      // Khi bật "Vô hiệu hóa tự động": trạng thái đèn phụ thuộc điều khiển tay (mặc định khi mới bật vô hiệu hóa là TẮT)
+      lamp12vOn = lampManualState;
+      lampRemainSec = null;
+    } else {
+      // Khi ở chế độ Tự động:
+      const resetTs = Number(vocIscCfg.lamp_cycle_reset_ts || 0);
+      if (isSleeping && !resolvedSleepDisabled) {
+        if (resetTs > 0) {
+          // Sau khi tắt chức năng vô hiệu hóa tự động -> đèn TẮT trước, đếm đủ 15p rồi mới BẬT 15p luân phiên
+          const elapsedMs = Math.max(0, now - resetTs);
+          const phaseIdx = Math.floor(elapsedMs / LAMP_PHASE_MS);
+          lamp12vOn = (phaseIdx % 2 === 1); // phase 0 (0-15p): TẮT, phase 1 (15-30p): BẬT, ...
+          lampRemainSec = Math.max(0, Math.ceil((LAMP_PHASE_MS - (elapsedMs % LAMP_PHASE_MS)) / 1000));
+        } else if (vocIscNode.lamp_12v_on !== undefined && vocIscNode.updated_at && (now - Number(vocIscNode.updated_at) < 30000)) {
+          lamp12vOn = Boolean(vocIscNode.lamp_12v_on);
+          lampRemainSec = vocIscNode.lamp_remain_sec !== undefined ? Number(vocIscNode.lamp_remain_sec) : null;
+        } else {
+          if (!this._lampSleepStartMs) {
+            this._lampSleepStartMs = now;
+          }
+          const elapsedMs = Math.max(0, now - this._lampSleepStartMs);
+          const phaseIdx = Math.floor(elapsedMs / LAMP_PHASE_MS);
+          lamp12vOn = (phaseIdx % 2 === 0); // Khi mới vào ngủ tự nhiên: BẬT 15p -> TẮT 15p
+          lampRemainSec = Math.max(0, Math.ceil((LAMP_PHASE_MS - (elapsedMs % LAMP_PHASE_MS)) / 1000));
+        }
+      } else {
+        this._lampSleepStartMs = null;
+        lamp12vOn = false;
+        lampRemainSec = null;
+      }
+    }
+
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
       rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || now,
@@ -878,13 +938,15 @@ export class FirebaseSolarService {
         connStatus: trkConnStatus,
         mode: tracking.mode || '--',
         state: rawState,
-        displayState,
+        displayState: resolvedSleepDisabled && isSleeping ? 'GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)' : displayState,
         wakeAt,
-        isSleeping,
-        sleepDisabled: Boolean(tracking.sleepDisabled),
-        relayIntervalSec: (tracking.relayIntervalSec !== undefined && tracking.relayIntervalSec !== null && !isNaN(tracking.relayIntervalSec))
-          ? Math.max(3, Number(tracking.relayIntervalSec))
-          : 10,
+        isSleeping: resolvedSleepDisabled ? false : isSleeping,
+        sleepDisabled: resolvedSleepDisabled,
+        relayIntervalSec: resolvedRelayIntervalSec,
+        lamp12vOn,
+        lampAutoDisabled,
+        lampManualState,
+        lampRemainSec,
         holdRemainSec: (tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec))
           ? Number(tracking.holdRemainSec)
           : (rawState === 'HOLD_15M' ? (this._fallbackRemainSec || 900) : null),
@@ -917,8 +979,8 @@ export class FirebaseSolarService {
           voltage: trkVolt,
           current: trkCurr,
           power: trkPower,
-          voc: tracking.voc_trk !== undefined ? Number(tracking.voc_trk) : null,
-          isc: tracking.isc_trk !== undefined ? Number(tracking.isc_trk) : null,
+          voc: tracking.voc_trk !== undefined ? Number(tracking.voc_trk) : (vocIscNode.voc_trk !== undefined ? Number(vocIscNode.voc_trk) : null),
+          isc: tracking.isc_trk !== undefined ? Number(tracking.isc_trk) : (vocIscNode.isc_trk !== undefined ? Number(vocIscNode.isc_trk) : null),
           panelTemp: tracking.temp_trk !== undefined ? Number(tracking.temp_trk) : null,
           energyWh: trkEnergyWh,
           energyKwh: trkEnergyWh !== null ? Number((trkEnergyWh / 1000).toFixed(3)) : null,
@@ -934,8 +996,8 @@ export class FirebaseSolarService {
           voltage: staVolt,
           current: staCurr,
           power: staPower,
-          voc: staticPanel.voc_sta !== undefined ? Number(staticPanel.voc_sta) : null,
-          isc: staticPanel.isc_sta !== undefined ? Number(staticPanel.isc_sta) : null,
+          voc: staticPanel.voc_sta !== undefined ? Number(staticPanel.voc_sta) : (vocIscNode.voc_sta !== undefined ? Number(vocIscNode.voc_sta) : null),
+          isc: staticPanel.isc_sta !== undefined ? Number(staticPanel.isc_sta) : (vocIscNode.isc_sta !== undefined ? Number(vocIscNode.isc_sta) : null),
           panelTemp: staticPanel.temp_sta !== undefined ? Number(staticPanel.temp_sta) : null,
           energyWh: staEnergyWh,
           energyKwh: staEnergyWh !== null ? Number((staEnergyWh / 1000).toFixed(3)) : null,
@@ -1153,6 +1215,77 @@ export class FirebaseSolarService {
       cmd: 'set_relay_interval',
       interval_sec: sec,
       value: sec
+    });
+  }
+
+  async setLampAutoDisabled(disabled) {
+    const disBool = Boolean(disabled);
+    const nowTs = Date.now();
+    if (this.db) {
+      try {
+        // Khi bật hoặc tắt chức năng vô hiệu hóa tự động:
+        // - Đèn đều chuyển ngay về trạng thái TẮT (lamp_manual_state: false, lamp_12v_on: false)
+        // - Cập nhật lamp_cycle_reset_ts = nowTs để khi quay về Tự động, đèn TẮT và đếm lại đủ 15p rồi mới BẬT
+        await update(ref(this.db, 'solar/config/voc_isc'), {
+          lamp_auto_disabled: disBool,
+          lamp_manual_state: false,
+          lamp_cycle_reset_ts: nowTs,
+          updated_at: nowTs
+        });
+        await update(ref(this.db, 'solar/voc_isc_node'), {
+          lamp_auto_disabled: disBool,
+          lamp_manual_state: false,
+          lamp_12v_on: false,
+          lamp_remain_sec: disBool ? 0 : 900,
+          updated_at: nowTs
+        });
+        await update(ref(this.db, 'solar/tracking'), {
+          lampAutoDisabled: disBool,
+          lampManualState: false,
+          lamp12vOn: false
+        });
+      } catch (e) {
+        console.warn('[Firebase setLampAutoDisabled update node warn]', e);
+      }
+    }
+    return this.sendCommand({
+      cmd: 'set_lamp_auto_disabled',
+      disabled: disBool,
+      lamp_manual_state: false,
+      lamp_cycle_reset_ts: nowTs
+    });
+  }
+
+  async setLampManualState(on) {
+    const onBool = Boolean(on);
+    const nowTs = Date.now();
+    if (this.db) {
+      try {
+        await update(ref(this.db, 'solar/config/voc_isc'), {
+          lamp_auto_disabled: true,
+          lamp_manual_state: onBool,
+          updated_at: nowTs
+        });
+        await update(ref(this.db, 'solar/voc_isc_node'), {
+          lamp_auto_disabled: true,
+          lamp_manual_state: onBool,
+          lamp_12v_on: onBool,
+          lamp_remain_sec: 0,
+          updated_at: nowTs
+        });
+        await update(ref(this.db, 'solar/tracking'), {
+          lampAutoDisabled: true,
+          lampManualState: onBool,
+          lamp12vOn: onBool
+        });
+      } catch (e) {
+        console.warn('[Firebase setLampManualState update node warn]', e);
+      }
+    }
+    return this.sendCommand({
+      cmd: 'set_lamp_manual',
+      on: onBool,
+      state: onBool
     });
   }
 

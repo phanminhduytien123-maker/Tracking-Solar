@@ -22,6 +22,8 @@ export default function ManualControlModal({
   onTestWake,
   onResumeReal,
   onSetSleepDisabled,
+  onSetLampAutoDisabled,
+  onSetLampManualState,
   motors,
   isExperimentLocked = false
 }) {
@@ -473,6 +475,94 @@ export default function ManualControlModal({
                 >
                   Tắt (Ngủ 18h)
                 </button>
+              </div>
+            </div>
+
+            {/* Vô hiệu hóa bật/tắt đèn 12V tự động & Điều khiển Đèn 12V bằng tay (Relay Kênh 5 - Relay E) */}
+            <div className="pt-2.5 border-t border-zinc-200 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-900">
+                      Vô hiệu hóa bật/tắt Đèn 12V tự động (Relay Kênh 5 / Kênh E)
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-xs text-[11px] font-bold border ${
+                        system?.lamp12vOn
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-zinc-100 text-zinc-700 border-zinc-300'
+                      }`}
+                    >
+                      Đèn 12V: {system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500 block mt-0.5">
+                    {system?.lampAutoDisabled
+                      ? 'Đang BẬT vô hiệu hóa tự động: Đèn tự động tắt khi mới kích hoạt; có thể Bật/Tắt đèn 12V bằng tay.'
+                      : 'Đang TẮT vô hiệu hóa (Chế độ Tự động): Đèn tắt và đếm lại 15p để bật, luân phiên 15p Bật / 15p Tắt khi ngủ.'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(true)}
+                    className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                      system?.lampAutoDisabled
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                        : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    Bật (Chỉnh tay)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(false)}
+                    className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                      !system?.lampAutoDisabled
+                        ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                        : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    Tắt (Tự động 15p)
+                  </button>
+                </div>
+              </div>
+
+              {/* Hàng nút Bật / Tắt đèn 12V bằng tay */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2 rounded-sm border border-zinc-200">
+                <span className="text-xs font-semibold text-zinc-800">
+                  Điều khiển Đèn 12V bằng tay {system?.lampAutoDisabled ? '(Đã mở khóa)' : '(Chỉ hoạt động khi Bật vô hiệu hóa tự động)'}:
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={!system?.lampAutoDisabled}
+                    onClick={() => onSetLampManualState && onSetLampManualState(true)}
+                    className={`px-3 py-1 rounded-sm text-xs font-bold border transition-colors ${
+                      !system?.lampAutoDisabled
+                        ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                        : system?.lamp12vOn
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs cursor-pointer'
+                          : 'bg-white hover:bg-emerald-50 text-zinc-800 border-zinc-300 cursor-pointer'
+                    }`}
+                  >
+                    BẬT ĐÈN 12V
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!system?.lampAutoDisabled}
+                    onClick={() => onSetLampManualState && onSetLampManualState(false)}
+                    className={`px-3 py-1 rounded-sm text-xs font-bold border transition-colors ${
+                      !system?.lampAutoDisabled
+                        ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                        : !system?.lamp12vOn
+                          ? 'bg-zinc-800 text-white border-zinc-900 shadow-xs cursor-pointer'
+                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 cursor-pointer'
+                    }`}
+                  >
+                    TẮT ĐÈN 12V
+                  </button>
+                </div>
               </div>
             </div>
           </div>
