@@ -443,6 +443,8 @@ void pushVocIscToFirebase() {
   nodeJson.set("lamp_phase_remain_sec", (int)lampRemainSec);
   nodeJson.set("cycles_count", (int)totalMeasureCycles);
   nodeJson.set("online", true);
+  nodeJson.set("ip", WiFi.localIP().toString());
+  nodeJson.set("ota_hostname", "esp32-voc-isc-node");
   nodeJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
   nodeJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &nodeJson);
