@@ -1293,6 +1293,7 @@ export class FirebaseSolarService {
         // Khi bật hoặc tắt chức năng vô hiệu hóa tự động:
         // - Đèn đều chuyển ngay về trạng thái TẮT (lamp_manual_state: false, lamp_12v_on: false)
         // - Cập nhật lamp_cycle_reset_ts = nowTs để khi quay về Tự động, đèn TẮT và đếm lại đủ 15p rồi mới BẬT
+        // - Lưu ý: Chỉ đồng bộ qua /solar/config/voc_isc (ESP32 #2 quản lý Relay E), KHÔNG gửi vào /solar/control tránh can nhiễu lệnh ESP32 #1
         await update(ref(this.db, 'solar/config/voc_isc'), {
           lamp_auto_disabled: disBool,
           lamp_manual_state: false,
@@ -1311,16 +1312,13 @@ export class FirebaseSolarService {
           lampManualState: false,
           lamp12vOn: false
         });
+        return true;
       } catch (e) {
         console.warn('[Firebase setLampAutoDisabled update node warn]', e);
+        return false;
       }
     }
-    return this.sendCommand({
-      cmd: 'set_lamp_auto_disabled',
-      disabled: disBool,
-      lamp_manual_state: false,
-      lamp_cycle_reset_ts: nowTs
-    });
+    return false;
   }
 
   async setLampManualState(on) {
@@ -1328,6 +1326,7 @@ export class FirebaseSolarService {
     const nowTs = Date.now();
     if (this.db) {
       try {
+        // Điều khiển Relay E (Đèn 12V) trên ESP32 #2 hoàn toàn qua /solar/config/voc_isc, tuyệt đối không gửi vào /solar/control
         await update(ref(this.db, 'solar/config/voc_isc'), {
           lamp_auto_disabled: true,
           lamp_manual_state: onBool,
@@ -1345,15 +1344,13 @@ export class FirebaseSolarService {
           lampManualState: onBool,
           lamp12vOn: onBool
         });
+        return true;
       } catch (e) {
         console.warn('[Firebase setLampManualState update node warn]', e);
+        return false;
       }
     }
-    return this.sendCommand({
-      cmd: 'set_lamp_manual',
-      on: onBool,
-      state: onBool
-    });
+    return false;
   }
 
   async setEstop(enabled) {
