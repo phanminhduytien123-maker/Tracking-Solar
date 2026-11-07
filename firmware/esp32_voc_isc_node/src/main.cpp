@@ -1,5 +1,5 @@
 // =========================================================================
-// FIRMWARE ESP32-S3 #2 (NODE ĐỘC LẬP ĐO VOC, ISC & NHIỆT ĐỘ 2 TẤM PIN)
+// FIRMWARE ESP32-S3 #2 (NODE ĐỘC LẬP ĐO VOC, ISC & ĐIỀU KHIỂN ĐÈN 12V BAN ĐÊM)
 // =========================================================================
 // Sơ đồ chân (Pinout) chuẩn cho ESP32-S3 N16R8 (#2):
 //   - GPIO 4  (ADC1_CH3) : FZ0430 #1 -> Đo áp hở mạch Voc Tấm Xoay (Tracker)
@@ -8,7 +8,7 @@
 //   - GPIO 7  (ADC1_CH6) : ACS712 #2 -> Đo dòng ngắn mạch Isc Tấm Cố Định (qua cầu 10k/20k)
 //   - GPIO 14 (kèm G40)  : Relay A + Relay C (Ngắt tải Sạc Tấm Xoay & Cố Định)
 //   - GPIO 41 (kèm G39)  : Relay B + Relay D (Đóng ngắn mạch qua ACS712 #1 & #2)
-//   - GPIO 42 (1-Wire)   : 2x Cảm biến nhiệt độ DS18B20 chống nước (T_trk & T_sta)
+//   - GPIO 42            : Relay E (Kênh 5 - Đèn 12V: Khi ngủ sẽ 15 phút BẬT / 15 phút TẮT luân phiên tới sáng)
 // =========================================================================
 
 #include <Arduino.h>
@@ -23,42 +23,45 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.0.0"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.0"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
 // -------------------------------------------------------------------------
-#define PIN_ADC_VOC_TRK   4   // ADC1_CH3: FZ0430 #1 (Tấm Xoay)
-#define PIN_ADC_ISC_TRK   5   // ADC1_CH4: ACS712 #1 (Tấm Xoay - qua cầu 10k/20k)
-#define PIN_ADC_VOC_STA   6   // ADC1_CH5: FZ0430 #2 (Tấm Cố Định)
-#define PIN_ADC_ISC_STA   7   // ADC1_CH6: ACS712 #2 (Tấm Cố Định - qua cầu 10k/20k)
+#define PIN_ADC_VOC_TRK     4   // ADC1_CH3: FZ0430 #1 (Tấm Xoay)
+#define PIN_ADC_ISC_TRK     5   // ADC1_CH4: ACS712 #1 (Tấm Xoay - qua cầu 10k/20k)
+#define PIN_ADC_VOC_STA     6   // ADC1_CH5: FZ0430 #2 (Tấm Cố Định)
+#define PIN_ADC_ISC_STA     7   // ADC1_CH6: ACS712 #2 (Tấm Cố Định - qua cầu 10k/20k)
 
-// Chân điều khiển Module 4 Relay (Hỗ trợ đồng thời cả đấu gộp 2 chân lẫn đấu rời 4 chân)
-#define PIN_RELAY_A_CUT   14  // Relay A (Ngắt tải Tấm Xoay) - hoặc gộp A+C
-#define PIN_RELAY_C_CUT   40  // Relay C (Ngắt tải Tấm Cố Định) - dự phòng nếu tách riêng
-#define PIN_RELAY_B_ISC   41  // Relay B (Ngắn mạch đo Isc Tấm Xoay) - hoặc gộp B+D
-#define PIN_RELAY_D_ISC   39  // Relay D (Ngắn mạch đo Isc Tấm Cố Định) - dự phòng nếu tách riêng
+// Chân điều khiển Module Relay A, B, C, D (Đo Voc/Isc ban ngày)
+#define PIN_RELAY_A_CUT     14  // Relay A (Ngắt tải Tấm Xoay) - hoặc gộp A+C
+#define PIN_RELAY_C_CUT     40  // Relay C (Ngắt tải Tấm Cố Định) - dự phòng nếu tách riêng
+#define PIN_RELAY_B_ISC     41  // Relay B (Ngắn mạch đo Isc Tấm Xoay) - hoặc gộp B+D
+#define PIN_RELAY_D_ISC     39  // Relay D (Ngắn mạch đo Isc Tấm Cố Định) - dự phòng nếu tách riêng
 
-// Chân 1-Wire đọc 2 cảm biến nhiệt độ DS18B20 (có trở kéo lên 4.7kΩ lên 3.3V)
-#define PIN_ONEWIRE_DS18  42
+// Chân điều khiển Relay Kênh 5 (Relay E - Đèn 12V ban đêm: 15p BẬT / 15p TẮT khi ngủ)
+#define PIN_RELAY_E_LAMP12V 42  // Ngay sát GPIO 41 trên hàng chân phải ESP32-S3
 
-// Cấu hình mức kích Relay (Module 4 Relay quang cách ly chuẩn kích mức THẤP - Active LOW)
-#define RELAY_ACTIVE_LOW  true
-#define RELAY_ON_LEVEL    (RELAY_ACTIVE_LOW ? LOW : HIGH)
-#define RELAY_OFF_LEVEL   (RELAY_ACTIVE_LOW ? HIGH : LOW)
+// Cấu hình mức kích Relay (Module Relay quang cách ly chuẩn kích mức THẤP - Active LOW)
+#define RELAY_ACTIVE_LOW    true
+#define RELAY_ON_LEVEL      (RELAY_ACTIVE_LOW ? LOW : HIGH)
+#define RELAY_OFF_LEVEL     (RELAY_ACTIVE_LOW ? HIGH : LOW)
+
+// Chu kỳ luân phiên BẬT / TẮT của Đèn 12V (Relay E) khi hệ thống ngủ: 15 phút = 900,000 ms
+const unsigned long LAMP_TOGGLE_INTERVAL_MS = 15UL * 60UL * 1000UL; // 15 phút (900 giây)
 
 // -------------------------------------------------------------------------
 // 2. HẰNG SỐ HIỆU CHUẨN CẢM BIẾN (CALIBRATION CONSTANTS)
 // -------------------------------------------------------------------------
 // FZ0430 đã mắc song song điện trở 6.2kΩ vào R2 (7.5kΩ):
 // R2_mới = (7.5 * 6.2) / (7.5 + 6.2) = 3.394 kΩ -> Tỉ số chia = 3.394 / (30 + 3.394) = 0.10164
-// Hệ số nhân ngược = 1 / 0.10164 = 9.8386 (Nếu chưa mắc 6.2kΩ thì hệ số chuẩn của FZ0430 là 5.0)
+// Hệ số nhân ngược = 1 / 0.10164 = 9.8386
 float calVocScaleTrk = 9.8386f;
 float calVocScaleSta = 9.8386f;
 
 // ACS712ELC-05B (Độ nhạy chuẩn 185 mV/A tại ngõ ra 5V, đi qua cầu chia áp 10kΩ/20kΩ -> nhân 1.5)
 float calAcsDividerGain = 1.500f;    // (10k + 20k) / 20k = 1.5
-float calAcsSensMvPerA  = 185.0f;    // 185 mV/A cho bản 5A (100 mV/A cho bản 20A)
+float calAcsSensMvPerA  = 185.0f;    // 185 mV/A cho bản 5A
 float zeroAcsMvTrk      = 2500.0f;   // Điểm 0A tự động hiệu chuẩn trong pha hở mạch (Pha 1)
 float zeroAcsMvSta      = 2500.0f;
 
@@ -72,22 +75,26 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
 // Cấu hình chu kỳ nhảy Relay & trạng thái ngủ đồng bộ từ hệ thống chính
-uint32_t relayIntervalSec = 10;      // Mặc định 10 giây / 1 chu kỳ nhảy relay
+uint32_t relayIntervalSec = 10;      // Mặc định 10 giây / 1 chu kỳ nhảy relay A-B-C-D
 bool remoteIsSleeping     = false;   // Trạng thái ngủ thực tế từ ESP32 #1
 bool remoteSleepDisabled  = false;   // Cờ vô hiệu hóa ngủ đêm
 bool remoteMotorsMoving   = false;   // Tránh đóng relay đúng lúc motor đang quay mạnh
 bool forceSingleTest      = false;   // Cờ kích hoạt test 1 chu kỳ ngay lập tức
+
+// Trạng thái Đèn 12V (Relay Kênh 5 - Relay E)
+bool lamp12vState         = false;   // true = Đang BẬT đèn 12V, false = Đang TẮT đèn 12V
+bool wasSleepingForLamp   = false;   // Theo dõi sườn chuyển trạng thái bắt đầu ngủ
+unsigned long lampPhaseStartMs = 0;  // Mốc thời gian bắt đầu pha 15 phút hiện tại
+int lampManualOverride    = -1;      // -1: Tự động theo giờ ngủ | 0: Ép TẮT | 1: Ép BẬT
 
 // Kết quả đo mới nhất
 float liveVocTrk  = 0.0f;
 float liveIscTrk  = 0.0f;
 float liveVocSta  = 0.0f;
 float liveIscSta  = 0.0f;
-float liveTempTrk = 28.5f;
-float liveTempSta = 28.5f;
 uint32_t totalMeasureCycles = 0;
 
-// Máy trạng thái hữu hạn (FSM) đóng ngắt Relay không chặn (Non-blocking)
+// Máy trạng thái hữu hạn (FSM) đóng ngắt Relay A-B-C-D không chặn (Non-blocking)
 enum MeasureFsmState {
   MEAS_IDLE = 0,
   MEAS_PHASE1_WAIT_VOC_SETTLE,  // Đã bật Relay A+C (ngắt tải), chờ 250ms ổn định áp hở mạch
@@ -102,9 +109,14 @@ unsigned long relayActiveStartMs = 0;
 bool relaysCurrentlyActive = false;
 
 // -------------------------------------------------------------------------
-// 4. HÀM ĐIỀU KHIỂN RELAY AN TOÀN (CÓ KHÓA LIÊN ĐỘNG & WATCHDOG 3 GIÂY)
+// 4. HÀM ĐIỀU KHIỂN RELAY A-B-C-D & RELAY E (ĐÈN 12V) AN TOÀN
 // -------------------------------------------------------------------------
 bool isCutLoadActive = false;
+
+void setLamp12vRelay(bool on) {
+  lamp12vState = on;
+  digitalWrite(PIN_RELAY_E_LAMP12V, on ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+}
 
 void forceAllRelaysOff() {
   // Luôn ngắt Relay ngắn mạch B+D trước
@@ -166,94 +178,76 @@ float readAdcMilliVoltsFiltered(uint8_t pin) {
 }
 
 // -------------------------------------------------------------------------
-// 6. GIAO TIẾP 1-WIRE ĐỌC NHIỆT ĐỘ DS18B20 (KHÔNG CHẶN, KHÔNG CẦN THƯ VIỆN NGOÀI)
+// 6. KIỂM TRA TRẠNG THÁI NGỦ CỦA HỆ THỐNG & ĐIỀU KHIỂN ĐÈN 12V (RELAY E)
 // -------------------------------------------------------------------------
-static bool ds18Reset(uint8_t pin) {
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
-  delayMicroseconds(480);
-  pinMode(pin, INPUT_PULLUP);
-  delayMicroseconds(70);
-  bool presence = (digitalRead(pin) == LOW);
-  delayMicroseconds(410);
-  return presence;
-}
-
-static void ds18WriteBit(uint8_t pin, uint8_t bit) {
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
-  if (bit) {
-    delayMicroseconds(6);
-    pinMode(pin, INPUT_PULLUP);
-    delayMicroseconds(64);
-  } else {
-    delayMicroseconds(60);
-    pinMode(pin, INPUT_PULLUP);
-    delayMicroseconds(10);
+// Hàm trả về true khi hệ thống đang trong trạng thái ngủ đêm
+bool isSystemCurrentlySleeping() {
+  if (remoteSleepDisabled) {
+    return false; // Đã bật Vô hiệu hóa ngủ đêm -> Hệ thống không ngủ
   }
-}
-
-static uint8_t ds18ReadBit(uint8_t pin) {
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
-  delayMicroseconds(3);
-  pinMode(pin, INPUT_PULLUP);
-  delayMicroseconds(10);
-  uint8_t b = digitalRead(pin);
-  delayMicroseconds(53);
-  return b;
-}
-
-static void ds18WriteByte(uint8_t pin, uint8_t data) {
-  for (uint8_t i = 0; i < 8; i++) {
-    ds18WriteBit(pin, (data >> i) & 0x01);
+  if (remoteIsSleeping) {
+    return true;  // ESP32 #1 báo đang ở trạng thái SLEEP / TEST_SLEEP
   }
-}
-
-static uint8_t ds18ReadByte(uint8_t pin) {
-  uint8_t val = 0;
-  for (uint8_t i = 0; i < 8; i++) {
-    if (ds18ReadBit(pin)) val |= (1 << i);
-  }
-  return val;
-}
-
-void updateDs18b20TemperaturesNonBlocking() {
-  static bool conversionStarted = false;
-  static unsigned long convStartMs = 0;
-
-  if (!conversionStarted) {
-    if (ds18Reset(PIN_ONEWIRE_DS18)) {
-      ds18WriteByte(PIN_ONEWIRE_DS18, 0xCC); // Skip ROM (phát lệnh đồng thời cho mọi cảm biến trên bus)
-      ds18WriteByte(PIN_ONEWIRE_DS18, 0x44); // Convert T
-      conversionStarted = true;
-      convStartMs = millis();
+  // Kiểm tra thêm khung giờ ngủ đêm (18:00 tối đến 04:00 sáng) qua NTP dự phòng
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo, 5)) {
+    int curH = timeinfo.tm_hour;
+    if (curH >= 18 || curH < 4) {
+      return true;
     }
-  } else if (millis() - convStartMs >= 800) {
-    conversionStarted = false;
-    if (ds18Reset(PIN_ONEWIRE_DS18)) {
-      ds18WriteByte(PIN_ONEWIRE_DS18, 0xCC);
-      ds18WriteByte(PIN_ONEWIRE_DS18, 0xBE); // Read Scratchpad
-      uint8_t lsb = ds18ReadByte(PIN_ONEWIRE_DS18);
-      uint8_t msb = ds18ReadByte(PIN_ONEWIRE_DS18);
-      int16_t raw = (msb << 8) | lsb;
-      float tC = (float)raw / 16.0f;
-      if (tC >= -10.0f && tC <= 95.0f && tC != 85.0f) {
-        liveTempTrk = tC;
-        liveTempSta = tC;
+  }
+  return false;
+}
+
+// Điều khiển Relay Kênh 5 (Relay E - Đèn 12V):
+// Khi hệ thống ngủ: 15 phút BẬT, 15 phút TẮT luân phiên cho tới sáng.
+// Khi hệ thống thức (ban ngày): Tự động TẮT đèn 12V.
+void updateNightLamp12vCycle() {
+  if (lampManualOverride == 1) {
+    if (!lamp12vState) setLamp12vRelay(true);
+    return;
+  } else if (lampManualOverride == 0) {
+    if (lamp12vState) setLamp12vRelay(false);
+    return;
+  }
+
+  bool sleepingNow = isSystemCurrentlySleeping();
+  unsigned long now = millis();
+
+  if (sleepingNow) {
+    if (!wasSleepingForLamp) {
+      // Vừa mới bước vào giờ ngủ -> Bắt đầu ngay pha đầu tiên: BẬT ĐÈN 12V trong 15 phút!
+      wasSleepingForLamp = true;
+      lampPhaseStartMs = now;
+      setLamp12vRelay(true);
+      Serial.println(">> [RELAY E - DEN 12V] He thong bat dau NGU DEM -> BAT DEN 12V (Pha 15 phut BAT dau tien)!");
+    } else {
+      // Đang trong giấc ngủ đêm -> Cứ đủ 15 phút (900,000 ms) thì đảo trạng thái BẬT <-> TẮT
+      if (now - lampPhaseStartMs >= LAMP_TOGGLE_INTERVAL_MS) {
+        lampPhaseStartMs = now;
+        bool nextState = !lamp12vState;
+        setLamp12vRelay(nextState);
+        Serial.printf(">> [RELAY E - DEN 12V] Het 15 phut -> Chuyen sang %s DEN 12V trong 15 phut tiep theo!\n",
+                      nextState ? "BAT (ON)" : "TAT (OFF)");
       }
     }
+  } else {
+    // Hệ thống đã thức dậy (ban ngày hoặc bật Vô hiệu hóa ngủ) -> Tắt đèn 12V ngay
+    if (wasSleepingForLamp || lamp12vState) {
+      wasSleepingForLamp = false;
+      setLamp12vRelay(false);
+      Serial.println(">> [RELAY E - DEN 12V] He thong THUC DAY -> TAT DEN 12V!");
+    }
   }
 }
 
-// -------------------------------------------------------------------------
-// 7. KIỂM TRA ĐIỀU KIỆN CHO PHÉP NHẢY RELAY (KHÔNG NHẢY TRONG GIỜ NGỦ!)
-// -------------------------------------------------------------------------
+// Kiểm tra điều kiện cho phép nhảy 4 Relay đo Voc/Isc (A, B, C, D):
+// Chỉ nhảy khi KHÔNG trong giờ ngủ!
 bool isRelayAllowedToClick() {
   if (forceSingleTest) return true;
 
-  // Quy tắc 1: Nếu hệ thống đang ở trạng thái ngủ (SLEEP / TEST_SLEEP) -> TUYỆT ĐỐI KHÔNG NHẢY RELAY
-  if (remoteIsSleeping) {
+  // Quy tắc 1: Trong giờ ngủ -> TUYỆT ĐỐI KHÔNG nhảy Relay A-B-C-D
+  if (isSystemCurrentlySleeping()) {
     return false;
   }
 
@@ -262,20 +256,11 @@ bool isRelayAllowedToClick() {
     return false;
   }
 
-  // Quy tắc 3: Kiểm tra khung giờ thực tế từ NTP (nếu đã đồng bộ giờ) và chưa bật Vô hiệu hóa ngủ
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo, 5)) {
-    int curH = timeinfo.tm_hour;
-    if (!remoteSleepDisabled && (curH >= 18 || curH < 6)) {
-      return false; // Trong khung giờ ngủ đêm (18:00 - 06:00) -> Không nhảy relay
-    }
-  }
-
   return true;
 }
 
 // -------------------------------------------------------------------------
-// 8. ĐỒNG BỘ TRẠNG THÁI NGỦ & CHU KỲ RELAY TỪ FIREBASE VÀ ĐẨY KẾT QUẢ ĐO
+// 7. ĐỒNG BỘ TRẠNG THÁI NGỦ & CHU KỲ RELAY TỪ FIREBASE VÀ ĐẨY KẾT QUẢ ĐO
 // -------------------------------------------------------------------------
 void pollSystemStateAndConfig() {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
@@ -342,18 +327,25 @@ void pollSystemStateAndConfig() {
 void pushVocIscToFirebase() {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
 
+  unsigned long lampRemainSec = 0;
+  if (wasSleepingForLamp) {
+    unsigned long elapsed = millis() - lampPhaseStartMs;
+    if (elapsed < LAMP_TOGGLE_INTERVAL_MS) {
+      lampRemainSec = (LAMP_TOGGLE_INTERVAL_MS - elapsed) / 1000UL;
+    }
+  }
+
   // Cập nhật trực tiếp vào /solar/tracking và /solar/static để Web Dashboard hiển thị tức thời
   FirebaseJson trkPatch;
   trkPatch.set("voc_trk", liveVocTrk);
   trkPatch.set("isc_trk", liveIscTrk);
-  trkPatch.set("temp_trk", liveTempTrk);
   trkPatch.set("relayIntervalSec", (int)relayIntervalSec);
+  trkPatch.set("lamp12vOn", lamp12vState);
   Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trkPatch);
 
   FirebaseJson staPatch;
   staPatch.set("voc_sta", liveVocSta);
   staPatch.set("isc_sta", liveIscSta);
-  staPatch.set("temp_sta", liveTempSta);
   Firebase.RTDB.updateNode(&fbdo, "/solar/static", &staPatch);
 
   // Cập nhật nhánh chuyên biệt /solar/voc_isc_node để giám sát chẩn đoán
@@ -362,11 +354,11 @@ void pushVocIscToFirebase() {
   nodeJson.set("isc_trk", liveIscTrk);
   nodeJson.set("voc_sta", liveVocSta);
   nodeJson.set("isc_sta", liveIscSta);
-  nodeJson.set("temp_trk", liveTempTrk);
-  nodeJson.set("temp_sta", liveTempSta);
   nodeJson.set("relay_interval_sec", (int)relayIntervalSec);
-  nodeJson.set("is_sleeping", remoteIsSleeping);
+  nodeJson.set("is_sleeping", isSystemCurrentlySleeping());
   nodeJson.set("sleep_disabled", remoteSleepDisabled);
+  nodeJson.set("lamp_12v_on", lamp12vState);
+  nodeJson.set("lamp_phase_remain_sec", (int)lampRemainSec);
   nodeJson.set("cycles_count", (int)totalMeasureCycles);
   nodeJson.set("online", true);
   nodeJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
@@ -375,7 +367,7 @@ void pushVocIscToFirebase() {
 }
 
 // -------------------------------------------------------------------------
-// 9. MÁY TRẠNG THÁI ĐO VOC & ISC KHÔNG CHẶN (NON-BLOCKING FSM)
+// 8. MÁY TRẠNG THÁI ĐO VOC & ISC KHÔNG CHẶN (NON-BLOCKING FSM)
 // -------------------------------------------------------------------------
 void runMeasurementStateMachine() {
   unsigned long now = millis();
@@ -387,11 +379,11 @@ void runMeasurementStateMachine() {
     return;
   }
 
-  // Nếu đang trong giờ ngủ phát sinh giữa chừng -> Ngắt toàn bộ relay ngay
+  // Nếu đang trong giờ ngủ phát sinh giữa chừng -> Ngắt toàn bộ relay đo Voc/Isc ngay
   if (!isRelayAllowedToClick()) {
     if (measState != MEAS_IDLE || relaysCurrentlyActive) {
       forceAllRelaysOff();
-      Serial.println(">> [SLEEP GUARD] He thong vao gio ngu -> Ngat toan bo Relay ngay lap tuc!");
+      Serial.println(">> [SLEEP GUARD] He thong vao gio ngu -> Ngat toan bo Relay A-B-C-D ngay lap tuc!");
     }
     return;
   }
@@ -474,11 +466,12 @@ void runMeasurementStateMachine() {
         measState = MEAS_IDLE;
         totalMeasureCycles++;
 
-        Serial.printf(">> [VOC/ISC #%lu] TRK: Voc=%.2fV, Isc=%.3fA, T=%.1fC | STA: Voc=%.2fV, Isc=%.3fA | Chu ky: %lus\n",
+        Serial.printf(">> [VOC/ISC #%lu] TRK: Voc=%.2fV, Isc=%.3fA | STA: Voc=%.2fV, Isc=%.3fA | Chu ky: %lus | Den 12V: %s\n",
                       (unsigned long)totalMeasureCycles,
-                      liveVocTrk, liveIscTrk, liveTempTrk,
+                      liveVocTrk, liveIscTrk,
                       liveVocSta, liveIscSta,
-                      (unsigned long)relayIntervalSec);
+                      (unsigned long)relayIntervalSec,
+                      lamp12vState ? "ON" : "OFF");
 
         // Đẩy kết quả đo mới nhất lên Firebase ngay sau khi hoàn tất chu kỳ
         pushVocIscToFirebase();
@@ -489,7 +482,7 @@ void runMeasurementStateMachine() {
 }
 
 // -------------------------------------------------------------------------
-// 10. XỬ LÝ LỆNH SERIAL CLI CHẨN ĐOÁN & HIỆU CHUẨN NHANH
+// 9. XỬ LÝ LỆNH SERIAL CLI CHẨN ĐOÁN & HIỆU CHUẨN NHANH
 // -------------------------------------------------------------------------
 void handleSerialCommands() {
   if (!Serial.available()) return;
@@ -500,17 +493,30 @@ void handleSerialCommands() {
   if (cmd.equalsIgnoreCase("test")) {
     forceSingleTest = true;
     Serial.println(">> [CLI] Kich hoat 1 chu ky do Voc/Isc ngay lap tuc!");
+  } else if (cmd.equalsIgnoreCase("lamp on")) {
+    lampManualOverride = 1;
+    setLamp12vRelay(true);
+    Serial.println(">> [CLI] Da EP BAT Den 12V (Relay E = ON)!");
+  } else if (cmd.equalsIgnoreCase("lamp off")) {
+    lampManualOverride = 0;
+    setLamp12vRelay(false);
+    Serial.println(">> [CLI] Da EP TAT Den 12V (Relay E = OFF)!");
+  } else if (cmd.equalsIgnoreCase("lamp auto")) {
+    lampManualOverride = -1;
+    Serial.println(">> [CLI] Da chuyen Den 12V (Relay E) ve che do TU DONG (15p BAT / 15p TAT khi ngu)!");
   } else if (cmd.equalsIgnoreCase("status")) {
     Serial.println("\n================ TRANG THAI NODE VOC/ISC (#2) ================");
     Serial.printf(" WiFi IP           : %s\n", WiFi.localIP().toString().c_str());
-    Serial.printf(" Chu ky Relay      : %lu giay\n", (unsigned long)relayIntervalSec);
+    Serial.printf(" Chu ky Relay A-D  : %lu giay\n", (unsigned long)relayIntervalSec);
     Serial.printf(" Trang thai Ngu    : %s (Vo hieu hoa ngu: %s)\n",
-                  remoteIsSleeping ? "DANG NGU (Khoa Relay)" : "THUC (Cho phep Relay)",
+                  isSystemCurrentlySleeping() ? "DANG NGU (Khoa Relay A-D, Chay Den 12V 15p/15p)" : "THUC (Cho phep Relay A-D)",
                   remoteSleepDisabled ? "BAT" : "TAT");
-    Serial.printf(" Tam Xoay (TRK)    : Voc = %.2f V | Isc = %.3f A | Temp = %.1f C\n",
-                  liveVocTrk, liveIscTrk, liveTempTrk);
-    Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A | Temp = %.1f C\n",
-                  liveVocSta, liveIscSta, liveTempSta);
+    Serial.printf(" Den 12V (Relay E) : %s (GPIO %d)\n",
+                  lamp12vState ? "DANG BAT (ON)" : "DANG TAT (OFF)", PIN_RELAY_E_LAMP12V);
+    Serial.printf(" Tam Xoay (TRK)    : Voc = %.2f V | Isc = %.3f A\n",
+                  liveVocTrk, liveIscTrk);
+    Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A\n",
+                  liveVocSta, liveIscSta);
     Serial.println("==============================================================\n");
   } else if (cmd.startsWith("interval ")) {
     int sec = cmd.substring(9).toInt();
@@ -523,20 +529,22 @@ void handleSerialCommands() {
 }
 
 // -------------------------------------------------------------------------
-// 11. SETUP & LOOP CHÍNH
+// 10. SETUP & LOOP CHÍNH
 // -------------------------------------------------------------------------
 void setup() {
-  // BƯỚC 1: KHÓA AN TOÀN TOÀN BỘ 4 RELAY NGAY TỪ MICRO-GIÂY ĐẦU TIÊN KHI CẤP NGUỒN!
+  // BƯỚC 1: KHÓA AN TOÀN TOÀN BỘ 5 RELAY (A, B, C, D, E) NGAY KHI CẤP NGUỒN!
   pinMode(PIN_RELAY_A_CUT, OUTPUT);
   pinMode(PIN_RELAY_C_CUT, OUTPUT);
   pinMode(PIN_RELAY_B_ISC, OUTPUT);
   pinMode(PIN_RELAY_D_ISC, OUTPUT);
+  pinMode(PIN_RELAY_E_LAMP12V, OUTPUT);
   forceAllRelaysOff();
+  setLamp12vRelay(false);
 
   Serial.begin(115200);
   delay(200);
   Serial.println("\n=======================================================");
-  Serial.println("  ESP32-S3 #2: NODE DO VOC, ISC & NHIET DO (FZ0430 + ACS712)");
+  Serial.println("  ESP32-S3 #2: NODE DO VOC, ISC & DEN 12V (RELAY E)");
   Serial.println("=======================================================");
 
   // BƯỚC 2: Cấu hình 4 kênh ADC1 với suy hao 11dB (đo chuẩn dải 0..3100mV)
@@ -545,7 +553,6 @@ void setup() {
   analogSetPinAttenuation(PIN_ADC_ISC_TRK, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_VOC_STA, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_ISC_STA, ADC_11db);
-  pinMode(PIN_ONEWIRE_DS18, INPUT_PULLUP);
 
   // BƯỚC 3: Khôi phục cấu hình từ NVS Flash
   prefs.begin("voc_isc_cfg", false);
@@ -553,7 +560,8 @@ void setup() {
   if (relayIntervalSec < 3 || relayIntervalSec > 3600) relayIntervalSec = 10;
   calVocScaleTrk = prefs.getFloat("voc_k_trk", 9.8386f);
   calVocScaleSta = prefs.getFloat("voc_k_sta", 9.8386f);
-  Serial.printf(">> [NVS] Chu ky nhay Relay mac dinh: %lu giay\n", (unsigned long)relayIntervalSec);
+  Serial.printf(">> [NVS] Chu ky nhay Relay A-D: %lu giay | Relay E (Den 12V): GPIO %d\n",
+                (unsigned long)relayIntervalSec, PIN_RELAY_E_LAMP12V);
 
   // BƯỚC 4: Kết nối WiFi & đồng bộ giờ NTP (múi giờ Việt Nam UTC+7)
   WiFi.mode(WIFI_STA);
@@ -585,6 +593,7 @@ void setup() {
   ArduinoOTA.setPassword("solar2026");
   ArduinoOTA.onStart([]() {
     forceAllRelaysOff();
+    setLamp12vRelay(false);
     Serial.println("\n>> [OTA] Ngat toan bo Relay an toan & bat dau nap OTA...");
   });
   ArduinoOTA.begin();
@@ -594,7 +603,7 @@ void setup() {
   esp_task_wdt_add(NULL);
 
   lastCycleFinishMs = millis();
-  Serial.println(">> [READY] He thong do Voc/Isc da san sang! Go 'status' hoac 'test' tren Serial.\n");
+  Serial.println(">> [READY] He thong do Voc/Isc & Den 12V da san sang!\n");
 }
 
 void loop() {
@@ -613,9 +622,6 @@ void loop() {
     }
   }
 
-  // Đọc nhiệt độ DS18B20 không chặn
-  updateDs18b20TemperaturesNonBlocking();
-
   // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 2 giây (khi đang ở MEAS_IDLE)
   static unsigned long lastFirebaseSyncMs = 0;
   if (measState == MEAS_IDLE && (millis() - lastFirebaseSyncMs >= 2000)) {
@@ -623,7 +629,18 @@ void loop() {
     pollSystemStateAndConfig();
   }
 
-  // Chạy máy trạng thái đóng ngắt Relay đo Voc & Isc
+  // Cập nhật chu trình Đèn 12V qua Relay Kênh 5 (Relay E):
+  // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
+  updateNightLamp12vCycle();
+
+  // Định kỳ mỗi 10 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
+  static unsigned long lastSleepHeartbeatMs = 0;
+  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 10000)) {
+    lastSleepHeartbeatMs = millis();
+    pushVocIscToFirebase();
+  }
+
+  // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc (Chỉ chạy khi thức)
   runMeasurementStateMachine();
 
   // Xử lý lệnh Serial CLI
@@ -631,4 +648,3 @@ void loop() {
 
   delay(5);
 }
-
