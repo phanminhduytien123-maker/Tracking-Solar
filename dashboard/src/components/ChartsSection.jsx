@@ -1021,23 +1021,23 @@ export default function ChartsSection({
 
           {/* Bảng dữ liệu có cuộn dọc */}
           <div className="border border-zinc-200 dark:border-slate-800 rounded-sm overflow-x-auto max-h-[380px]">
-            <table className="w-full text-left border-collapse text-xs tabular-nums">
-              <thead className="bg-zinc-50/90 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700">
+            <table className="w-full text-left border-collapse text-[13px] tabular-nums font-sans">
+              <thead className="bg-zinc-50/95 dark:bg-slate-800/95 text-zinc-800 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700 text-xs font-bold">
                 <tr>
-                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">STT</th>
-                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">Ngày</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Tracker (Wh)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Cố định (Wh)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">% Gain</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Voc Trk (V)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Voc Sta (V)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Isc Trk (A)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">Isc Sta (A)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">T° Trk (°C)</th>
-                  <th className="py-2.5 px-3 text-right font-bold text-zinc-900 dark:text-white">T° Sta (°C)</th>
-                  <th className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">Ghi chú</th>
-                  <th className="py-2.5 px-3 text-center font-bold text-zinc-900 dark:text-white">Trạng thái</th>
-                  {isAdmin && onOpenDataSettings && <th className="py-2.5 px-3 text-center font-bold text-zinc-900 dark:text-white">Thao tác</th>}
+                  <th className="py-2.5 px-3">STT</th>
+                  <th className="py-2.5 px-3">Ngày</th>
+                  <th className="py-2.5 px-3 text-right">Tracker (Wh)</th>
+                  <th className="py-2.5 px-3 text-right">Cố định (Wh)</th>
+                  <th className="py-2.5 px-3 text-right">% Gain</th>
+                  <th className="py-2.5 px-3 text-right">Voc Trk (V)</th>
+                  <th className="py-2.5 px-3 text-right">Voc Sta (V)</th>
+                  <th className="py-2.5 px-3 text-right">Isc Trk (A)</th>
+                  <th className="py-2.5 px-3 text-right">Isc Sta (A)</th>
+                  <th className="py-2.5 px-3 text-right">T° Trk (°C)</th>
+                  <th className="py-2.5 px-3 text-right">T° Sta (°C)</th>
+                  <th className="py-2.5 px-3">Ghi chú</th>
+                  <th className="py-2.5 px-3 text-center">Trạng thái</th>
+                  {isAdmin && onOpenDataSettings && <th className="py-2.5 px-3 text-center">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
@@ -1053,54 +1053,54 @@ export default function ChartsSection({
                     const staWh = row.staticWh !== undefined ? row.staticWh : (Number(row.staticKwh || 0) * 1000);
                     return (
                       <tr key={row.date} className="hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-2 px-3 text-zinc-400 font-mono">{idx + 1}</td>
-                        <td className="py-2 px-3 font-bold text-zinc-900 dark:text-white font-mono">{row.date}</td>
-                        <td className="py-2 px-3 text-right font-mono font-semibold text-blue-700 dark:text-blue-400">
+                        <td className="py-2.5 px-3 text-zinc-400 dark:text-slate-500 font-medium text-xs">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white whitespace-nowrap">{row.date}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-blue-600 dark:text-blue-400 text-sm">
                           {formatDecimal(trkWh, 1)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-amber-700 dark:text-amber-400">
+                        <td className="py-2.5 px-3 text-right font-bold text-amber-600 dark:text-amber-400 text-sm">
                           {formatDecimal(staWh, 1)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        <td className="py-2.5 px-3 text-right font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
                           {formatSignedNumber(row.gainPercent, 1, '%')}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-zinc-800 dark:text-slate-200">
+                        <td className="py-2.5 px-3 text-right font-semibold text-zinc-900 dark:text-slate-100">
                           {formatDecimal(row.voc_trk, 2)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2.5 px-3 text-right font-semibold text-zinc-600 dark:text-slate-300">
                           {formatDecimal(row.voc_sta, 2)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-emerald-700 dark:text-emerald-300 font-semibold">
+                        <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                           {formatDecimal(row.isc_trk, 2)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2.5 px-3 text-right font-semibold text-zinc-600 dark:text-slate-300">
                           {formatDecimal(row.isc_sta, 2)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-zinc-800 dark:text-slate-200">
+                        <td className="py-2.5 px-3 text-right font-medium text-zinc-800 dark:text-slate-200">
                           {formatDecimal(row.temp_trk, 1)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono text-zinc-500 dark:text-slate-400">
+                        <td className="py-2.5 px-3 text-right font-medium text-zinc-500 dark:text-slate-400">
                           {formatDecimal(row.temp_sta, 1)}
                         </td>
-                        <td className="py-2 px-3 text-zinc-600 dark:text-slate-300 max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
+                        <td className="py-2.5 px-3 text-zinc-600 dark:text-slate-300 text-xs max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
                           {row.weather_note || 'Bình thường'}
                         </td>
-                        <td className="py-2 px-3 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           {row.severe_invalid ? (
-                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-xs">
+                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-sm">
                               Lỗi
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-xs">
+                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-sm">
                               Hợp lệ
                             </span>
                           )}
                         </td>
                         {isAdmin && onOpenDataSettings && (
-                          <td className="py-2 px-3 text-center">
+                          <td className="py-2.5 px-3 text-center">
                             <button
                               onClick={() => onOpenDataSettings(row.date)}
-                              className="px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
+                              className="px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
                               title={`Chỉnh sửa dữ liệu ngày ${row.date}`}
                             >
                               Sửa

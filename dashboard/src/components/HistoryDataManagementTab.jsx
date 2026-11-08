@@ -605,17 +605,17 @@ export default function HistoryDataManagementTab({
           <span className="text-[11px] font-normal text-zinc-500">Nhấp chọn hàng để chỉnh sửa</span>
         </div>
         <div className="max-h-56 overflow-y-auto">
-          <table className="w-full text-left border-collapse text-xs tabular-nums">
-            <thead className="bg-zinc-50 text-zinc-700 sticky top-0 border-b border-zinc-200">
+          <table className="w-full text-left border-collapse text-[13px] tabular-nums font-sans">
+            <thead className="bg-zinc-50 text-zinc-800 sticky top-0 border-b border-zinc-200 text-xs font-bold">
               <tr>
-                <th className="py-2 px-2.5 font-bold">Ngày</th>
-                <th className="py-2 px-2.5 text-right font-bold">Tracker (Wh)</th>
-                <th className="py-2 px-2.5 text-right font-bold">Cố định (Wh)</th>
-                <th className="py-2 px-2.5 text-right font-bold">% Gain</th>
-                <th className="py-2 px-2.5 text-right font-bold">Voc Trk (V)</th>
-                <th className="py-2 px-2.5 text-right font-bold">Isc Trk (A)</th>
-                <th className="py-2 px-2.5 text-right font-bold">Nhiệt độ Trk</th>
-                <th className="py-2 px-2.5 text-center font-bold">Trạng thái</th>
+                <th className="py-2 px-2.5">Ngày</th>
+                <th className="py-2 px-2.5 text-right">Tracker (Wh)</th>
+                <th className="py-2 px-2.5 text-right">Cố định (Wh)</th>
+                <th className="py-2 px-2.5 text-right">% Gain</th>
+                <th className="py-2 px-2.5 text-right">Voc Trk (V)</th>
+                <th className="py-2 px-2.5 text-right">Isc Trk (A)</th>
+                <th className="py-2 px-2.5 text-right">Nhiệt độ Trk</th>
+                <th className="py-2 px-2.5 text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
@@ -633,22 +633,22 @@ export default function HistoryDataManagementTab({
                         : 'hover:bg-zinc-50'
                     }`}
                   >
-                    <td className="py-1.5 px-2.5 font-bold font-mono">{d.date}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-blue-700">{formatDecimal(trkWh, 1)}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-amber-700">{formatDecimal(staWh, 1)}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-700">
+                    <td className="py-2 px-2.5 font-bold text-zinc-900">{d.date}</td>
+                    <td className="py-2 px-2.5 text-right font-bold text-blue-600 text-sm">{formatDecimal(trkWh, 1)}</td>
+                    <td className="py-2 px-2.5 text-right font-bold text-amber-600 text-sm">{formatDecimal(staWh, 1)}</td>
+                    <td className="py-2 px-2.5 text-right font-extrabold text-emerald-600 text-sm">
                       {formatSignedNumber(d.gainPercent, 1, '%')}
                     </td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-zinc-700">{formatDecimal(d.voc_trk, 2)}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-zinc-700">{formatDecimal(d.isc_trk, 2)}</td>
-                    <td className="py-1.5 px-2.5 text-right font-mono text-zinc-700">{formatDecimal(d.temp_trk, 1)}°C</td>
-                    <td className="py-1.5 px-2.5 text-center">
+                    <td className="py-2 px-2.5 text-right font-semibold text-zinc-900">{formatDecimal(d.voc_trk, 2)}</td>
+                    <td className="py-2 px-2.5 text-right font-semibold text-emerald-600">{formatDecimal(d.isc_trk, 2)}</td>
+                    <td className="py-2 px-2.5 text-right font-medium text-zinc-800">{formatDecimal(d.temp_trk, 1)}°C</td>
+                    <td className="py-2 px-2.5 text-center">
                       {d.severe_invalid ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-red-100 text-red-800 rounded-xs">
+                        <span className="px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800 rounded-sm">
                           Lỗi
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 rounded-xs">
+                        <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-800 rounded-sm">
                           Hợp lệ
                         </span>
                       )}
