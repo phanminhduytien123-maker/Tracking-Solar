@@ -910,7 +910,10 @@ export default function App() {
       system: {
         ...prev.system,
         lampOnMin: onVal,
-        lampOffMin: offVal
+        lampOffMin: offVal,
+        lamp12vOn: true,
+        lampAutoPhase: 'ON',
+        lampRemainSec: onVal * 60
       }
     }));
   };

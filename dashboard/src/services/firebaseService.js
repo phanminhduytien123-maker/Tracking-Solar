@@ -965,20 +965,32 @@ export class FirebaseSolarService {
       lampRemainSec = null;
     } else {
       // Khi ở chế độ Tự động: Ưu tiên dữ liệu thực tế từ phần cứng ESP32 #2
-      if (vocIscNode.lamp_12v_on !== undefined && vocIscNode.updated_at && (now - Number(vocIscNode.updated_at) < 60000)) {
+      // Node ESP32 #2 được coi là online nếu có bản tin trong vòng 120 giây
+      const hasRecentVocNode = vocIscNode.updated_at && (serverTimeNow - Number(vocIscNode.updated_at) < 120000);
+
+      if (hasRecentVocNode && vocIscNode.lamp_12v_on !== undefined) {
         lamp12vOn = Boolean(vocIscNode.lamp_12v_on);
-        lampRemainSec = (vocIscNode.lamp_remain_sec !== undefined && vocIscNode.lamp_remain_sec !== null)
-          ? Number(vocIscNode.lamp_remain_sec)
-          : null;
         lampAutoPhase = vocIscNode.lamp_auto_phase || (lamp12vOn ? 'ON' : 'OFF');
-      } else if (tracking.lamp12vOn !== undefined) {
+
+        // NỘI SUY MƯỢT THỜI GIAN ĐẾM NGƯỢC GIỮA CÁC GÓI HEARTBEAT CỦA PHẦN CỨNG:
+        // Giúp đồng hồ đếm ngược từng giây một mượt mà (09:59 -> 09:58 -> 09:57...)
+        // không bị đứng hình 10s và tuyệt đối không bị nhảy gián đoạn qua lại!
+        const elapsedSecSinceHeartbeat = Math.max(0, Math.floor((serverTimeNow - Number(vocIscNode.updated_at)) / 1000));
+        const rawReportedRemainSec = (vocIscNode.lamp_remain_sec !== undefined && vocIscNode.lamp_remain_sec !== null)
+          ? Number(vocIscNode.lamp_remain_sec)
+          : (lampAutoPhase === 'ON' ? lampOnMin * 60 : lampOffMin * 60);
+
+        lampRemainSec = Math.max(0, rawReportedRemainSec - elapsedSecSinceHeartbeat);
+      } else if (tracking.lamp12vOn !== undefined && (now - Number(tracking.lastUpdate || 0) < 60000)) {
         lamp12vOn = Boolean(tracking.lamp12vOn);
-        lampRemainSec = (tracking.lampRemainSec !== undefined && tracking.lampRemainSec !== null)
-          ? Number(tracking.lampRemainSec)
-          : null;
         lampAutoPhase = tracking.lampAutoPhase || (lamp12vOn ? 'ON' : 'OFF');
+        const elapsedSecSinceTrk = Math.max(0, Math.floor((serverTimeNow - Number(tracking.lastUpdate || serverTimeNow)) / 1000));
+        const rawTrkRemain = (tracking.lampRemainSec !== undefined && tracking.lampRemainSec !== null)
+          ? Number(tracking.lampRemainSec)
+          : (lampAutoPhase === 'ON' ? lampOnMin * 60 : lampOffMin * 60);
+        lampRemainSec = Math.max(0, rawTrkRemain - elapsedSecSinceTrk);
       } else if (isSleeping && !resolvedSleepDisabled) {
-        // Fallback khi thiết bị offline nhưng đang trong giờ ngủ
+        // Fallback duy nhất: Khi TOÀN BỘ phần cứng offline nhưng hệ thống đang ngủ
         const onMs = lampOnMin * 60 * 1000;
         const offMs = lampOffMin * 60 * 1000;
         const cycleMs = onMs + offMs;
@@ -1385,6 +1397,7 @@ export class FirebaseSolarService {
     const onVal = Math.max(1, Math.min(360, Math.round(Number(onMin) || 15)));
     const offVal = Math.max(1, Math.min(360, Math.round(Number(offMin) || 15)));
     const nowTs = Date.now();
+    this._lampSleepStartMs = nowTs;
     if (this.db) {
       try {
         await update(ref(this.db, 'solar/config/voc_isc'), {
@@ -1396,11 +1409,18 @@ export class FirebaseSolarService {
         await update(ref(this.db, 'solar/voc_isc_node'), {
           lamp_on_min: onVal,
           lamp_off_min: offVal,
+          lamp_12v_on: true,
+          lamp_auto_phase: 'ON',
+          lamp_remain_sec: onVal * 60,
+          lamp_phase_remain_sec: onVal * 60,
           updated_at: nowTs
         }).catch(() => {});
         await update(ref(this.db, 'solar/tracking'), {
           lampOnMin: onVal,
-          lampOffMin: offVal
+          lampOffMin: offVal,
+          lamp12vOn: true,
+          lampAutoPhase: 'ON',
+          lampRemainSec: onVal * 60
         }).catch(() => {});
         return true;
       } catch (e) {
