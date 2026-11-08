@@ -499,7 +499,7 @@ export default function ManualControlModal({
                   <span className="text-[11px] text-zinc-500 block mt-0.5">
                     {system?.lampAutoDisabled
                       ? 'Đang BẬT vô hiệu hóa tự động: Đèn tự động tắt khi mới kích hoạt; có thể Bật/Tắt đèn 12V bằng tay.'
-                      : 'Đang TẮT vô hiệu hóa (Chế độ Tự động): Đèn tắt và đếm lại 15p để bật, luân phiên 15p Bật / 15p Tắt khi ngủ.'}
+                      : `Đang TẮT vô hiệu hóa (Chế độ Tự động): Luân phiên BẬT ${system?.lampOnMin || 15}p / TẮT ${system?.lampOffMin || 15}p khi ngủ.`}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -523,7 +523,7 @@ export default function ManualControlModal({
                         : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
                     }`}
                   >
-                    Tắt (Tự động 15p)
+                    Tắt (Tự động luân phiên)
                   </button>
                 </div>
               </div>

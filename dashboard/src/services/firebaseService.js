@@ -929,6 +929,20 @@ export class FirebaseSolarService {
         ? Math.max(3, Number(tracking.relayIntervalSec))
         : 10);
 
+    // Cấu hình chu kỳ BẬT / TẮT của Đèn 12V (Relay E) - mặc định 15 phút / 15 phút
+    const lampOnMin = Math.max(1, Math.min(360, Number(
+      vocIscCfg.lamp_on_min ??
+      vocIscNode.lamp_on_min ??
+      tracking.lampOnMin ??
+      15
+    )));
+    const lampOffMin = Math.max(1, Math.min(360, Number(
+      vocIscCfg.lamp_off_min ??
+      vocIscNode.lamp_off_min ??
+      tracking.lampOffMin ??
+      15
+    )));
+
     // Trạng thái Đèn 12V (Relay Kênh 5 - Relay E trên GPIO 42 của ESP32 #2)
     const lampAutoDisabled = vocIscCfg.lamp_auto_disabled !== undefined
       ? Boolean(vocIscCfg.lamp_auto_disabled)
@@ -943,38 +957,49 @@ export class FirebaseSolarService {
 
     let lamp12vOn = false;
     let lampRemainSec = null;
-    const LAMP_PHASE_MS = 15 * 60 * 1000; // 15 phút = 900.000 ms
+    let lampAutoPhase = vocIscNode.lamp_auto_phase || tracking.lampAutoPhase || (lamp12vOn ? 'ON' : 'OFF');
 
     if (lampAutoDisabled) {
       // Khi bật "Vô hiệu hóa tự động": trạng thái đèn phụ thuộc điều khiển tay (mặc định khi mới bật vô hiệu hóa là TẮT)
       lamp12vOn = lampManualState;
       lampRemainSec = null;
     } else {
-      // Khi ở chế độ Tự động:
-      const resetTs = Number(vocIscCfg.lamp_cycle_reset_ts || 0);
-      if (isSleeping && !resolvedSleepDisabled) {
-        if (resetTs > 0) {
-          // Sau khi tắt chức năng vô hiệu hóa tự động -> đèn TẮT trước, đếm đủ 15p rồi mới BẬT 15p luân phiên
-          const elapsedMs = Math.max(0, now - resetTs);
-          const phaseIdx = Math.floor(elapsedMs / LAMP_PHASE_MS);
-          lamp12vOn = (phaseIdx % 2 === 1); // phase 0 (0-15p): TẮT, phase 1 (15-30p): BẬT, ...
-          lampRemainSec = Math.max(0, Math.ceil((LAMP_PHASE_MS - (elapsedMs % LAMP_PHASE_MS)) / 1000));
-        } else if (vocIscNode.lamp_12v_on !== undefined && vocIscNode.updated_at && (now - Number(vocIscNode.updated_at) < 30000)) {
-          lamp12vOn = Boolean(vocIscNode.lamp_12v_on);
-          lampRemainSec = vocIscNode.lamp_remain_sec !== undefined ? Number(vocIscNode.lamp_remain_sec) : null;
+      // Khi ở chế độ Tự động: Ưu tiên dữ liệu thực tế từ phần cứng ESP32 #2
+      if (vocIscNode.lamp_12v_on !== undefined && vocIscNode.updated_at && (now - Number(vocIscNode.updated_at) < 60000)) {
+        lamp12vOn = Boolean(vocIscNode.lamp_12v_on);
+        lampRemainSec = (vocIscNode.lamp_remain_sec !== undefined && vocIscNode.lamp_remain_sec !== null)
+          ? Number(vocIscNode.lamp_remain_sec)
+          : null;
+        lampAutoPhase = vocIscNode.lamp_auto_phase || (lamp12vOn ? 'ON' : 'OFF');
+      } else if (tracking.lamp12vOn !== undefined) {
+        lamp12vOn = Boolean(tracking.lamp12vOn);
+        lampRemainSec = (tracking.lampRemainSec !== undefined && tracking.lampRemainSec !== null)
+          ? Number(tracking.lampRemainSec)
+          : null;
+        lampAutoPhase = tracking.lampAutoPhase || (lamp12vOn ? 'ON' : 'OFF');
+      } else if (isSleeping && !resolvedSleepDisabled) {
+        // Fallback khi thiết bị offline nhưng đang trong giờ ngủ
+        const onMs = lampOnMin * 60 * 1000;
+        const offMs = lampOffMin * 60 * 1000;
+        const cycleMs = onMs + offMs;
+        if (!this._lampSleepStartMs) {
+          this._lampSleepStartMs = now;
+        }
+        const elapsedMs = (now - this._lampSleepStartMs) % cycleMs;
+        if (elapsedMs < onMs) {
+          lamp12vOn = true;
+          lampAutoPhase = 'ON';
+          lampRemainSec = Math.max(0, Math.ceil((onMs - elapsedMs) / 1000));
         } else {
-          if (!this._lampSleepStartMs) {
-            this._lampSleepStartMs = now;
-          }
-          const elapsedMs = Math.max(0, now - this._lampSleepStartMs);
-          const phaseIdx = Math.floor(elapsedMs / LAMP_PHASE_MS);
-          lamp12vOn = (phaseIdx % 2 === 0); // Khi mới vào ngủ tự nhiên: BẬT 15p -> TẮT 15p
-          lampRemainSec = Math.max(0, Math.ceil((LAMP_PHASE_MS - (elapsedMs % LAMP_PHASE_MS)) / 1000));
+          lamp12vOn = false;
+          lampAutoPhase = 'OFF';
+          lampRemainSec = Math.max(0, Math.ceil((cycleMs - elapsedMs) / 1000));
         }
       } else {
         this._lampSleepStartMs = null;
         lamp12vOn = false;
         lampRemainSec = null;
+        lampAutoPhase = 'OFF';
       }
     }
 
@@ -1014,6 +1039,9 @@ export class FirebaseSolarService {
         lampAutoDisabled,
         lampManualState,
         lampRemainSec,
+        lampOnMin,
+        lampOffMin,
+        lampAutoPhase,
         holdRemainSec: (tracking.holdRemainSec !== undefined && tracking.holdRemainSec !== null && !isNaN(tracking.holdRemainSec))
           ? Number(tracking.holdRemainSec)
           : (rawState === 'HOLD_15M' ? (this._fallbackRemainSec || 900) : null),
@@ -1347,6 +1375,36 @@ export class FirebaseSolarService {
         return true;
       } catch (e) {
         console.warn('[Firebase setLampManualState update node warn]', e);
+        return false;
+      }
+    }
+    return false;
+  }
+
+  async setLampCustomCycle(onMin, offMin) {
+    const onVal = Math.max(1, Math.min(360, Math.round(Number(onMin) || 15)));
+    const offVal = Math.max(1, Math.min(360, Math.round(Number(offMin) || 15)));
+    const nowTs = Date.now();
+    if (this.db) {
+      try {
+        await update(ref(this.db, 'solar/config/voc_isc'), {
+          lamp_on_min: onVal,
+          lamp_off_min: offVal,
+          lamp_config_apply_ts: nowTs,
+          updated_at: nowTs
+        });
+        await update(ref(this.db, 'solar/voc_isc_node'), {
+          lamp_on_min: onVal,
+          lamp_off_min: offVal,
+          updated_at: nowTs
+        }).catch(() => {});
+        await update(ref(this.db, 'solar/tracking'), {
+          lampOnMin: onVal,
+          lampOffMin: offVal
+        }).catch(() => {});
+        return true;
+      } catch (e) {
+        console.warn('[Firebase setLampCustomCycle error]', e);
         return false;
       }
     }

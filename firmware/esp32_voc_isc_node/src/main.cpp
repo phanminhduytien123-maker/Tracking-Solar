@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.2"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.3"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -47,8 +47,12 @@
 #define RELAY_ON_LEVEL      (RELAY_ACTIVE_LOW ? LOW : HIGH)
 #define RELAY_OFF_LEVEL     (RELAY_ACTIVE_LOW ? HIGH : LOW)
 
-// Chu kỳ luân phiên BẬT / TẮT của Đèn 12V (Relay E) khi hệ thống ngủ: 15 phút = 900,000 ms
-const unsigned long LAMP_TOGGLE_INTERVAL_MS = 15UL * 60UL * 1000UL; // 15 phút (900 giây)
+// Chu kỳ luân phiên BẬT / TẮT của Đèn 12V (Relay E) khi hệ thống ngủ:
+// Mặc định: BẬT 15 phút (900s) / TẮT 15 phút (900s), người dùng tùy chỉnh tự do trên Web Dashboard
+uint32_t lampOnSec = 15UL * 60UL;   // Thời gian BẬT (giây)
+uint32_t lampOffSec = 15UL * 60UL;  // Thời gian TẮT (giây)
+bool lampAutoPhase = true;          // true = Đang trong pha BẬT, false = Đang trong pha TẮT
+uint64_t lastLampConfigApplyTs = 0; // Timestamp lần cuối bấm "OK" áp dụng chu kỳ mới trên Web
 
 // -------------------------------------------------------------------------
 // 2. HẰNG SỐ HIỆU CHUẨN CẢM BIẾN (CALIBRATION CONSTANTS)
@@ -197,11 +201,11 @@ bool isSystemCurrentlySleeping() {
   if (remoteIsSleeping) {
     return true;  // ESP32 #1 báo đang ở trạng thái SLEEP / TEST_SLEEP
   }
-  // Kiểm tra thêm khung giờ ngủ đêm (18:00 tối đến 04:00 sáng) qua NTP dự phòng
+  // Kiểm tra thêm khung giờ ngủ đêm (18:00 tối đến 05:00 sáng) qua NTP dự phòng
   struct tm timeinfo;
-  if (getLocalTime(&timeinfo, 5)) {
+  if (getLocalTime(&timeinfo, 50)) {
     int curH = timeinfo.tm_hour;
-    if (curH >= 18 || curH < 4) {
+    if (curH >= 18 || curH < 5) {
       return true;
     }
   }
@@ -213,7 +217,7 @@ bool isSystemCurrentlySleeping() {
 //   + Ngay khi vừa bật vô hiệu hóa: Đèn luôn về trạng thái TẮT (lampManualState = false).
 //   + Khi đang vô hiệu hóa tự động: Cho phép bật/tắt đèn bằng tay (lampManualState).
 // - Nếu TẮT "Vô hiệu hóa tự động đèn" (lampAutoDisabled == false -> về Tự động):
-//   + Ngay khi vừa tắt vô hiệu hóa: Đèn lập tức TẮT và đếm lại đủ 15 phút rồi mới BẬT và tiếp tục chu kỳ 15p/15p khi ngủ.
+//   + Chu kỳ luân phiên 2 trạng thái: BẬT trong lampOnSec giây -> TẮT trong lampOffSec giây -> Lặp lại liên tục!
 void updateNightLamp12vCycle() {
   if (lampCliOverride == 1) {
     if (!lamp12vState) setLamp12vRelay(true);
@@ -230,37 +234,53 @@ void updateNightLamp12vCycle() {
       setLamp12vRelay(lampManualState);
       Serial.printf(">> [RELAY E - MANUAL] Dieu khien tay Den 12V: %s\n",
                     lampManualState ? "BAT (ON)" : "TAT (OFF)");
+      pushVocIscToFirebase();
     }
     return;
   }
 
-  // CHẾ ĐỘ 2: TỰ ĐỘNG THEO GIỜ NGỦ (15 PHÚT BẬT / 15 PHÚT TẮT LUÂN PHIÊN)
+  // CHẾ ĐỘ 2: TỰ ĐỘNG THEO GIỜ NGỦ (LUÂN PHIÊN BẬT lampOnSec / TẮT lampOffSec)
   bool sleepingNow = isSystemCurrentlySleeping();
   unsigned long now = millis();
 
+  // Chống chập chờn (Hysteresis debounce 5s khi chuyển từ Ngủ -> Thức để không ngắt ngang chu kỳ)
+  static unsigned long awakeSinceMs = 0;
+
   if (sleepingNow) {
+    awakeSinceMs = 0;
     if (!wasSleepingForLamp) {
-      // Vừa mới bước vào giờ ngủ tự nhiên -> Bắt đầu chu kỳ 15 phút
+      // Vừa mới bước vào giờ ngủ -> Bắt đầu Pha 1: BẬT ĐÈN trong lampOnSec giây
       wasSleepingForLamp = true;
+      lampAutoPhase = true;
       lampPhaseStartMs = now;
       setLamp12vRelay(true);
-      Serial.println(">> [RELAY E - AUTO] He thong bat dau NGU DEM -> BAT DEN 12V (Pha 15 phut dau tien)!");
+      Serial.printf(">> [RELAY E - AUTO] He thong bat dau NGU DEM -> BAT DEN 12V trong %lu phut dau tien!\n",
+                    (unsigned long)(lampOnSec / 60));
+      pushVocIscToFirebase();
     } else {
-      // Đang trong giấc ngủ đêm -> Cứ đủ 15 phút (900,000 ms) thì đảo trạng thái BẬT <-> TẮT
-      if (now - lampPhaseStartMs >= LAMP_TOGGLE_INTERVAL_MS) {
+      // Đang trong chu kỳ ngủ -> Kiểm tra thời gian hết hạn của Pha hiện tại
+      unsigned long currentTargetMs = (lampAutoPhase ? lampOnSec : lampOffSec) * 1000UL;
+      if (now - lampPhaseStartMs >= currentTargetMs) {
         lampPhaseStartMs = now;
-        bool nextState = !lamp12vState;
-        setLamp12vRelay(nextState);
-        Serial.printf(">> [RELAY E - AUTO] Het 15 phut -> Chuyen sang %s DEN 12V trong 15 phut tiep theo!\n",
-                      nextState ? "BAT (ON)" : "TAT (OFF)");
+        lampAutoPhase = !lampAutoPhase; // Đảo trạng thái: BẬT -> TẮT hoặc TẮT -> BẬT
+        setLamp12vRelay(lampAutoPhase);
+        Serial.printf(">> [RELAY E - AUTO] Chuyen sang %s DEN 12V trong %lu phut tiep theo!\n",
+                      lampAutoPhase ? "BAT (ON)" : "TAT (OFF)",
+                      (unsigned long)((lampAutoPhase ? lampOnSec : lampOffSec) / 60));
+        pushVocIscToFirebase();
       }
     }
   } else {
-    // Hệ thống đã thức dậy (ban ngày hoặc bật Vô hiệu hóa ngủ) -> Tắt đèn 12V ngay
-    if (wasSleepingForLamp || lamp12vState) {
-      wasSleepingForLamp = false;
-      setLamp12vRelay(false);
-      Serial.println(">> [RELAY E - AUTO] He thong THUC DAY -> TAT DEN 12V!");
+    // Chỉ ngắt chu kỳ ngủ nếu hệ thống đã thức liên tục >= 5 giây (tránh rớt gói NTP/WiFi)
+    if (awakeSinceMs == 0) awakeSinceMs = now;
+    if (now - awakeSinceMs >= 5000) {
+      if (wasSleepingForLamp || lamp12vState) {
+        wasSleepingForLamp = false;
+        lampAutoPhase = false;
+        setLamp12vRelay(false);
+        Serial.println(">> [RELAY E - AUTO] He thong THUC DAY -> TAT DEN 12V!");
+        pushVocIscToFirebase();
+      }
     }
   }
 }
@@ -378,13 +398,15 @@ void pollSystemStateAndConfig() {
         wasSleepingForLamp = false;
         Serial.println(">> [LAMP CONFIG] Da BAT Vo hieu hoa tu dong den -> Den 12V chuyen ve TAT (San sang bat/tat tay)!");
       } else {
-        // Vừa TẮT vô hiệu hóa tự động đèn -> Đèn cũng TẮT và đếm lại 15 phút để BẬT và tiếp tục chu kỳ!
+        // Vừa TẮT vô hiệu hóa tự động đèn -> Bắt đầu lại chu kỳ tự động (BẬT lampOnSec trước)
         lampManualState = false;
         prefs.putBool("lamp_man", false);
-        setLamp12vRelay(false);
-        lampPhaseStartMs = millis();
         wasSleepingForLamp = isSystemCurrentlySleeping();
-        Serial.println(">> [LAMP CONFIG] Da TAT Vo hieu hoa tu dong den -> Den 12V TAT va dem lai 15 phut truoc khi BAT!");
+        lampAutoPhase = true;
+        lampPhaseStartMs = millis();
+        setLamp12vRelay(wasSleepingForLamp);
+        Serial.printf(">> [LAMP CONFIG] Da TAT Vo hieu hoa tu dong den -> Chay tu dong: BAT %lu phut / TAT %lu phut!\n",
+                      (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60));
       }
       pushVocIscToFirebase();
     } else if (lampAutoDisabled) {
@@ -402,6 +424,48 @@ void pollSystemStateAndConfig() {
         }
       }
     }
+
+    // 4. Đồng bộ chu kỳ BẬT / TẮT tùy chỉnh từ Web (lamp_on_min & lamp_off_min)
+    uint32_t newOnMin = 0;
+    json.get(d, "lamp_on_min");
+    if (d.success && d.intValue >= 1 && d.intValue <= 360) {
+      newOnMin = (uint32_t)d.intValue;
+    }
+    uint32_t newOffMin = 0;
+    json.get(d, "lamp_off_min");
+    if (d.success && d.intValue >= 1 && d.intValue <= 360) {
+      newOffMin = (uint32_t)d.intValue;
+    }
+
+    uint64_t newApplyTs = lastLampConfigApplyTs;
+    json.get(d, "lamp_config_apply_ts");
+    if (d.success) {
+      newApplyTs = (uint64_t)d.doubleValue;
+    }
+
+    bool timingChanged = false;
+    if (newOnMin > 0 && newOnMin * 60UL != lampOnSec) {
+      lampOnSec = newOnMin * 60UL;
+      prefs.putUInt("lamp_on_s", lampOnSec);
+      timingChanged = true;
+    }
+    if (newOffMin > 0 && newOffMin * 60UL != lampOffSec) {
+      lampOffSec = newOffMin * 60UL;
+      prefs.putUInt("lamp_off_s", lampOffSec);
+      timingChanged = true;
+    }
+
+    if (newApplyTs > 0 && newApplyTs != lastLampConfigApplyTs) {
+      lastLampConfigApplyTs = newApplyTs;
+      prefs.putULong64("lamp_app_ts", lastLampConfigApplyTs);
+      // Áp dụng ngay: Đếm lại từ đầu thời gian pha hiện tại
+      lampPhaseStartMs = millis();
+      Serial.printf(">> [LAMP CUSTOM CYCLE] Ap dung chu ky moi: BAT %lu phut / TAT %lu phut!\n",
+                    (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60));
+      pushVocIscToFirebase();
+    } else if (timingChanged) {
+      pushVocIscToFirebase();
+    }
   }
 }
 
@@ -410,9 +474,10 @@ void pushVocIscToFirebase() {
 
   unsigned long lampRemainSec = 0;
   if (!lampAutoDisabled && wasSleepingForLamp) {
+    unsigned long currentTargetMs = (lampAutoPhase ? lampOnSec : lampOffSec) * 1000UL;
     unsigned long elapsed = millis() - lampPhaseStartMs;
-    if (elapsed < LAMP_TOGGLE_INTERVAL_MS) {
-      lampRemainSec = (LAMP_TOGGLE_INTERVAL_MS - elapsed) / 1000UL;
+    if (elapsed < currentTargetMs) {
+      lampRemainSec = (currentTargetMs - elapsed) / 1000UL;
     }
   }
 
@@ -425,6 +490,9 @@ void pushVocIscToFirebase() {
   trkPatch.set("lampAutoDisabled", lampAutoDisabled);
   trkPatch.set("lampManualState", lampManualState);
   trkPatch.set("lampRemainSec", (int)lampRemainSec);
+  trkPatch.set("lampOnMin", (int)(lampOnSec / 60));
+  trkPatch.set("lampOffMin", (int)(lampOffSec / 60));
+  trkPatch.set("lampAutoPhase", lampAutoPhase ? "ON" : "OFF");
   Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trkPatch);
 
   FirebaseJson staPatch;
@@ -450,7 +518,11 @@ void pushVocIscToFirebase() {
   nodeJson.set("lamp_12v_on", lamp12vState);
   nodeJson.set("lamp_auto_disabled", lampAutoDisabled);
   nodeJson.set("lamp_manual_state", lampManualState);
+  nodeJson.set("lamp_remain_sec", (int)lampRemainSec);
   nodeJson.set("lamp_phase_remain_sec", (int)lampRemainSec);
+  nodeJson.set("lamp_on_min", (int)(lampOnSec / 60));
+  nodeJson.set("lamp_off_min", (int)(lampOffSec / 60));
+  nodeJson.set("lamp_auto_phase", lampAutoPhase ? "ON" : "OFF");
   nodeJson.set("cycles_count", (int)totalMeasureCycles);
   nodeJson.set("online", true);
   nodeJson.set("ip", WiFi.localIP().toString());
@@ -662,13 +734,18 @@ void setup() {
   if (relayIntervalSec < 3 || relayIntervalSec > 3600) relayIntervalSec = 10;
   lampAutoDisabled = prefs.getBool("lamp_dis", false);
   lampManualState = prefs.getBool("lamp_man", false);
+  lampOnSec = prefs.getUInt("lamp_on_s", 15 * 60);
+  lampOffSec = prefs.getUInt("lamp_off_s", 15 * 60);
+  if (lampOnSec < 60 || lampOnSec > 360 * 60) lampOnSec = 15 * 60;
+  if (lampOffSec < 60 || lampOffSec > 360 * 60) lampOffSec = 15 * 60;
+  lastLampConfigApplyTs = prefs.getULong64("lamp_app_ts", 0);
   if (lampAutoDisabled) {
     setLamp12vRelay(lampManualState);
   }
   calVocScaleTrk = prefs.getFloat("voc_k_trk", 9.8386f);
   calVocScaleSta = prefs.getFloat("voc_k_sta", 9.8386f);
-  Serial.printf(">> [NVS] Chu ky nhay Relay A-D: %lu giay | Relay E (Den 12V): GPIO %d\n",
-                (unsigned long)relayIntervalSec, PIN_RELAY_E_LAMP12V);
+  Serial.printf(">> [NVS] Chu ky nhay Relay A-D: %lu giay | Relay E (Den 12V): BAT %lu phut / TAT %lu phut (GPIO %d)\n",
+                (unsigned long)relayIntervalSec, (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60), PIN_RELAY_E_LAMP12V);
 
   // BƯỚC 4: Kết nối WiFi & đồng bộ giờ NTP (múi giờ Việt Nam UTC+7)
   WiFi.mode(WIFI_STA);
