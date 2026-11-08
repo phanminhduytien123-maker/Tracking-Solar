@@ -37,12 +37,15 @@ export default function SettingsModal({
   onSetSleepDisabled = null,
   onSetRelayInterval = null,
   onSetLampAutoDisabled = null,
-  onSetLampManualState = null
+  onSetLampManualState = null,
+  onSetLampCustomCycle = null
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
   const [isExperimentLocked, setIsExperimentLocked] = useState(() => localStorage.getItem('solar_experiment_locked') === 'true');
   const [relaySecInput, setRelaySecInput] = useState(() => Number(latestTelemetry?.system?.relayIntervalSec || localStorage.getItem('solar_relay_interval_sec') || 10));
+  const [lampOnMinInput, setLampOnMinInput] = useState(() => Number(latestTelemetry?.system?.lampOnMin || localStorage.getItem('solar_lamp_on_min') || 15));
+  const [lampOffMinInput, setLampOffMinInput] = useState(() => Number(latestTelemetry?.system?.lampOffMin || localStorage.getItem('solar_lamp_off_min') || 15));
   const [hwConfigFeedback, setHwConfigFeedback] = useState(null);
 
   useEffect(() => {
@@ -51,6 +54,20 @@ export default function SettingsModal({
       setRelaySecInput(Number(liveRelaySec));
     }
   }, [latestTelemetry?.system?.relayIntervalSec]);
+
+  useEffect(() => {
+    const liveOn = latestTelemetry?.system?.lampOnMin;
+    if (liveOn && !isNaN(liveOn)) {
+      setLampOnMinInput(Number(liveOn));
+    }
+  }, [latestTelemetry?.system?.lampOnMin]);
+
+  useEffect(() => {
+    const liveOff = latestTelemetry?.system?.lampOffMin;
+    if (liveOff && !isNaN(liveOff)) {
+      setLampOffMinInput(Number(liveOff));
+    }
+  }, [latestTelemetry?.system?.lampOffMin]);
 
   // Sync initialTab if passed dynamically
   useEffect(() => {
@@ -681,28 +698,89 @@ void loop() {
                       </div>
                     </div>
 
-                    {/* 3. Đèn 12V (Relay Kênh 5 - Relay E): Vô hiệu hóa tự động & Bật/Tắt đèn bằng tay */}
-                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
+                    {/* 3. Đèn 12V (Relay Kênh 5 - Relay E): Cấu hình chu kỳ Bật/Tắt & Vô hiệu hóa tự động & Bật/Tắt bằng tay */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-3">
+                      {/* Tiêu đề & Trạng thái hiện tại */}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="text-xs font-bold text-zinc-900 block">
-                            3. Điều khiển Đèn 12V (Relay Kênh 5 / Kênh E - GPIO 42)
+                            3. Điều khiển & Cài đặt Chu kỳ Đèn 12V (Relay Kênh 5 / Kênh E - GPIO 42)
                           </span>
                           <span className="text-[11px] text-zinc-600 block">
                             {latestTelemetry?.system?.lampAutoDisabled
-                              ? 'Đang BẬT vô hiệu hóa tự động: Đèn tự động tắt khi mới kích hoạt; cho phép bật/tắt đèn 12V bằng tay bên dưới.'
-                              : 'Đang ở chế độ Tự động: Khi tắt vô hiệu hóa tự động, đèn TẮT ngay và đếm 15 phút để BẬT, tiếp tục chu kỳ 15p Bật / 15p Tắt khi hệ thống ngủ.'}
+                              ? 'Đang BẬT vô hiệu hóa tự động: Đèn tắt khi kích hoạt; cho phép Bật/Tắt đèn 12V bằng tay bên dưới.'
+                              : `Đang ở chế độ Tự động: Luân phiên BẬT ${latestTelemetry?.system?.lampOnMin || 15} phút rồi TẮT ${latestTelemetry?.system?.lampOffMin || 15} phút lặp lại liên tục khi hệ thống ngủ.`}
                           </span>
                         </div>
-                        <span
-                          className={`px-2.5 py-0.5 rounded-sm border text-xs font-bold ${
-                            latestTelemetry?.system?.lamp12vOn
-                              ? 'bg-amber-100 border-amber-300 text-amber-900'
-                              : 'bg-zinc-100 border-zinc-300 text-zinc-700'
-                          }`}
-                        >
-                          Đèn 12V: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-sm border text-xs font-bold ${
+                              latestTelemetry?.system?.lamp12vOn
+                                ? 'bg-amber-100 border-amber-300 text-amber-900'
+                                : 'bg-zinc-100 border-zinc-300 text-zinc-700'
+                            }`}
+                          >
+                            Đèn 12V: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                          </span>
+                          {!latestTelemetry?.system?.lampAutoDisabled && latestTelemetry?.system?.lampRemainSec > 0 && (
+                            <span className="px-2 py-0.5 rounded-sm bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-semibold">
+                              (còn {Math.floor(Number(latestTelemetry.system.lampRemainSec) / 60)}p {Number(latestTelemetry.system.lampRemainSec) % 60}s)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Khối Cài đặt Chu kỳ BẬT / TẮT luân phiên tự do */}
+                      <div className="p-2.5 rounded-sm bg-slate-50 border border-slate-200 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <span className="text-xs font-bold text-slate-800">
+                            ⚙ Cài đặt chu kỳ BẬT / TẮT luân phiên tự động:
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Hiện hành: BẬT <strong className="text-amber-700">{latestTelemetry?.system?.lampOnMin || 15}p</strong> ➔ TẮT <strong className="text-zinc-700">{latestTelemetry?.system?.lampOffMin || 15}p</strong>
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-xs text-zinc-700 font-medium">Thời gian BẬT:</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="360"
+                              value={lampOnMinInput}
+                              onChange={(e) => setLampOnMinInput(Math.max(1, Math.min(360, Number(e.target.value) || 1)))}
+                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white focus:outline-none focus:border-amber-500"
+                            />
+                            <span className="text-xs text-zinc-500">phút</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-xs text-zinc-700 font-medium">Thời gian TẮT:</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="360"
+                              value={lampOffMinInput}
+                              onChange={(e) => setLampOffMinInput(Math.max(1, Math.min(360, Number(e.target.value) || 1)))}
+                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white focus:outline-none focus:border-blue-500"
+                            />
+                            <span className="text-xs text-zinc-500">phút</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const onVal = Math.max(1, Math.min(360, Number(lampOnMinInput) || 15));
+                              const offVal = Math.max(1, Math.min(360, Number(lampOffMinInput) || 15));
+                              onSetLampCustomCycle && onSetLampCustomCycle(onVal, offVal);
+                              setHwConfigFeedback(`✓ Đã áp dụng chu kỳ Đèn 12V: BẬT ${onVal} phút / TẮT ${offVal} phút luân phiên!`);
+                            }}
+                            className="px-3.5 py-1 rounded-sm text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white border border-amber-700 shadow-xs cursor-pointer transition-colors shrink-0"
+                          >
+                            ✓ Áp dụng chu kỳ Đèn (OK)
+                          </button>
+                        </div>
                       </div>
 
                       {/* Nút Bật / Tắt Vô hiệu hóa bật tắt đèn tự động */}
@@ -729,7 +807,7 @@ void loop() {
                             type="button"
                             onClick={() => {
                               onSetLampAutoDisabled && onSetLampAutoDisabled(false);
-                              setHwConfigFeedback('Đã TẮT vô hiệu hóa tự động: Đèn 12V đã TẮT và bắt đầu đếm lại 15 phút để BẬT theo chu kỳ!');
+                              setHwConfigFeedback(`Đã TẮT vô hiệu hóa tự động: Đèn 12V bắt đầu chu kỳ BẬT ${latestTelemetry?.system?.lampOnMin || 15}p / TẮT ${latestTelemetry?.system?.lampOffMin || 15}p!`);
                             }}
                             className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
                               !latestTelemetry?.system?.lampAutoDisabled
@@ -737,7 +815,7 @@ void loop() {
                                 : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
                             }`}
                           >
-                            TẮT Vô hiệu hóa (Tự động 15p)
+                            TẮT Vô hiệu hóa (Tự động luân phiên)
                           </button>
                         </div>
                       </div>

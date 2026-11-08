@@ -897,6 +897,24 @@ export default function App() {
     }));
   };
 
+  const handleSetLampCustomCycle = (onMin, offMin) => {
+    const onVal = Math.max(1, Math.min(360, Math.round(Number(onMin) || 15)));
+    const offVal = Math.max(1, Math.min(360, Math.round(Number(offMin) || 15)));
+    localStorage.setItem('solar_lamp_on_min', onVal.toString());
+    localStorage.setItem('solar_lamp_off_min', offVal.toString());
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setLampCustomCycle(onVal, offVal);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        lampOnMin: onVal,
+        lampOffMin: offVal
+      }
+    }));
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -1150,6 +1168,7 @@ export default function App() {
         onSetSleepDisabled={handleSetSleepDisabled}
         onSetLampAutoDisabled={handleSetLampAutoDisabled}
         onSetLampManualState={handleSetLampManualState}
+        onSetLampCustomCycle={handleSetLampCustomCycle}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
       />
@@ -1197,6 +1216,7 @@ export default function App() {
         onSetRelayInterval={handleSetRelayInterval}
         onSetLampAutoDisabled={handleSetLampAutoDisabled}
         onSetLampManualState={handleSetLampManualState}
+        onSetLampCustomCycle={handleSetLampCustomCycle}
       />
 
       {/* 4. FOOTER */}
