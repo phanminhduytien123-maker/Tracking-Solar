@@ -103,12 +103,12 @@ void ParamRegistryClass::init() {
   registerParam("BACKLASH_STEPS_AZ",   0.0f,     "pulses",  0.0f,    2000.0f,  POLICY_AUTO_ON_CONFIRM, "B7");
   registerParam("BACKLASH_STEPS_EL",   0.0f,     "pulses",  0.0f,    2000.0f,  POLICY_AUTO_ON_CONFIRM, "B7");
 
-  // 10. Cảm biến đo công suất INA226 (Tracker & Static)
-  registerParam("INA_SHUNT_TRK",       0.002f,   "ohm",     0.0001f, 1.0f,     POLICY_MANUAL_ONLY,     "B14");
-  registerParam("INA_MAX_CURR_TRK",    10.0f,    "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
-  registerParam("INA_SHUNT_STA",       0.002f,   "ohm",     0.0001f, 1.0f,     POLICY_MANUAL_ONLY,     "B14");
-  registerParam("INA_MAX_CURR_STA",    10.0f,    "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
-  registerParam("INA_SCALE_FACTOR",    10.0f,    "ratio",   0.1f,    100.0f,   POLICY_MANUAL_ONLY,     "B14");
+  // 10. Cảm biến đo công suất INA226 (Tracker & Static) - Điện trở Shunt R100 = 0.100 Ohm
+  registerParam("INA_SHUNT_TRK",       0.100f,   "ohm",     0.0001f, 1.0f,     POLICY_MANUAL_ONLY,     "B14");
+  registerParam("INA_MAX_CURR_TRK",    3.0f,     "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
+  registerParam("INA_SHUNT_STA",       0.100f,   "ohm",     0.0001f, 1.0f,     POLICY_MANUAL_ONLY,     "B14");
+  registerParam("INA_MAX_CURR_STA",    3.0f,     "A",       0.1f,    50.0f,    POLICY_MANUAL_ONLY,     "B14");
+  registerParam("INA_SCALE_FACTOR",    1.0f,     "ratio",   0.1f,    100.0f,   POLICY_MANUAL_ONLY,     "B14");
 
   // 11. Tấm cố định đối chứng (Fixed Panel Parameters)
   registerParam("FIXED_AZ_DEG",        180.0f,   "deg",     0.0f,    360.0f,   POLICY_MANUAL_ONLY,     "INIT");

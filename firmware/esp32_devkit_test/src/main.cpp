@@ -4099,11 +4099,29 @@ void setup() {
   // Khởi tạo hàng đợi Offline LittleFS (Mục 2 & Mục 9)
   OfflineQueue.begin();
 
-  // Đọc thông số INA226 từ ParamRegistry (A7)
-  float shuntTrk = ParamRegistry.get("INA_SHUNT_TRK", 0.002f);
-  float maxCurrTrk = ParamRegistry.get("INA_MAX_CURR_TRK", 10.0f);
-  float shuntSta = ParamRegistry.get("INA_SHUNT_STA", 0.002f);
-  float maxCurrSta = ParamRegistry.get("INA_MAX_CURR_STA", 10.0f);
+  // Đọc thông số INA226 từ ParamRegistry (A7) - Điện trở Shunt chuẩn R100 = 0.100 Ohm
+  float shuntTrk = ParamRegistry.get("INA_SHUNT_TRK", SHUNT_RESISTOR_OHM);
+  float maxCurrTrk = ParamRegistry.get("INA_MAX_CURR_TRK", (float)MAX_EXPECTED_CURRENT_A);
+  float shuntSta = ParamRegistry.get("INA_SHUNT_STA", SHUNT_RESISTOR_OHM);
+  float maxCurrSta = ParamRegistry.get("INA_MAX_CURR_STA", (float)MAX_EXPECTED_CURRENT_A);
+
+  // Vệ sinh giá trị cũ: Nếu NVS lưu shunt < 0.01 ohm (giá trị 0.002 ohm cũ phóng đại 50x) -> Ép về 0.100 ohm chuẩn
+  if (shuntTrk < 0.01f) {
+    shuntTrk = (float)SHUNT_RESISTOR_OHM;
+    ParamRegistry.set("INA_SHUNT_TRK", shuntTrk);
+  }
+  if (shuntSta < 0.01f) {
+    shuntSta = (float)SHUNT_RESISTOR_OHM;
+    ParamRegistry.set("INA_SHUNT_STA", shuntSta);
+  }
+  if (maxCurrTrk > 5.0f) {
+    maxCurrTrk = (float)MAX_EXPECTED_CURRENT_A;
+    ParamRegistry.set("INA_MAX_CURR_TRK", maxCurrTrk);
+  }
+  if (maxCurrSta > 5.0f) {
+    maxCurrSta = (float)MAX_EXPECTED_CURRENT_A;
+    ParamRegistry.set("INA_MAX_CURR_STA", maxCurrSta);
+  }
 
   ParamEntry *peTrk = ParamRegistry.getEntry("INA_SHUNT_TRK");
   if (peTrk && peTrk->status == PARAM_STATUS_UNVERIFIED) {
@@ -4156,7 +4174,16 @@ void setup() {
     if (savedDay == dRtc) {
       energyWhTracker = prefs.getFloat("wh_trk", 0.0f);
       energyWhStatic = prefs.getFloat("wh_sta", 0.0f);
-      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay: "
+      // Tự động hiệu chỉnh nếu năng lượng trong ngày bị phình to do hệ số 50x cũ
+      if (energyWhTracker > 20.0f) {
+        energyWhTracker /= 50.0f;
+        prefs.putFloat("wh_trk", energyWhTracker);
+      }
+      if (energyWhStatic > 20.0f) {
+        energyWhStatic /= 50.0f;
+        prefs.putFloat("wh_sta", energyWhStatic);
+      }
+      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay (sau hieu chuan Shunt): "
                     "Tracker=%.2f Wh, Static=%.2f Wh\n",
                     energyWhTracker, energyWhStatic);
     } else {

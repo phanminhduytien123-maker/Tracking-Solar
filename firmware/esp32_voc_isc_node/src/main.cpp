@@ -4,8 +4,9 @@
 // Sơ đồ chân (Pinout) chuẩn cho ESP32-S3 N16R8 (#2):
 //   - GPIO 4  (ADC1_CH3) : FZ0430 #1 -> Đo áp hở mạch Voc Tấm Xoay (Tracker)
 //   - GPIO 5  (ADC1_CH4) : ACS712 #1 -> Đo dòng ngắn mạch Isc Tấm Xoay (qua cầu 10k/20k)
-//   - GPIO 6  (ADC1_CH5) : FZ0430 #2 -> Đo áp hở mạch Voc Tấm Cố Định (Static)
-//   - GPIO 7  (ADC1_CH6) : ACS712 #2 -> Đo dòng ngắn mạch Isc Tấm Cố Định (qua cầu 10k/20k)
+//   - GPIO 6             : BỎ TRỐNG (Không cắm theo yêu cầu người dùng)
+//   - GPIO 7  (ADC1_CH6) : FZ0430 #2 -> Đo áp hở mạch Voc Tấm Cố Định (Static)
+//   - GPIO 8  (ADC1_CH7) : ACS712 #2 -> Đo dòng ngắn mạch Isc Tấm Cố Định (Static - qua cầu 10k/20k)
 //   - GPIO 14 (kèm G40)  : Relay A + Relay C (Ngắt tải Sạc Tấm Xoay & Cố Định)
 //   - GPIO 41 (kèm G39)  : Relay B + Relay D (Đóng ngắn mạch qua ACS712 #1 & #2)
 //   - GPIO 42            : Relay E (Kênh 5 - Đèn 12V: Khi ngủ sẽ 15 phút BẬT / 15 phút TẮT luân phiên tới sáng)
@@ -23,15 +24,15 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.0"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.1"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
 // -------------------------------------------------------------------------
 #define PIN_ADC_VOC_TRK     4   // ADC1_CH3: FZ0430 #1 (Tấm Xoay)
 #define PIN_ADC_ISC_TRK     5   // ADC1_CH4: ACS712 #1 (Tấm Xoay - qua cầu 10k/20k)
-#define PIN_ADC_VOC_STA     6   // ADC1_CH5: FZ0430 #2 (Tấm Cố Định)
-#define PIN_ADC_ISC_STA     7   // ADC1_CH6: ACS712 #2 (Tấm Cố Định - qua cầu 10k/20k)
+#define PIN_ADC_VOC_STA     7   // ADC1_CH6: FZ0430 #2 (Tấm Cố Định - đã chuyển từ 6 sang 7)
+#define PIN_ADC_ISC_STA     8   // ADC1_CH7: ACS712 #2 (Tấm Cố Định - cắm chân GPIO 8 qua cầu 10k/20k)
 
 // Chân điều khiển Module Relay A, B, C, D (Đo Voc/Isc ban ngày)
 #define PIN_RELAY_A_CUT     14  // Relay A (Ngắt tải Tấm Xoay) - hoặc gộp A+C
