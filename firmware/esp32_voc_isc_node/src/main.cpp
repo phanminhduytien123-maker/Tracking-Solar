@@ -699,9 +699,13 @@ void setup() {
   ArduinoOTA.setHostname("esp32-voc-isc-node");
   ArduinoOTA.setPassword("solar2026");
   ArduinoOTA.onStart([]() {
+    esp_task_wdt_delete(NULL); // Hủy watchdog trong lúc đang nạp OTA để không bị timeout
     forceAllRelaysOff();
     setLamp12vRelay(false);
     Serial.println("\n>> [OTA] Ngat toan bo Relay an toan & bat dau nap OTA...");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    esp_task_wdt_reset();
   });
   ArduinoOTA.begin();
 
