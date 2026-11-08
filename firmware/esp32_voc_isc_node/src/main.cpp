@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.3"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.4"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -458,10 +458,19 @@ void pollSystemStateAndConfig() {
     if (newApplyTs > 0 && newApplyTs != lastLampConfigApplyTs) {
       lastLampConfigApplyTs = newApplyTs;
       prefs.putULong64("lamp_app_ts", lastLampConfigApplyTs);
-      // Áp dụng ngay: Đếm lại từ đầu thời gian pha hiện tại
+
+      // ÁP DỤNG NGAY: Luôn bắt đầu từ Pha 1 (BẬT ĐÈN) nếu hệ thống đang ngủ
+      wasSleepingForLamp = isSystemCurrentlySleeping();
+      lampAutoPhase = true;
       lampPhaseStartMs = millis();
-      Serial.printf(">> [LAMP CUSTOM CYCLE] Ap dung chu ky moi: BAT %lu phut / TAT %lu phut!\n",
-                    (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60));
+      if (wasSleepingForLamp && !lampAutoDisabled) {
+        setLamp12vRelay(true);
+      } else {
+        setLamp12vRelay(false);
+      }
+      Serial.printf(">> [LAMP CUSTOM CYCLE] Ap dung chu ky moi: BAT %lu phut / TAT %lu phut! (Phase: ON, Relay: %s)\n",
+                    (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60),
+                    (wasSleepingForLamp && !lampAutoDisabled) ? "BAT" : "TAT");
       pushVocIscToFirebase();
     } else if (timingChanged) {
       pushVocIscToFirebase();
@@ -821,9 +830,9 @@ void loop() {
   // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
   updateNightLamp12vCycle();
 
-  // Định kỳ mỗi 10 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
+  // Định kỳ mỗi 4 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
   static unsigned long lastSleepHeartbeatMs = 0;
-  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 10000)) {
+  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 4000)) {
     lastSleepHeartbeatMs = millis();
     pushVocIscToFirebase();
   }
