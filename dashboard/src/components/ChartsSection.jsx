@@ -758,7 +758,7 @@ export default function ChartsSection({
         <div className="lab-card p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-              Số liệu đối chứng 30 ngày
+              Số liệu đối chứng {history30Days.length >= 28 ? '30 ngày' : `chu kỳ (${history30Days.length} ngày - từ 04/11)`}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
               Tổng hợp sản lượng điện, điện áp Voc, dòng Isc và nhiệt độ tấm pin
@@ -769,9 +769,9 @@ export default function ChartsSection({
             <button
               onClick={handleExportCSV}
               className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-slate-100 bg-zinc-50 dark:bg-slate-800 hover:bg-zinc-100 dark:hover:bg-slate-700 border border-zinc-300 dark:border-slate-600 rounded-sm cursor-pointer transition-colors"
-              title="Tải toàn bộ số liệu 30 ngày về máy dạng file CSV"
+              title="Tải toàn bộ số liệu về máy dạng file CSV"
             >
-              Xuất CSV 30 ngày
+              Xuất CSV {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
             </button>
 
             {isAdmin && onOpenDataSettings && (
@@ -791,7 +791,7 @@ export default function ChartsSection({
           {/* KPI 1: Năng lượng */}
           <div className="lab-card p-3.5 flex flex-col justify-between">
             <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
-              Tổng năng lượng 30 ngày
+              Tổng năng lượng {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
             </span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
@@ -897,7 +897,7 @@ export default function ChartsSection({
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                  Đồ thị Voc & Isc 30 ngày
+                  Đồ thị Voc & Isc {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
                   Điện áp hở mạch Voc (V) và dòng ngắn mạch Isc (A)
@@ -958,7 +958,7 @@ export default function ChartsSection({
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-zinc-200 dark:border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
-                  Đồ thị nhiệt độ tấm pin 30 ngày
+                  Đồ thị nhiệt độ tấm pin {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
                   Nhiệt độ bề mặt pin (°C) và chênh lệch nhiệt độ
@@ -987,7 +987,7 @@ export default function ChartsSection({
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                <span>Bảng số liệu 30 ngày</span>
+                <span>Bảng số liệu {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}</span>
                 <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 dark:bg-slate-800 text-zinc-700 dark:text-slate-300 rounded-sm font-mono">
                   {filteredTableData.length} bản ghi
                 </span>
@@ -1130,8 +1130,8 @@ export default function ChartsSection({
                   : expandedChart === 'history'
                   ? 'Đồ thị năng lượng tích lũy (Phóng to)'
                   : expandedChart === 'voc_isc'
-                  ? 'Đồ thị Voc & Isc 30 ngày (Phóng to)'
-                  : 'Đồ thị nhiệt độ 30 ngày (Phóng to)'}
+                  ? `Đồ thị Voc & Isc ${history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`} (Phóng to)`
+                  : `Đồ thị nhiệt độ ${history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`} (Phóng to)`}
               </h3>
               <button
                 onClick={() => setExpandedChart(null)}

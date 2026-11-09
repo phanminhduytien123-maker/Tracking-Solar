@@ -281,7 +281,8 @@ export class FirebaseSolarService {
         if (this.latestRawData && this.latestRawData.history) {
           this.processHistory(this.latestRawData.history, this.latestRawData.tracking);
         } else if (this.onHistory) {
-          this.onHistory(customVal, null, null);
+          const filteredCustom = customVal.filter(item => !item.fullDate || item.fullDate >= '2026-11-04');
+          this.onHistory(filteredCustom, null, null);
         }
       } else {
         this.customHistoryData = null;
@@ -574,6 +575,20 @@ export class FirebaseSolarService {
         return item;
       });
     }
+
+    // LỌC CHU KỲ DỮ LIỆU THỰC NGHIỆM: Bắt đầu tính từ ngày 04/11/2026 trở về sau
+    historyList = historyList.filter(item => {
+      if (item.fullDate) return item.fullDate >= '2026-11-04';
+      const parts = (item.date || '').split('/');
+      if (parts.length === 2) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (m === 11) return d >= 4;
+        if (m > 11) return true;
+        return false;
+      }
+      return true;
+    });
 
     if (this.onHistory) {
       this.onHistory(historyList, allIntradayProfiles, availableDates);
