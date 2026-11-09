@@ -5,8 +5,8 @@ import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/da
 import { generate30DaysHistory, generateIntradayProfile } from './mockDataService';
 
 export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
-export const STALE_THRESHOLD_MS = 12000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
-export const DISCONNECT_THRESHOLD_MS = 35000; // 15 giây không có gói tin mới -> MẤT KẾT NỐI
+export const STALE_THRESHOLD_MS = 25000; // 25 giây (chống chập chờn khi mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
+export const DISCONNECT_THRESHOLD_MS = 60000; // 60 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
  * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.
@@ -746,15 +746,17 @@ export class FirebaseSolarService {
     }
 
     // 4. ĐO LƯỜNG ĐIỆN NĂNG INA226
-    // QUY TẮC: Khi CŨ hoặc MẤT KẾT NỐI -> null (hiện '--', KHÔNG hiện 0, KHÔNG hiện số cũ giả vờ mới)
-    const trkVolt = isTrackingLive ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
-    const trkCurr = isTrackingLive ? (tracking.current !== undefined ? Number(tracking.current) : null) : null;
-    const trkPower = isTrackingLive ? (tracking.power !== undefined ? Number(tracking.power) : (trkVolt !== null && trkCurr !== null ? Number((trkVolt * trkCurr).toFixed(2)) : null)) : null;
+    // Khi LIVE hoặc STALE (chờ gói tin trong 60s) -> Vẫn giữ số đo để người dùng quan sát, chỉ chuyển '--' khi MẤT KẾT NỐI hoàn toàn
+    const isTrkAvailable = (trkConnStatus === 'LIVE' || trkConnStatus === 'STALE');
+    const isStaAvailable = (staConnStatus === 'LIVE' || staConnStatus === 'STALE');
+    const trkVolt = isTrkAvailable ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
+    const trkCurr = isTrkAvailable ? (tracking.current !== undefined ? Number(tracking.current) : null) : null;
+    const trkPower = isTrkAvailable ? (tracking.power !== undefined ? Number(tracking.power) : (trkVolt !== null && trkCurr !== null ? Number((trkVolt * trkCurr).toFixed(2)) : null)) : null;
     const trkEnergyWh = tracking.dailyEnergyWh !== undefined ? Number(tracking.dailyEnergyWh) : (tracking.dailyEnergy !== undefined ? Number((tracking.dailyEnergy * 1000).toFixed(1)) : null);
 
-    const staVolt = isStaticLive ? (staticPanel.voltage !== undefined ? Number(staticPanel.voltage) : null) : null;
-    const staCurr = isStaticLive ? (staticPanel.current !== undefined ? Number(staticPanel.current) : null) : null;
-    const staPower = isStaticLive ? (staticPanel.power !== undefined ? Number(staticPanel.power) : (staVolt !== null && staCurr !== null ? Number((staVolt * staCurr).toFixed(2)) : null)) : null;
+    const staVolt = isStaAvailable ? (staticPanel.voltage !== undefined ? Number(staticPanel.voltage) : null) : null;
+    const staCurr = isStaAvailable ? (staticPanel.current !== undefined ? Number(staticPanel.current) : null) : null;
+    const staPower = isStaAvailable ? (staticPanel.power !== undefined ? Number(staticPanel.power) : (staVolt !== null && staCurr !== null ? Number((staVolt * staCurr).toFixed(2)) : null)) : null;
     const staEnergyWh = staticPanel.dailyEnergyWh !== undefined ? Number(staticPanel.dailyEnergyWh) : (staticPanel.dailyEnergy !== undefined ? Number((staticPanel.dailyEnergy * 1000).toFixed(1)) : null);
 
     // Tấm cố định: lấy fixed_az_deg và fixed_tilt_beta_deg; ε tính ra = 90 - beta

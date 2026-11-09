@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.1"
+#define CURRENT_FIRMWARE_VERSION "2.1.2"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -2660,7 +2660,13 @@ void pushTelemetryToFirebase() {
   root.set("tracking", trk);
   root.set("static", sta);
   root.set("algorithm", algoJson);
-  Firebase.RTDB.updateNode(&fbdo, "/solar", &root);
+  if (!Firebase.RTDB.updateNode(&fbdo, "/solar", &root)) {
+    static unsigned long lastPushErrPrint = 0;
+    if (millis() - lastPushErrPrint >= 5000) {
+      lastPushErrPrint = millis();
+      Serial.printf(">> [FIREBASE PUSH ERR] %s (HTTP code: %d)\n", fbdo.errorReason().c_str(), fbdo.httpCode());
+    }
+  }
 }
 
 // =========================================================================
@@ -3120,12 +3126,16 @@ void telemetryTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // 0. Tự động phục hồi kết nối WiFi ngầm mỗi 5 giây nếu bị rớt mạng
-    if (now - lastWifiCheck >= 5000) {
-      lastWifiCheck = now;
-      if (WiFi.status() != WL_CONNECTED) {
-        WiFi.reconnect();
+    // 0. Tự động phục hồi kết nối WiFi ngầm chủ động nếu bị rớt mạng
+    if (WiFi.status() != WL_CONNECTED) {
+      if (now - lastWifiCheck >= 6000) {
+        lastWifiCheck = now;
+        Serial.println(">> [WIFI RECOVERY] Mat ket noi WiFi -> Khoi dong lai WiFi STA...");
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
       }
+    } else {
+      lastWifiCheck = now;
     }
 
     // Xử lý nạp firmware và can thiệp qua WiFi (ArduinoOTA)
@@ -3133,17 +3143,17 @@ void telemetryTask(void *pvParameters) {
       ArduinoOTA.handle();
     }
 
-    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 1.5s
-    if (now - lastRemoteCheck >= 1500) {
+    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 2.5s (giảm tải socket)
+    if (now - lastRemoteCheck >= 2500) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 5s
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 10s
     static unsigned long lastFotaCheck = 0;
-    if (now - lastFotaCheck >= 5000) {
+    if (now - lastFotaCheck >= 10000) {
       lastFotaCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkSystemOtaTrigger();
@@ -3171,9 +3181,9 @@ void telemetryTask(void *pvParameters) {
       printTelemetryIfChanged();
     }
 
-    // 4. Đẩy Telemetry lên Firebase RTDB đều đặn 1s/lần cho Dashboard luôn LIVE
+    // 4. Đẩy Telemetry lên Firebase RTDB đều đặn 1.5s/lần cho Dashboard luôn LIVE mượt mà
     // (Mục 9)
-    unsigned long fbPushInterval = 1000;
+    unsigned long fbPushInterval = 1500;
     if (now - lastFbPushTime >= fbPushInterval) {
       lastFbPushTime = now;
       pushTelemetryToFirebase();
@@ -4245,6 +4255,9 @@ void setup() {
   // 8. Khởi tạo WiFi & Firebase Realtime Database
   Serial.printf(">> Dang ket noi WiFi toi SSID: %s ...\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+  WiFi.setSleep(false); // VÔ HIỆU HÓA MODEM SLEEP -> CÔNG SUẤT RF LUÔN PHÁT TỐI ĐA, CHỐNG RỚT GÓI
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startWifi = millis();
