@@ -4291,7 +4291,7 @@ void setup() {
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
-                          10240, // 10 KB stack cho Firebase TLS
+                          24576, // 24 KB stack dồi dào cho Firebase TLS + Cloud FOTA mbedTLS
                           NULL,
                           0, // Priority 0 (tskIDLE_PRIORITY) - Time-slice cong
                              // bang voi IDLE0, chong triet de Task Watchdog!
