@@ -790,39 +790,41 @@ export default function ChartsSection({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* KPI 1: Năng lượng */}
           <div className="lab-card p-3.5 flex flex-col justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-white">
               Tổng năng lượng {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
-                {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">kWh</span>
+              <span className="text-lg sm:text-xl font-extrabold text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-semibold text-slate-300 ml-0.5">kWh</span>
               </span>
-              <span className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-sans tabular-nums">
+              <span className={`text-xs sm:text-sm font-extrabold font-sans tabular-nums ${overallGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatSignedNumber(overallGain, 1, '%')}
               </span>
             </div>
-            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
-              <span>Cố định: <span className="font-bold text-zinc-800 dark:text-slate-100">{formatDecimal(totalStaWh / 1000, 2)}</span> kWh</span>
-              <span className="font-bold text-blue-600 dark:text-blue-400">+{formatDecimal(totalDiffWh / 1000, 2)}</span>
+            <div className="text-xs font-sans tabular-nums text-slate-200 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+              <span>Cố định: <span className="font-bold text-white">{formatDecimal(totalStaWh / 1000, 2)}</span> kWh</span>
+              <span className={`font-bold ${totalDiffWh >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {totalDiffWh >= 0 ? `+${formatDecimal(totalDiffWh / 1000, 2)}` : formatDecimal(totalDiffWh / 1000, 2)}
+              </span>
             </div>
           </div>
 
           {/* KPI 2: Điện áp Voc */}
           <div className="lab-card p-3.5 flex flex-col justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-white">
               Voc trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
-                {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">V</span>
+              <span className="text-lg sm:text-xl font-extrabold text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-semibold text-slate-300 ml-0.5">V</span>
               </span>
-              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
-                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgVocSta, 2)}</span>V
+              <span className="text-xs font-medium text-slate-300 font-sans tabular-nums">
+                Sta: <span className="font-bold text-white">{formatDecimal(avgVocSta, 2)}</span>V
               </span>
             </div>
-            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-slate-200 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch áp:</span>
-              <span className="font-bold text-zinc-900 dark:text-slate-100">
+              <span className={`font-bold ${(avgVocTrk - avgVocSta) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatSignedNumber(avgVocTrk - avgVocSta, 2, 'V')}
               </span>
             </div>
@@ -830,41 +832,41 @@ export default function ChartsSection({
 
           {/* KPI 3: Dòng Isc */}
           <div className="lab-card p-3.5 flex flex-col justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-white">
               Isc đỉnh trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
-                {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">A</span>
+              <span className="text-lg sm:text-xl font-extrabold text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-semibold text-slate-300 ml-0.5">A</span>
               </span>
-              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
-                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgIscSta, 2)}</span>A
+              <span className="text-xs font-medium text-slate-300 font-sans tabular-nums">
+                Sta: <span className="font-bold text-white">{formatDecimal(avgIscSta, 2)}</span>A
               </span>
             </div>
-            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-slate-200 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Tăng trưởng dòng:</span>
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                {avgIscSta > 0 ? `+${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%` : '--'}
+              <span className={`font-extrabold ${avgIscTrk >= avgIscSta ? 'text-emerald-400' : 'text-red-400'}`}>
+                {avgIscSta > 0 ? (avgIscTrk >= avgIscSta ? `+${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%` : `${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%`) : '--'}
               </span>
             </div>
           </div>
 
           {/* KPI 4: Nhiệt độ */}
           <div className="lab-card p-3.5 flex flex-col justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-white">
               Nhiệt độ TB (Tcell)
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
-                {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">°C</span>
+              <span className="text-lg sm:text-xl font-extrabold text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-semibold text-slate-300 ml-0.5">°C</span>
               </span>
-              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
-                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgTempSta, 1)}</span>°C
+              <span className="text-xs font-medium text-slate-300 font-sans tabular-nums">
+                Sta: <span className="font-bold text-white">{formatDecimal(avgTempSta, 1)}</span>°C
               </span>
             </div>
-            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-slate-200 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch ΔT:</span>
-              <span className="font-bold text-purple-600 dark:text-purple-400">
+              <span className={`font-bold ${(avgTempTrk - avgTempSta) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatSignedNumber(avgTempTrk - avgTempSta, 1, '°C')}
               </span>
             </div>
@@ -872,18 +874,18 @@ export default function ChartsSection({
 
           {/* KPI 5: Trạng thái đo */}
           <div className="lab-card p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-white">
               Độ tin cậy chu kỳ
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-lg sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 font-sans tabular-nums tracking-tight">
+              <span className="text-lg sm:text-xl font-extrabold text-emerald-400 font-sans tabular-nums tracking-tight">
                 {validHistory.length}/{history30Days.length}
               </span>
-              <span className="text-xs font-semibold text-zinc-500">ngày</span>
+              <span className="text-xs font-semibold text-white">ngày</span>
             </div>
-            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-slate-200 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Ngày loại trừ:</span>
-              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans tabular-nums">
+              <span className={`font-bold font-sans tabular-nums ${history30Days.length === validHistory.length ? 'text-white' : 'text-red-400'}`}>
                 {history30Days.length - validHistory.length} ngày
               </span>
             </div>
@@ -1022,7 +1024,7 @@ export default function ChartsSection({
           {/* Bảng dữ liệu có cuộn dọc */}
           <div className="border border-zinc-200 dark:border-slate-800 rounded-sm overflow-x-auto max-h-[420px]">
             <table className="w-full text-left border-collapse text-sm font-sans">
-              <thead className="bg-zinc-50/95 dark:bg-slate-800/95 text-zinc-800 dark:text-slate-200 sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700 text-xs sm:text-[13px] font-bold">
+              <thead className="bg-zinc-50/95 dark:bg-slate-800/95 text-zinc-900 dark:text-white sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700 text-xs sm:text-[13px] font-bold">
                 <tr>
                   <th className="py-3 px-3.5">STT</th>
                   <th className="py-3 px-3.5">Ngày</th>
@@ -1040,10 +1042,10 @@ export default function ChartsSection({
                   {isAdmin && onOpenDataSettings && <th className="py-3 px-3.5 text-center">Thao tác</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60 text-sm">
+              <tbody className="divide-y divide-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-sm">
                 {filteredTableData.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="py-8 text-center text-zinc-500 dark:text-slate-400">
+                    <td colSpan={14} className="py-8 text-center text-zinc-400 dark:text-slate-400">
                       Không tìm thấy bản ghi nào phù hợp với bộ lọc.
                     </td>
                   </tr>
@@ -1051,47 +1053,48 @@ export default function ChartsSection({
                   filteredTableData.map((row, idx) => {
                     const trkWh = row.trackingWh !== undefined ? row.trackingWh : (Number(row.trackingKwh || 0) * 1000);
                     const staWh = row.staticWh !== undefined ? row.staticWh : (Number(row.staticKwh || 0) * 1000);
+                    const isGainPos = row.gainPercent >= 0;
                     return (
                       <tr key={row.date} className="hover:bg-zinc-50/80 dark:hover:bg-slate-800/60 transition-colors">
-                        <td className="py-3 px-3.5 text-zinc-400 dark:text-slate-500 font-medium text-xs sm:text-sm">{idx + 1}</td>
+                        <td className="py-3 px-3.5 text-zinc-500 dark:text-slate-300 font-medium text-xs sm:text-sm">{idx + 1}</td>
                         <td className="py-3 px-3.5 font-bold text-zinc-900 dark:text-white whitespace-nowrap text-sm sm:text-[15px]">{row.date}</td>
-                        <td className="py-3 px-3.5 text-right font-bold text-blue-600 dark:text-blue-400 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(trkWh, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-bold text-amber-600 dark:text-amber-400 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(staWh, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-extrabold text-emerald-600 dark:text-emerald-400 text-sm sm:text-[15px]">
+                        <td className={`py-3 px-3.5 text-right font-extrabold text-sm sm:text-[15px] ${isGainPos ? 'text-emerald-400' : 'text-red-400'}`}>
                           {formatSignedNumber(row.gainPercent, 1, '%')}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-800 dark:text-slate-100 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.voc_trk, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-600 dark:text-slate-300 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.voc_sta, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.isc_trk, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-600 dark:text-slate-300 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.isc_sta, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-medium text-zinc-800 dark:text-slate-200 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.temp_trk, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-medium text-zinc-500 dark:text-slate-400 text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px]">
                           {formatDecimal(row.temp_sta, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-zinc-600 dark:text-slate-300 text-xs sm:text-sm max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
+                        <td className="py-3 px-3.5 text-zinc-900 dark:text-white text-xs sm:text-sm max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
                           {row.weather_note || 'Bình thường'}
                         </td>
                         <td className="py-3 px-3.5 text-center">
                           {row.severe_invalid ? (
-                            <span className="px-2.5 py-1 text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 rounded-sm">
+                            <span className="px-2.5 py-1 text-xs font-semibold bg-red-900/60 text-red-300 border border-red-700/50 rounded-sm">
                               Lỗi
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-sm">
+                            <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 rounded-sm">
                               Hợp lệ
                             </span>
                           )}
@@ -1100,7 +1103,7 @@ export default function ChartsSection({
                           <td className="py-3 px-3.5 text-center">
                             <button
                               onClick={() => onOpenDataSettings(row.date)}
-                              className="px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                              className="px-2.5 py-0.5 text-xs font-bold text-slate-300 hover:text-white hover:underline cursor-pointer"
                               title={`Chỉnh sửa dữ liệu ngày ${row.date}`}
                             >
                               Sửa

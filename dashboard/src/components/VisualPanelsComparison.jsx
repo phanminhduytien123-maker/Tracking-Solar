@@ -132,7 +132,7 @@ export default function VisualPanelsComparison({
             <thead>
               <tr className="bg-zinc-50/80 dark:bg-slate-800/90 text-zinc-700 dark:text-slate-200">
                 <th className="text-left font-bold py-2.5 px-3 w-1/3 text-zinc-900 dark:text-white">Thông số đo đạc</th>
-                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-blue-700 dark:text-sky-300">
+                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-zinc-900 dark:text-white">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${trkBadge.dotColor}`} />
                     <span>Tấm tracker (Trục kép)</span>
@@ -141,7 +141,7 @@ export default function VisualPanelsComparison({
                     {trkBadge.text}
                   </span>
                 </th>
-                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-amber-800 dark:text-amber-300">
+                <th className="text-left font-bold py-2.5 px-3 w-1/3 text-zinc-900 dark:text-white">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${staBadge.dotColor}`} />
                     <span>Tấm cố định (Nam, ngửa 75°)</span>
@@ -156,10 +156,10 @@ export default function VisualPanelsComparison({
               {/* 1. Công suất tức thời */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">Công suất tức thời (P)</td>
-                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-blue-700 dark:text-sky-300">
+                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                   {formatValueOrDash(tracking.power, 1, 'W')}
                 </td>
-                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-amber-800 dark:text-amber-300">
+                <td className="py-2.5 px-3 font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                   {formatValueOrDash(stat.power, 1, 'W')}
                 </td>
               </tr>
@@ -214,10 +214,10 @@ export default function VisualPanelsComparison({
               {/* 4. Năng lượng tích lũy hôm nay */}
               <tr>
                 <td className="py-2.5 px-3 text-zinc-700 dark:text-slate-200 font-medium">Năng lượng hôm nay (ΣE)</td>
-                <td className="py-2.5 px-3 font-bold text-blue-700 dark:text-sky-300">
+                <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">
                   {formatValueOrDash(tracking.energyWh, 1, 'Wh')}
                 </td>
-                <td className="py-2.5 px-3 font-bold text-amber-800 dark:text-amber-300">
+                <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">
                   {formatValueOrDash(stat.energyWh, 1, 'Wh')}
                 </td>
               </tr>
@@ -256,10 +256,10 @@ export default function VisualPanelsComparison({
             </span>
             <div className="text-xs sm:text-sm">
               {hasValidGain ? (
-                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-base">
+                <span className={`font-bold text-base ${comparison.percentGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatSignedNumber(comparison.percentGain, 1, '%')}
                   {comparison.powerDelta !== null && (
-                    <span className="text-xs text-zinc-600 dark:text-slate-300 font-normal ml-2">
+                    <span className="text-xs text-slate-300 font-normal ml-2">
                       (chênh lệch tức thời {formatSignedNumber(comparison.powerDelta, 1, 'W')})
                     </span>
                   )}

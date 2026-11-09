@@ -633,15 +633,15 @@ export default function HistoryDataManagementTab({
                         : 'hover:bg-zinc-50'
                     }`}
                   >
-                    <td className="py-2 px-2.5 font-bold text-zinc-900">{d.date}</td>
-                    <td className="py-2 px-2.5 text-right font-bold text-blue-600 text-sm">{formatDecimal(trkWh, 1)}</td>
-                    <td className="py-2 px-2.5 text-right font-bold text-amber-600 text-sm">{formatDecimal(staWh, 1)}</td>
-                    <td className="py-2 px-2.5 text-right font-extrabold text-emerald-600 text-sm">
+                    <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">{d.date}</td>
+                    <td className="py-2 px-2.5 text-right font-bold text-zinc-900 dark:text-white text-sm">{formatDecimal(trkWh, 1)}</td>
+                    <td className="py-2 px-2.5 text-right font-bold text-zinc-900 dark:text-white text-sm">{formatDecimal(staWh, 1)}</td>
+                    <td className={`py-2 px-2.5 text-right font-extrabold text-sm ${d.gainPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                       {formatSignedNumber(d.gainPercent, 1, '%')}
                     </td>
-                    <td className="py-2 px-2.5 text-right font-semibold text-zinc-900">{formatDecimal(d.voc_trk, 2)}</td>
-                    <td className="py-2 px-2.5 text-right font-semibold text-emerald-600">{formatDecimal(d.isc_trk, 2)}</td>
-                    <td className="py-2 px-2.5 text-right font-medium text-zinc-800">{formatDecimal(d.temp_trk, 1)}°C</td>
+                    <td className="py-2 px-2.5 text-right font-semibold text-zinc-900 dark:text-white">{formatDecimal(d.voc_trk, 2)}</td>
+                    <td className="py-2 px-2.5 text-right font-semibold text-zinc-900 dark:text-white">{formatDecimal(d.isc_trk, 2)}</td>
+                    <td className="py-2 px-2.5 text-right font-medium text-zinc-900 dark:text-white">{formatDecimal(d.temp_trk, 1)}°C</td>
                     <td className="py-2 px-2.5 text-center">
                       {d.severe_invalid ? (
                         <span className="px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800 rounded-sm">
