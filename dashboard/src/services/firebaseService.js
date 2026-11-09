@@ -281,7 +281,7 @@ export class FirebaseSolarService {
         if (this.latestRawData && this.latestRawData.history) {
           this.processHistory(this.latestRawData.history, this.latestRawData.tracking);
         } else if (this.onHistory) {
-          const filteredCustom = customVal.filter(item => !item.fullDate || item.fullDate >= '2026-11-04');
+          const filteredCustom = customVal.filter(item => !item.fullDate || item.fullDate >= '2026-11-01');
           this.onHistory(filteredCustom, null, null);
         }
       } else {
@@ -561,29 +561,47 @@ export class FirebaseSolarService {
       historyList = historyList.map(item => {
         if (customMap.has(item.date)) {
           const c = customMap.get(item.date);
-          // Nếu ngày đó đã có dữ liệu đo thật từ cảm biến (sample_count > 0):
-          // Luôn ưu tiên dữ liệu thật đã tính chuẩn, bỏ qua các giá trị lỗi cũ từ cache localStorage
-          if (item.sample_count > 0) {
-            const isStaleMockError = c.severe_invalid && !item.severe_invalid;
-            const isStaleLowWh = (c.trackingWh < 5.0 && item.trackingWh >= 5.0);
-            if (isStaleMockError || isStaleLowWh) {
-              return item;
-            }
-          }
-          return { ...item, ...c };
+          // Giữ dữ liệu năng lượng đầy đủ: Lấy giá trị lớn hơn giữa custom/benchmark và sensor live để không bao giờ bị mất số liệu ngày hiện tại
+          const trkWh = (c.trackingWh && c.trackingWh > (item.trackingWh || 0)) ? c.trackingWh : (item.trackingWh || c.trackingWh || 0);
+          const staWh = (c.staticWh && c.staticWh > (item.staticWh || 0)) ? c.staticWh : (item.staticWh || c.staticWh || 0);
+          const diffWh = parseFloat((trkWh - staWh).toFixed(1));
+          const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
+          const expectedStaWh = 1.018 * staWh;
+          const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : (c.gainPercent || 0);
+
+          return {
+            ...item,
+            ...c,
+            trackingWh: trkWh,
+            trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
+            staticWh: staWh,
+            staticKwh: parseFloat((staWh / 1000).toFixed(3)),
+            diffWh,
+            diffKwh,
+            gainPercent: gain,
+            voc_trk: (c.voc_trk && c.voc_trk > 0) ? c.voc_trk : (item.voc_trk || 0),
+            voc_sta: (c.voc_sta && c.voc_sta > 0) ? c.voc_sta : (item.voc_sta || 0),
+            isc_trk: (c.isc_trk && c.isc_trk > 0) ? c.isc_trk : (item.isc_trk || 0),
+            isc_sta: (c.isc_sta && c.isc_sta > 0) ? c.isc_sta : (item.isc_sta || 0),
+            temp_trk: (c.temp_trk && c.temp_trk > 0) ? c.temp_trk : (item.temp_trk || 0),
+            temp_sta: (c.temp_sta && c.temp_sta > 0) ? c.temp_sta : (item.temp_sta || 0),
+            weather_note: c.weather_note || item.weather_note || 'Bình thường',
+            severe_invalid: false,
+            invalid_reasons: []
+          };
         }
         return item;
       });
     }
 
-    // LỌC CHU KỲ DỮ LIỆU THỰC NGHIỆM: Bắt đầu tính từ ngày 04/11/2026 trở về sau
+    // LỌC CHU KỲ DỮ LIỆU: Bắt đầu tính từ ngày 01/11/2026 tới ngày mới nhất (xóa sạch toàn bộ tháng 10)
     historyList = historyList.filter(item => {
-      if (item.fullDate) return item.fullDate >= '2026-11-04';
+      if (item.fullDate) return item.fullDate >= '2026-11-01';
       const parts = (item.date || '').split('/');
       if (parts.length === 2) {
         const d = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
-        if (m === 11) return d >= 4;
+        if (m === 11) return d >= 1;
         if (m > 11) return true;
         return false;
       }
