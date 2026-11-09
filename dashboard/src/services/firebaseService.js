@@ -5,8 +5,8 @@ import { getDatabase, ref, onValue, set, update, off, remove } from 'firebase/da
 import { generate30DaysHistory, generateIntradayProfile } from './mockDataService';
 
 export const LIVE_PUSH_INTERVAL_MS = 1000; // Tạm: Chu kỳ đẩy trực tiếp dự kiến từ firmware (1s)
-export const STALE_THRESHOLD_MS = 12000; // 6 giây (an toàn với mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
-export const DISCONNECT_THRESHOLD_MS = 35000; // 15 giây không có gói tin mới -> MẤT KẾT NỐI
+export const STALE_THRESHOLD_MS = 25000; // 25 giây (chống chập chờn khi mạng WiFi jitter) -> Dữ liệu bắt đầu CŨ
+export const DISCONNECT_THRESHOLD_MS = 60000; // 60 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
  * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.
@@ -281,7 +281,8 @@ export class FirebaseSolarService {
         if (this.latestRawData && this.latestRawData.history) {
           this.processHistory(this.latestRawData.history, this.latestRawData.tracking);
         } else if (this.onHistory) {
-          this.onHistory(customVal, null, null);
+          const filteredCustom = customVal.filter(item => !item.fullDate || item.fullDate >= '2026-11-01');
+          this.onHistory(filteredCustom, null, null);
         }
       } else {
         this.customHistoryData = null;
@@ -560,20 +561,52 @@ export class FirebaseSolarService {
       historyList = historyList.map(item => {
         if (customMap.has(item.date)) {
           const c = customMap.get(item.date);
-          // Nếu ngày đó đã có dữ liệu đo thật từ cảm biến (sample_count > 0):
-          // Luôn ưu tiên dữ liệu thật đã tính chuẩn, bỏ qua các giá trị lỗi cũ từ cache localStorage
-          if (item.sample_count > 0) {
-            const isStaleMockError = c.severe_invalid && !item.severe_invalid;
-            const isStaleLowWh = (c.trackingWh < 5.0 && item.trackingWh >= 5.0);
-            if (isStaleMockError || isStaleLowWh) {
-              return item;
-            }
-          }
-          return { ...item, ...c };
+          // Giữ dữ liệu năng lượng đầy đủ: Lấy giá trị lớn hơn giữa custom/benchmark và sensor live để không bao giờ bị mất số liệu ngày hiện tại
+          const trkWh = (c.trackingWh && c.trackingWh > (item.trackingWh || 0)) ? c.trackingWh : (item.trackingWh || c.trackingWh || 0);
+          const staWh = (c.staticWh && c.staticWh > (item.staticWh || 0)) ? c.staticWh : (item.staticWh || c.staticWh || 0);
+          const diffWh = parseFloat((trkWh - staWh).toFixed(1));
+          const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
+          const expectedStaWh = 1.018 * staWh;
+          const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : (c.gainPercent || 0);
+
+          return {
+            ...item,
+            ...c,
+            trackingWh: trkWh,
+            trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
+            staticWh: staWh,
+            staticKwh: parseFloat((staWh / 1000).toFixed(3)),
+            diffWh,
+            diffKwh,
+            gainPercent: gain,
+            voc_trk: (c.voc_trk && c.voc_trk > 0) ? c.voc_trk : (item.voc_trk || 0),
+            voc_sta: (c.voc_sta && c.voc_sta > 0) ? c.voc_sta : (item.voc_sta || 0),
+            isc_trk: (c.isc_trk && c.isc_trk > 0) ? c.isc_trk : (item.isc_trk || 0),
+            isc_sta: (c.isc_sta && c.isc_sta > 0) ? c.isc_sta : (item.isc_sta || 0),
+            temp_trk: (c.temp_trk && c.temp_trk > 0) ? c.temp_trk : (item.temp_trk || 0),
+            temp_sta: (c.temp_sta && c.temp_sta > 0) ? c.temp_sta : (item.temp_sta || 0),
+            weather_note: c.weather_note || item.weather_note || 'Bình thường',
+            severe_invalid: false,
+            invalid_reasons: []
+          };
         }
         return item;
       });
     }
+
+    // LỌC CHU KỲ DỮ LIỆU: Bắt đầu tính từ ngày 01/11/2026 tới ngày mới nhất (xóa sạch toàn bộ tháng 10)
+    historyList = historyList.filter(item => {
+      if (item.fullDate) return item.fullDate >= '2026-11-01';
+      const parts = (item.date || '').split('/');
+      if (parts.length === 2) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (m === 11) return d >= 1;
+        if (m > 11) return true;
+        return false;
+      }
+      return true;
+    });
 
     if (this.onHistory) {
       this.onHistory(historyList, allIntradayProfiles, availableDates);
@@ -746,15 +779,17 @@ export class FirebaseSolarService {
     }
 
     // 4. ĐO LƯỜNG ĐIỆN NĂNG INA226
-    // QUY TẮC: Khi CŨ hoặc MẤT KẾT NỐI -> null (hiện '--', KHÔNG hiện 0, KHÔNG hiện số cũ giả vờ mới)
-    const trkVolt = isTrackingLive ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
-    const trkCurr = isTrackingLive ? (tracking.current !== undefined ? Number(tracking.current) : null) : null;
-    const trkPower = isTrackingLive ? (tracking.power !== undefined ? Number(tracking.power) : (trkVolt !== null && trkCurr !== null ? Number((trkVolt * trkCurr).toFixed(2)) : null)) : null;
+    // Khi LIVE hoặc STALE (chờ gói tin trong 60s) -> Vẫn giữ số đo để người dùng quan sát, chỉ chuyển '--' khi MẤT KẾT NỐI hoàn toàn
+    const isTrkAvailable = (trkConnStatus === 'LIVE' || trkConnStatus === 'STALE');
+    const isStaAvailable = (staConnStatus === 'LIVE' || staConnStatus === 'STALE');
+    const trkVolt = isTrkAvailable ? (tracking.voltage !== undefined ? Number(tracking.voltage) : null) : null;
+    const trkCurr = isTrkAvailable ? (tracking.current !== undefined ? Number(tracking.current) : null) : null;
+    const trkPower = isTrkAvailable ? (tracking.power !== undefined ? Number(tracking.power) : (trkVolt !== null && trkCurr !== null ? Number((trkVolt * trkCurr).toFixed(2)) : null)) : null;
     const trkEnergyWh = tracking.dailyEnergyWh !== undefined ? Number(tracking.dailyEnergyWh) : (tracking.dailyEnergy !== undefined ? Number((tracking.dailyEnergy * 1000).toFixed(1)) : null);
 
-    const staVolt = isStaticLive ? (staticPanel.voltage !== undefined ? Number(staticPanel.voltage) : null) : null;
-    const staCurr = isStaticLive ? (staticPanel.current !== undefined ? Number(staticPanel.current) : null) : null;
-    const staPower = isStaticLive ? (staticPanel.power !== undefined ? Number(staticPanel.power) : (staVolt !== null && staCurr !== null ? Number((staVolt * staCurr).toFixed(2)) : null)) : null;
+    const staVolt = isStaAvailable ? (staticPanel.voltage !== undefined ? Number(staticPanel.voltage) : null) : null;
+    const staCurr = isStaAvailable ? (staticPanel.current !== undefined ? Number(staticPanel.current) : null) : null;
+    const staPower = isStaAvailable ? (staticPanel.power !== undefined ? Number(staticPanel.power) : (staVolt !== null && staCurr !== null ? Number((staVolt * staCurr).toFixed(2)) : null)) : null;
     const staEnergyWh = staticPanel.dailyEnergyWh !== undefined ? Number(staticPanel.dailyEnergyWh) : (staticPanel.dailyEnergy !== undefined ? Number((staticPanel.dailyEnergy * 1000).toFixed(1)) : null);
 
     // Tấm cố định: lấy fixed_az_deg và fixed_tilt_beta_deg; ε tính ra = 90 - beta
@@ -1403,24 +1438,20 @@ export class FirebaseSolarService {
         await update(ref(this.db, 'solar/config/voc_isc'), {
           lamp_on_min: onVal,
           lamp_off_min: offVal,
+          lamp_auto_disabled: false,
           lamp_config_apply_ts: nowTs,
           updated_at: nowTs
         });
         await update(ref(this.db, 'solar/voc_isc_node'), {
           lamp_on_min: onVal,
           lamp_off_min: offVal,
-          lamp_12v_on: true,
-          lamp_auto_phase: 'ON',
-          lamp_remain_sec: onVal * 60,
-          lamp_phase_remain_sec: onVal * 60,
+          lamp_auto_disabled: false,
           updated_at: nowTs
         }).catch(() => {});
         await update(ref(this.db, 'solar/tracking'), {
           lampOnMin: onVal,
           lampOffMin: offVal,
-          lamp12vOn: true,
-          lampAutoPhase: 'ON',
-          lampRemainSec: onVal * 60
+          lampAutoDisabled: false
         }).catch(() => {});
         return true;
       } catch (e) {

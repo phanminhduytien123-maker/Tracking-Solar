@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.0"
+#define CURRENT_FIRMWARE_VERSION "2.1.3"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -140,10 +140,9 @@ FirebaseData cmdFbdo;
 FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
-// Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8,
-// SCL: GPIO 9) Tấm cố định: 0x41 (A0 hàn VCC) | Tấm xoay Tracker: 0x44 (Địa chỉ
-// thực tế trên bus)
-INA226 inaTracker(0x44, &Wire);
+// Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8, SCL: GPIO 9)
+// Tấm xoay Tracker: 0x40 (Mặc định A0/A1 để hở) | Tấm cố định: 0x41 (A0 hàn VCC)
+INA226 inaTracker(0x40, &Wire);
 INA226 inaStatic(0x41, &Wire);
 bool inaTrackerFound = false;
 bool inaStaticFound = false;
@@ -151,6 +150,8 @@ double energyWhTracker = 0.0;
 double energyWhStatic = 0.0;
 float voltTrkLive = 0.0f, currTrkLive = 0.0f, pwrTrkLive = 0.0f;
 float voltStaLive = 0.0f, currStaLive = 0.0f, pwrStaLive = 0.0f;
+float globalShuntTrk = SHUNT_RESISTOR_OHM;
+float globalShuntSta = SHUNT_RESISTOR_OHM;
 unsigned long lastEnergyCalcTime = 0;
 unsigned long lastEnergySaveTime = 0;
 int lastRtcDay = -1;
@@ -1539,16 +1540,30 @@ void updateEnergyAndPower() {
   if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
     if (inaTrackerFound) {
       voltTrkLive = inaTracker.getBusVoltage();
-      currTrkLive = inaTracker.getCurrent_mA() / 1000.0f;
-      if (currTrkLive < 0)
-        currTrkLive = 0.0f;
+      // Đọc dòng trực tiếp từ Shunt Voltage vi sai (I = V_shunt / R_shunt)
+      // Không bị phụ thuộc vào thanh ghi Calibration, không bao giờ bị khóa về 0!
+      float vShuntTrk = inaTracker.getShuntVoltage(); // đơn vị Volt
+      float cTrk = vShuntTrk / (globalShuntTrk > 0.001f ? globalShuntTrk : 0.100f);
+      if (cTrk < 0.0f) cTrk = -cTrk; // Chống ngược cực IN+ / IN-
+      if (cTrk < 0.0001f) {
+        float libCurr = inaTracker.getCurrent();
+        if (libCurr < 0.0f) libCurr = -libCurr;
+        cTrk = libCurr;
+      }
+      currTrkLive = cTrk;
       pwrTrkLive = voltTrkLive * currTrkLive;
     }
     if (inaStaticFound) {
       voltStaLive = inaStatic.getBusVoltage();
-      currStaLive = inaStatic.getCurrent_mA() / 1000.0f;
-      if (currStaLive < 0)
-        currStaLive = 0.0f;
+      float vShuntSta = inaStatic.getShuntVoltage();
+      float cSta = vShuntSta / (globalShuntSta > 0.001f ? globalShuntSta : 0.100f);
+      if (cSta < 0.0f) cSta = -cSta;
+      if (cSta < 0.0001f) {
+        float libCurr = inaStatic.getCurrent();
+        if (libCurr < 0.0f) libCurr = -libCurr;
+        cSta = libCurr;
+      }
+      currStaLive = cSta;
       pwrStaLive = voltStaLive * currStaLive;
     }
     xSemaphoreGive(i2cMutex);
@@ -1701,10 +1716,10 @@ void scanI2CBus() {
         Serial.print("RTC DS3231 [CHIP CHINH]");
       else if (address == 0x57 || address == 0x50)
         Serial.print("EEPROM AT24C32 (tren module RTC)");
-      else if (address == 0x44 || address == 0x40)
-        Serial.print("INA226 #1 (Tam Xoay Tracker)");
+      else if (address == 0x40 || address == 0x44)
+        Serial.print("INA226 #1 (Tam Xoay Tracker - Mac dinh A0/A1 ho)");
       else if (address == 0x41)
-        Serial.print("INA226 #2 (Tam Co Dinh Static)");
+        Serial.print("INA226 #2 (Tam Co Dinh Static - A0=VCC)");
       else
         Serial.print("Thiet bi I2C");
       Serial.println();
@@ -2641,11 +2656,19 @@ void pushTelemetryToFirebase() {
   // 3. Dong goi CA 3 VAO 1 BAN TIN ATOMIC DUY NHAT day len /solar
   // Giam 3 lan so lan ket noi HTTPS, chong nghen socket va dam bao dong bo hoan
   // hao!
+  if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
   FirebaseJson root;
   root.set("tracking", trk);
   root.set("static", sta);
   root.set("algorithm", algoJson);
-  Firebase.RTDB.updateNode(&fbdo, "/solar", &root);
+  if (!Firebase.RTDB.updateNode(&fbdo, "/solar", &root)) {
+    static unsigned long lastPushErrPrint = 0;
+    if (millis() - lastPushErrPrint >= 5000) {
+      lastPushErrPrint = millis();
+      Serial.printf(">> [FIREBASE PUSH ERR] %s (HTTP code: %d)\n", fbdo.errorReason().c_str(), fbdo.httpCode());
+    }
+  }
 }
 
 // =========================================================================
@@ -2689,7 +2712,6 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
       if (millis() - lastProgressPrint >= 1500 || pct == 100) {
         lastProgressPrint = millis();
         Serial.printf(">> [FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n", pct, (unsigned)current, (unsigned)total);
-        Firebase.RTDB.setInt(&cmdFbdo, "/solar/ota/progress", pct);
       }
     }
   });
@@ -3118,17 +3140,17 @@ void telemetryTask(void *pvParameters) {
       ArduinoOTA.handle();
     }
 
-    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 1.5s
-    if (now - lastRemoteCheck >= 1500) {
+    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 3.0s (giảm 50% tải socket)
+    if (now - lastRemoteCheck >= 3000) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 5s
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 15s (tránh chiếm socket liên tục)
     static unsigned long lastFotaCheck = 0;
-    if (now - lastFotaCheck >= 5000) {
+    if (now - lastFotaCheck >= 15000) {
       lastFotaCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkSystemOtaTrigger();
@@ -3156,9 +3178,9 @@ void telemetryTask(void *pvParameters) {
       printTelemetryIfChanged();
     }
 
-    // 4. Đẩy Telemetry lên Firebase RTDB đều đặn 1s/lần cho Dashboard luôn LIVE
+    // 4. Đẩy Telemetry lên Firebase RTDB mỗi 2.0s/lần (cực kỳ ổn định, triệt tiêu nghẽn TLS)
     // (Mục 9)
-    unsigned long fbPushInterval = 1000;
+    unsigned long fbPushInterval = 2000;
     if (now - lastFbPushTime >= fbPushInterval) {
       lastFbPushTime = now;
       pushTelemetryToFirebase();
@@ -4114,14 +4136,16 @@ void setup() {
     shuntSta = (float)SHUNT_RESISTOR_OHM;
     ParamRegistry.set("INA_SHUNT_STA", shuntSta);
   }
-  if (maxCurrTrk > 5.0f) {
+  if (maxCurrTrk * shuntTrk > 0.0819f || maxCurrTrk > 1.0f) {
     maxCurrTrk = (float)MAX_EXPECTED_CURRENT_A;
     ParamRegistry.set("INA_MAX_CURR_TRK", maxCurrTrk);
   }
-  if (maxCurrSta > 5.0f) {
+  if (maxCurrSta * shuntSta > 0.0819f || maxCurrSta > 1.0f) {
     maxCurrSta = (float)MAX_EXPECTED_CURRENT_A;
     ParamRegistry.set("INA_MAX_CURR_STA", maxCurrSta);
   }
+  globalShuntTrk = shuntTrk;
+  globalShuntSta = shuntSta;
 
   ParamEntry *peTrk = ParamRegistry.getEntry("INA_SHUNT_TRK");
   if (peTrk && peTrk->status == PARAM_STATUS_UNVERIFIED) {
@@ -4130,23 +4154,33 @@ void setup() {
   }
 
   // Khởi tạo 2 cảm biến đo dòng/áp INA226
+  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x40, Static: 0x41)
   if (inaTracker.begin()) {
     inaTrackerFound = true;
     inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x44 - Tam Xoay "
+    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
                   "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntTrk, maxCurrTrk);
   } else {
-    inaTracker = INA226(0x40, &Wire);
+    inaTracker = INA226(0x44, &Wire);
     if (inaTracker.begin()) {
       inaTrackerFound = true;
       inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-      Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
+      Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x44 - Tam Xoay "
                     "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntTrk, maxCurrTrk);
     } else {
-      Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
-                     "thu 0x44 va 0x40)");
+      inaTracker = INA226(0x41, &Wire);
+      if (inaTracker.begin()) {
+        inaTrackerFound = true;
+        inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
+        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
+                      "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                      shuntTrk, maxCurrTrk);
+      } else {
+        Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
+                       "thu 0x40, 0x44 va 0x41)");
+      }
     }
   }
 
@@ -4157,8 +4191,26 @@ void setup() {
                   "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntSta, maxCurrSta);
   } else {
-    Serial.println(
-        ">> [INA226 #2 --] Chua tim thay INA226 (0x41 - Tam Co Dinh)");
+    inaStatic = INA226(0x44, &Wire);
+    if (inaStatic.begin()) {
+      inaStaticFound = true;
+      inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
+      Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x44 - Tam Co Dinh "
+                    "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                    shuntSta, maxCurrSta);
+    } else {
+      inaStatic = INA226(0x40, &Wire);
+      if (inaStatic.begin()) {
+        inaStaticFound = true;
+        inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
+        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
+                      "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                      shuntSta, maxCurrSta);
+      } else {
+        Serial.println(
+            ">> [INA226 #2 --] Chua tim thay INA226 (0x41, 0x44, 0x40 - Tam Co Dinh)");
+      }
+    }
   }
 
   // 7. Quét thiết bị I2C và in giờ RTC ban đầu
@@ -4174,17 +4226,8 @@ void setup() {
     if (savedDay == dRtc) {
       energyWhTracker = prefs.getFloat("wh_trk", 0.0f);
       energyWhStatic = prefs.getFloat("wh_sta", 0.0f);
-      // Tự động hiệu chỉnh nếu năng lượng trong ngày bị phình to do hệ số 50x cũ
-      if (energyWhTracker > 20.0f) {
-        energyWhTracker /= 50.0f;
-        prefs.putFloat("wh_trk", energyWhTracker);
-      }
-      if (energyWhStatic > 20.0f) {
-        energyWhStatic /= 50.0f;
-        prefs.putFloat("wh_sta", energyWhStatic);
-      }
-      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay (sau hieu chuan Shunt): "
-                    "Tracker=%.2f Wh, Static=%.2f Wh\n",
+      // Khôi phục nguyên vẹn năng lượng tích lũy trong ngày đã lưu trong NVS
+      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay: Tracker=%.2f Wh, Static=%.2f Wh\n",
                     energyWhTracker, energyWhStatic);
     } else {
       Serial.println(
@@ -4199,12 +4242,15 @@ void setup() {
 
   // 8. Khởi tạo WiFi & Firebase Realtime Database
   Serial.printf(">> Dang ket noi WiFi toi SSID: %s ...\n", WIFI_SSID);
+  Serial.flush();
+  delay(150);
   WiFi.mode(WIFI_STA);
+  delay(100);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startWifi = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - startWifi < 2500)) {
-    delay(150);
+  while (WiFi.status() != WL_CONNECTED && (millis() - startWifi < 6000)) {
+    delay(200);
     Serial.print(".");
   }
   if (WiFi.status() == WL_CONNECTED) {
@@ -4222,6 +4268,10 @@ void setup() {
   fbConfig.timeout.serverResponse = 8000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
+  fbdo.setBSSLBufferSize(8192, 1024);
+  fbdo.setResponseSize(4096);
+  cmdFbdo.setBSSLBufferSize(4096, 1024);
+  cmdFbdo.setResponseSize(2048);
   Serial.println(
       ">> [FIREBASE OK] Da san sang day Telemetry len Web Dashboard!\n");
 

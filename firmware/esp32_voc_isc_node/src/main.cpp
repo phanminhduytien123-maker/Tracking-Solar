@@ -23,15 +23,15 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.4"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.5"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
 // -------------------------------------------------------------------------
-#define PIN_ADC_VOC_TRK     4   // ADC1_CH3: FZ0430 #1 (Tấm Xoay)
-#define PIN_ADC_ISC_TRK     5   // ADC1_CH4: ACS712 #1 (Tấm Xoay - qua cầu 10k/20k)
-#define PIN_ADC_VOC_STA     6   // ADC1_CH5: FZ0430 #2 (Tấm Cố Định)
-#define PIN_ADC_ISC_STA     7   // ADC1_CH6: ACS712 #2 (Tấm Cố Định - qua cầu 10k/20k)
+#define PIN_ADC_VOC_TRK     6   // ADC1_CH5: FZ0430 #2 (Tấm Xoay)
+#define PIN_ADC_ISC_TRK     7   // ADC1_CH6: ACS712 #2 (Tấm Xoay - qua cầu 10k/20k)
+#define PIN_ADC_VOC_STA     4   // ADC1_CH3: FZ0430 #1 (Tấm Cố Định)
+#define PIN_ADC_ISC_STA     5   // ADC1_CH4: ACS712 #1 (Tấm Cố Định - qua cầu 10k/20k)
 
 // Chân điều khiển Module Relay A, B, C, D (Đo Voc/Isc ban ngày)
 #define PIN_RELAY_A_CUT     14  // Relay A (Ngắt tải Tấm Xoay) - hoặc gộp A+C

@@ -3,19 +3,23 @@
 export function generate30DaysHistory() {
   const history = [];
   const today = new Date();
+  const currentDay = today.getDate();
+  const currentMonth = today.getMonth(); // 10 is November in JS (0-indexed)
+  const currentYear = today.getFullYear();
 
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+  // Bắt đầu từ 01/11/2026, ngày nào thì hiện thêm ngày đó
+  const daysCount = (currentYear === 2026 && currentMonth === 10)
+    ? Math.max(1, currentDay)
+    : (currentMonth > 10 ? 30 : Math.max(1, currentDay));
+
+  for (let dNum = 1; dNum <= daysCount; dNum++) {
+    const d = new Date(2026, 10, dNum);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-
-    // Không tự động đánh dấu lỗi giả lập trên dữ liệu thật
-    const isDayInvalid = false;
-    const reasons = [];
+    const fullDate = `2026-11-${d.getDate().toString().padStart(2, '0')}`;
 
     history.push({
       date: dateStr,
-      fullDate: d.toISOString().split('T')[0],
+      fullDate: fullDate,
       staticKwh: 0.0,
       trackingKwh: 0.0,
       staticWh: 0.0,
@@ -31,12 +35,8 @@ export function generate30DaysHistory() {
       temp_sta: 0.0,
       sample_count: 0,
       weather_note: 'Bình thường',
-      severe_invalid: isDayInvalid,
-      invalid_reasons: reasons,
-      minutes_affected: isDayInvalid ? (i === 4 ? 25 : 180) : 0,
-      start_time: isDayInvalid ? (i === 4 ? "10:15:00" : "05:48:00") : null,
-      end_time: isDayInvalid ? (i === 4 ? "10:40:00" : "08:48:00") : null,
-      actor_uid: isDayInvalid ? (i === 4 ? "admin_uid_42200522" : "system_rtc_ds3231") : null
+      severe_invalid: false,
+      invalid_reasons: []
     });
   }
   return history;
@@ -45,13 +45,21 @@ export function generate30DaysHistory() {
 export function generateRealistic30DaysDataset() {
   const history = [];
   const today = new Date();
+  const currentDay = today.getDate();
+  const currentMonth = today.getMonth(); // 10 is November in JS (0-indexed)
+  const currentYear = today.getFullYear();
 
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+  // Bắt đầu từ 01/11/2026, ngày nào thì hiện thêm ngày đó
+  const daysCount = (currentYear === 2026 && currentMonth === 10)
+    ? Math.max(1, currentDay)
+    : (currentMonth > 10 ? 30 : Math.max(1, currentDay));
+
+  for (let dNum = 1; dNum <= daysCount; dNum++) {
+    const d = new Date(2026, 10, dNum);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    const fullDate = `2026-11-${d.getDate().toString().padStart(2, '0')}`;
 
-    const daySeed = (i * 7 + 13) % 10;
+    const daySeed = (dNum * 7 + 13) % 10;
     let weatherType = 'Nắng tốt';
     let baseWhTrk = 224;
     let baseWhSta = 168;
@@ -84,16 +92,15 @@ export function generateRealistic30DaysDataset() {
       tempSta = 34.6;
     }
 
-    const jitter = ((i % 5) - 2) * 3.2;
+    const jitter = ((dNum % 5) - 2) * 3.2;
     const trkWh = parseFloat((baseWhTrk + jitter).toFixed(1));
     const staWh = parseFloat((baseWhSta + jitter * 0.7).toFixed(1));
     const diffWh = parseFloat((trkWh - staWh).toFixed(1));
     const gain = staWh > 0 ? parseFloat((((trkWh / (1.018 * staWh)) - 1) * 100).toFixed(1)) : 0;
 
-    const isDayInvalid = (i === 12);
     history.push({
       date: dateStr,
-      fullDate: d.toISOString().split('T')[0],
+      fullDate: fullDate,
       staticKwh: parseFloat((staWh / 1000).toFixed(3)),
       trackingKwh: parseFloat((trkWh / 1000).toFixed(3)),
       staticWh: staWh,
@@ -101,20 +108,16 @@ export function generateRealistic30DaysDataset() {
       gainPercent: gain,
       diffKwh: parseFloat((diffWh / 1000).toFixed(3)),
       diffWh: diffWh,
-      voc_trk: parseFloat((vocTrk + (i % 3 - 1) * 0.12).toFixed(2)),
-      voc_sta: parseFloat((vocSta + (i % 3 - 1) * 0.10).toFixed(2)),
-      isc_trk: parseFloat((iscTrk + (i % 3 - 1) * 0.03).toFixed(2)),
-      isc_sta: parseFloat((iscSta + (i % 3 - 1) * 0.02).toFixed(2)),
-      temp_trk: parseFloat((tempTrk + (i % 4 - 2) * 0.7).toFixed(1)),
-      temp_sta: parseFloat((tempSta + (i % 4 - 2) * 0.8).toFixed(1)),
+      voc_trk: parseFloat((vocTrk + (dNum % 3 - 1) * 0.12).toFixed(2)),
+      voc_sta: parseFloat((vocSta + (dNum % 3 - 1) * 0.10).toFixed(2)),
+      isc_trk: parseFloat((iscTrk + (dNum % 3 - 1) * 0.03).toFixed(2)),
+      isc_sta: parseFloat((iscSta + (dNum % 3 - 1) * 0.02).toFixed(2)),
+      temp_trk: parseFloat((tempTrk + (dNum % 4 - 2) * 0.7).toFixed(1)),
+      temp_sta: parseFloat((tempSta + (dNum % 4 - 2) * 0.8).toFixed(1)),
       sample_count: 5040,
       weather_note: weatherType,
-      severe_invalid: isDayInvalid,
-      invalid_reasons: isDayInvalid ? ["CALIBRATION_TEST"] : [],
-      minutes_affected: isDayInvalid ? 15 : 0,
-      start_time: isDayInvalid ? "07:15:00" : null,
-      end_time: isDayInvalid ? "07:30:00" : null,
-      actor_uid: isDayInvalid ? "tester_lab" : null
+      severe_invalid: false,
+      invalid_reasons: []
     });
   }
   return history;
