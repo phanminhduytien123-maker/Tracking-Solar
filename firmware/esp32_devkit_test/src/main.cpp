@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.0"
+#define CURRENT_FIRMWARE_VERSION "2.1.1"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -140,11 +140,10 @@ FirebaseData cmdFbdo;
 FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
-// Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8,
-// SCL: GPIO 9) Tấm cố định: 0x41 (A0 hàn VCC) | Tấm xoay Tracker: 0x44 (Địa chỉ
-// thực tế trên bus)
-INA226 inaTracker(0x44, &Wire);
-INA226 inaStatic(0x41, &Wire);
+// Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8, SCL: GPIO 9)
+// Tấm xoay Tracker: 0x41 (A0 hàn VCC) | Tấm cố định: 0x40 (Mặc định A0/A1 để hở)
+INA226 inaTracker(0x41, &Wire);
+INA226 inaStatic(0x40, &Wire);
 bool inaTrackerFound = false;
 bool inaStaticFound = false;
 double energyWhTracker = 0.0;
@@ -1717,10 +1716,10 @@ void scanI2CBus() {
         Serial.print("RTC DS3231 [CHIP CHINH]");
       else if (address == 0x57 || address == 0x50)
         Serial.print("EEPROM AT24C32 (tren module RTC)");
-      else if (address == 0x44 || address == 0x40)
-        Serial.print("INA226 #1 (Tam Xoay Tracker)");
       else if (address == 0x41)
-        Serial.print("INA226 #2 (Tam Co Dinh Static)");
+        Serial.print("INA226 #1 (Tam Xoay Tracker - A0=VCC)");
+      else if (address == 0x40 || address == 0x44)
+        Serial.print("INA226 #2 (Tam Co Dinh Static - Mac dinh A0/A1 ho)");
       else
         Serial.print("Thiet bi I2C");
       Serial.println();
@@ -4148,35 +4147,63 @@ void setup() {
   }
 
   // Khởi tạo 2 cảm biến đo dòng/áp INA226
+  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x41, Static: 0x40)
   if (inaTracker.begin()) {
     inaTrackerFound = true;
     inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x44 - Tam Xoay "
+    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
                   "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntTrk, maxCurrTrk);
   } else {
-    inaTracker = INA226(0x40, &Wire);
+    inaTracker = INA226(0x44, &Wire);
     if (inaTracker.begin()) {
       inaTrackerFound = true;
       inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-      Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
+      Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x44 - Tam Xoay "
                     "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntTrk, maxCurrTrk);
     } else {
-      Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
-                     "thu 0x44 va 0x40)");
+      inaTracker = INA226(0x40, &Wire);
+      if (inaTracker.begin()) {
+        inaTrackerFound = true;
+        inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
+        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
+                      "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                      shuntTrk, maxCurrTrk);
+      } else {
+        Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
+                       "thu 0x41, 0x44 va 0x40)");
+      }
     }
   }
 
   if (inaStatic.begin()) {
     inaStaticFound = true;
     inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
-    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
+    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
                   "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntSta, maxCurrSta);
   } else {
-    Serial.println(
-        ">> [INA226 #2 --] Chua tim thay INA226 (0x41 - Tam Co Dinh)");
+    inaStatic = INA226(0x44, &Wire);
+    if (inaStatic.begin()) {
+      inaStaticFound = true;
+      inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
+      Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x44 - Tam Co Dinh "
+                    "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                    shuntSta, maxCurrSta);
+    } else {
+      inaStatic = INA226(0x41, &Wire);
+      if (inaStatic.begin()) {
+        inaStaticFound = true;
+        inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
+        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
+                      "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
+                      shuntSta, maxCurrSta);
+      } else {
+        Serial.println(
+            ">> [INA226 #2 --] Chua tim thay INA226 (0x40, 0x44, 0x41 - Tam Co Dinh)");
+      }
+    }
   }
 
   // 7. Quét thiết bị I2C và in giờ RTC ban đầu
