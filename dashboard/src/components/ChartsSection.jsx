@@ -794,16 +794,16 @@ export default function ChartsSection({
               Tổng năng lượng {history30Days.length >= 28 ? '30 ngày' : `(${history30Days.length} ngày)`}
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
-                {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-normal text-zinc-500">kWh</span>
+              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(totalTrkWh / 1000, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">kWh</span>
               </span>
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-sans tabular-nums">
                 {formatSignedNumber(overallGain, 1, '%')}
               </span>
             </div>
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
-              <span>Cố định: {formatDecimal(totalStaWh / 1000, 2)} kWh</span>
-              <span className="font-semibold text-blue-600 dark:text-blue-400">+{formatDecimal(totalDiffWh / 1000, 2)}</span>
+            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+              <span>Cố định: <span className="font-bold text-zinc-800 dark:text-slate-100">{formatDecimal(totalStaWh / 1000, 2)}</span> kWh</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400">+{formatDecimal(totalDiffWh / 1000, 2)}</span>
             </div>
           </div>
 
@@ -813,16 +813,16 @@ export default function ChartsSection({
               Voc trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
-                {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-normal text-zinc-500">V</span>
+              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgVocTrk, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">V</span>
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
-                Sta: {formatDecimal(avgVocSta, 2)}V
+              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
+                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgVocSta, 2)}</span>V
               </span>
             </div>
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch áp:</span>
-              <span className="font-semibold text-zinc-800 dark:text-slate-200 font-mono">
+              <span className="font-bold text-zinc-900 dark:text-slate-100">
                 {formatSignedNumber(avgVocTrk - avgVocSta, 2, 'V')}
               </span>
             </div>
@@ -834,16 +834,16 @@ export default function ChartsSection({
               Isc đỉnh trung bình
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
-                {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-normal text-zinc-500">A</span>
+              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgIscTrk, 2)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">A</span>
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
-                Sta: {formatDecimal(avgIscSta, 2)}A
+              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
+                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgIscSta, 2)}</span>A
               </span>
             </div>
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Tăng trưởng dòng:</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                 {avgIscSta > 0 ? `+${formatDecimal(((avgIscTrk / avgIscSta) - 1) * 100, 1)}%` : '--'}
               </span>
             </div>
@@ -855,16 +855,16 @@ export default function ChartsSection({
               Nhiệt độ TB (Tcell)
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white font-mono">
-                {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-normal text-zinc-500">°C</span>
+              <span className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-white font-sans tabular-nums tracking-tight">
+                {formatDecimal(avgTempTrk, 1)} <span className="text-xs font-semibold text-zinc-500 ml-0.5">°C</span>
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
-                Sta: {formatDecimal(avgTempSta, 1)}°C
+              <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans tabular-nums">
+                Sta: <span className="font-bold text-zinc-700 dark:text-slate-200">{formatDecimal(avgTempSta, 1)}</span>°C
               </span>
             </div>
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Chênh lệch ΔT:</span>
-              <span className="font-semibold text-purple-600 dark:text-purple-400 font-mono">
+              <span className="font-bold text-purple-600 dark:text-purple-400">
                 {formatSignedNumber(avgTempTrk - avgTempSta, 1, '°C')}
               </span>
             </div>
@@ -876,14 +876,14 @@ export default function ChartsSection({
               Độ tin cậy chu kỳ
             </span>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="text-lg sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400 font-sans tabular-nums tracking-tight">
                 {validHistory.length}/{history30Days.length}
               </span>
-              <span className="text-xs text-zinc-500">ngày</span>
+              <span className="text-xs font-semibold text-zinc-500">ngày</span>
             </div>
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-slate-400 mt-1 flex justify-between border-t border-zinc-200 dark:border-slate-800 pt-1.5">
+            <div className="text-xs font-sans tabular-nums text-zinc-600 dark:text-slate-300 mt-2 flex justify-between items-center border-t border-zinc-200 dark:border-slate-800 pt-1.5">
               <span>Ngày loại trừ:</span>
-              <span className="font-semibold text-amber-600 dark:text-amber-400 font-mono">
+              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans tabular-nums">
                 {history30Days.length - validHistory.length} ngày
               </span>
             </div>

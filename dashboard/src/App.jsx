@@ -1125,6 +1125,7 @@ export default function App() {
             <CompactInteractiveTwin
               telemetry={telemetry}
               location={selectedLocation}
+              weatherData={weatherData}
               isActive={compactMode}
             />
           </div>

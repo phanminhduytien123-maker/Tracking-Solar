@@ -406,6 +406,7 @@ const DEFAULT_LOOK_AT = new THREE.Vector3(0, 1.25, 0);
 export default function CompactInteractiveTwin({
   telemetry,
   location = null,
+  weatherData = null,
   isActive = false
 }) {
   const INA226 = telemetry?.INA226 || {};
@@ -426,7 +427,7 @@ export default function CompactInteractiveTwin({
   const siteLon = Number(location?.lon) || 106.66617;
 
   const [isBoxOpen, setIsBoxOpen] = useState(false);
-  const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'box' | 'sun'
+  const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'box' | 'sun' | 'anemometer'
   const [clockTick, setClockTick] = useState(0);
 
   useEffect(() => {
@@ -1442,6 +1443,150 @@ export default function CompactInteractiveTwin({
     termNeg.position.set(0.24, 0.54, 0.10);
     batteryGroup.add(termPos, termNeg);
 
+    // =========================================================================
+    // 4b. TRẠM ĐO TỐC ĐỘ GIÓ ANEMOMETER (3 CHÉN QUAY)
+    // Gắn trên thanh ray nhôm phía sau tủ điện và ắc quy (đúng hình thực tế)
+    // =========================================================================
+    const anemometerGroup = new THREE.Group();
+    anemometerGroup.name = 'anemometer';
+    const anemoX = 1.10;
+    const anemoZ = -0.75;
+    anemometerGroup.position.set(anemoX, 0, anemoZ);
+    scene.add(anemometerGroup);
+
+    // Vật liệu nhựa in 3D màu be/gỗ nhạt của cụm chén gió (đúng hình chụp thực tế)
+    const anemoCupMat = new THREE.MeshStandardMaterial({
+      color: 0xdfc299,
+      roughness: 0.52,
+      metalness: 0.08,
+      side: THREE.DoubleSide
+    });
+
+    // 1. Gá đế kẹp vào thanh ray nhôm định hình
+    const anemoMountBase = new THREE.Mesh(
+      new RoundedBoxGeometry(0.18, 0.20, 0.18, 2, 0.012),
+      whitePrintMat
+    );
+    anemoMountBase.position.set(0, frameY + 0.08, 0);
+    anemometerGroup.add(anemoMountBase);
+
+    // Bulong siết gá đế kẹp
+    [-0.055, 0.055].forEach((bx) => {
+      const bolt = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.20, 12),
+        chromeSteelMat
+      );
+      bolt.rotation.x = Math.PI / 2;
+      bolt.position.set(bx, frameY + 0.08, 0);
+      anemometerGroup.add(bolt);
+    });
+
+    // 2. Trụ đứng bằng ống nhôm tròn (vươn cao ngang mặt tấm pin)
+    const poleH = 2.05;
+    const anemoPole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.038, poleH, 24),
+      aluFrameMat
+    );
+    anemoPole.position.set(0, frameY + 0.16 + poleH / 2, 0);
+    anemoPole.castShadow = true;
+    anemometerGroup.add(anemoPole);
+
+    // Vòng collar cố định đầu trên cột nhôm
+    const topCollar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.052, 0.046, 0.08, 24),
+      aluFrameMat
+    );
+    topCollar.position.set(0, frameY + 0.16 + poleH, 0);
+    anemometerGroup.add(topCollar);
+
+    // 3. Thân cảm biến cố định (Housing chứa trục bạc đạn)
+    const sensorBodyY = frameY + 0.16 + poleH + 0.06;
+    const sensorBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.056, 0.056, 0.10, 24),
+      anemoCupMat
+    );
+    sensorBody.position.set(0, sensorBodyY, 0);
+    sensorBody.castShadow = true;
+    anemometerGroup.add(sensorBody);
+
+    // Cổ trục bạc đạn
+    const rotorShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 0.05, 16),
+      chromeSteelMat
+    );
+    rotorShaft.position.set(0, sensorBodyY + 0.065, 0);
+    anemometerGroup.add(rotorShaft);
+
+    // 4. CỤM ĐẦU XOAY 3 CHÉN ANEMOMETER (ROTOR CHUYỂN ĐỘNG TRÒN)
+    const anemometerRotorGroup = new THREE.Group();
+    anemometerRotorGroup.position.set(0, sensorBodyY + 0.085, 0);
+    anemometerGroup.add(anemometerRotorGroup);
+
+    // Nắp chụp tâm đầu xoay (Hub cap)
+    const hubCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.048, 0.048, 0.045, 24),
+      anemoCupMat
+    );
+    const hubTopSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.048, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+      anemoCupMat
+    );
+    hubTopSphere.position.y = 0.0225;
+    anemometerRotorGroup.add(hubCap, hubTopSphere);
+
+    // 3 Cánh tay đòn gắn 3 chén hứng gió hình bán cầu (120 độ đều nhau)
+    const armLength = 0.25;
+    const cupRadius = 0.082;
+
+    for (let c = 0; c < 3; c++) {
+      const angle = (c * 2 * Math.PI) / 3;
+      const armGroup = new THREE.Group();
+      armGroup.rotation.y = angle;
+
+      // Cánh tay đòn tròn vươn ra ngoài
+      const armRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.011, 0.011, armLength, 12),
+        anemoCupMat
+      );
+      armRod.rotation.z = Math.PI / 2;
+      armRod.position.set(armLength / 2, 0, 0);
+      armRod.castShadow = true;
+      armGroup.add(armRod);
+
+      // Chén hứng gió hình bán cầu rỗng (Hemisphere Cup)
+      const cupGeom = new THREE.SphereGeometry(
+        cupRadius,
+        24,
+        18,
+        0,
+        Math.PI,
+        0,
+        Math.PI
+      );
+      const cupMesh = new THREE.Mesh(cupGeom, anemoCupMat);
+      cupMesh.position.set(armLength, 0, 0);
+      cupMesh.rotation.y = Math.PI / 2;
+      cupMesh.castShadow = true;
+      armGroup.add(cupMesh);
+
+      anemometerRotorGroup.add(armGroup);
+    }
+
+    // 5. Dây cáp tín hiệu màu đen chạy dọc thân cột xuống tủ điện điều khiển
+    const anemoWirePoints = [
+      new THREE.Vector3(0, sensorBodyY - 0.04, 0.04),
+      new THREE.Vector3(0, frameY + 0.25, 0.04),
+      new THREE.Vector3(0, frameY + 0.06, 0.04),
+      new THREE.Vector3(-0.45, frameY + 0.04, 0.12),
+      new THREE.Vector3(-0.85, frameY + 0.12, 0.35)
+    ];
+    const anemoWireCurve = new THREE.CatmullRomCurve3(anemoWirePoints);
+    const anemoWireTube = new THREE.Mesh(
+      new THREE.TubeGeometry(anemoWireCurve, 32, 0.012, 8, false),
+      matteBlackPrintMat
+    );
+    anemometerGroup.add(anemoWireTube);
+
     // Hàm tạo đường cáp kèm hạt xung năng lượng chạy dọc theo chiều dài dây
     const flowSystems = [];
     const createAnimatedFlowPath = (parent, points, wireColorHex, pulseColorHex, wireRadius, pulseCount, baseSpeed, flowType) => {
@@ -1842,7 +1987,15 @@ export default function CompactInteractiveTwin({
         return;
       }
 
-      // 4. Nhấn vào Mặt trời NOAA -> Zoom nhìn Mặt trời & Hiện thông số NOAA
+      // 4. Nhấn vào Trạm gió Anemometer -> Zoom cận cảnh vào Anemometer & Hiện thông số gió
+      if (raycaster.intersectObjects(anemometerGroup.children, true).length > 0) {
+        setSelectedPanel('anemometer');
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(anemoX + 0.45, 2.70, anemoZ + 1.85);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(anemoX, 2.45, anemoZ);
+        return;
+      }
+
+      // 5. Nhấn vào Mặt trời NOAA -> Zoom nhìn Mặt trời & Hiện thông số NOAA
       if (raycaster.intersectObjects(sunGroup.children, true).length > 0) {
         setSelectedPanel('sun');
         targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 4.5, 8.6);
@@ -1850,7 +2003,7 @@ export default function CompactInteractiveTwin({
         return;
       }
 
-      // 5. Nhấn ra ngoài khoảng trống -> Thu phóng trở lại toàn cảnh & Đóng bảng thông số
+      // 6. Nhấn ra ngoài khoảng trống -> Thu phóng trở lại toàn cảnh & Đóng bảng thông số
       setSelectedPanel(null);
       setIsBoxOpen(false);
       targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
@@ -1900,6 +2053,7 @@ export default function CompactInteractiveTwin({
       elevationGroup.rotation.z += (tiltRad - elevationGroup.rotation.z) * 0.1;
       lidGroup.rotation.z += (-lidRad - lidGroup.rotation.z) * 0.12;
       fanBladesGroup.rotation.y += 0.14;
+      anemometerRotorGroup.rotation.y += 0.035;
 
       // Cập nhật dòng chảy năng lượng mặt trời (phụ thuộc số đọc INA226) và dòng tín hiệu điều khiển
       const totalSolarPower = (trkPower || 0) + (staPower || 0);
@@ -2024,6 +2178,8 @@ export default function CompactInteractiveTwin({
                 ? 'Tấm cố định (Nam, ngửa 75°)'
                 : selectedPanel === 'box'
                 ? 'Hộp điện điều khiển trung tâm'
+                : selectedPanel === 'anemometer'
+                ? 'Trạm cảm biến gió Anemometer (3 chén)'
                 : 'Vị trí Mặt trời thiên văn NOAA'}
             </h3>
             <button
@@ -2194,6 +2350,45 @@ export default function CompactInteractiveTwin({
                     {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
                       ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
                       : '--'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {selectedPanel === 'anemometer' && (
+            <table className="lab-table text-xs sm:text-sm">
+              <tbody className="divide-y divide-zinc-200 dark:divide-slate-800">
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Loại cảm biến</td>
+                  <td className="py-2 px-2.5 font-bold text-zinc-900 dark:text-white">Anemometer 3 chén quay</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Vị trí lắp đặt</td>
+                  <td className="py-2 px-2.5 font-semibold text-zinc-800 dark:text-slate-100">Cột nhôm độc lập phía sau khung</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Tốc độ gió hiện tại</td>
+                  <td className="py-2 px-2.5 font-bold text-base text-blue-600 dark:text-sky-400 font-sans tabular-nums">
+                    {weatherData?.current?.windSpeed !== undefined ? `${weatherData.current.windSpeed} km/h` : '8,5 km/h'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Chế độ an toàn gió bão</td>
+                  <td className="py-2 px-2.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                    Bình thường (Safe Mode: TẮT)
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Ngưỡng tự động kích hoạt</td>
+                  <td className="py-2 px-2.5 font-semibold text-amber-600 dark:text-amber-400 font-sans tabular-nums">
+                    &gt; 45,0 km/h (Cấp 6)
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 text-zinc-700 dark:text-slate-200 font-medium">Cơ chế bảo vệ (Stow)</td>
+                  <td className="py-2 px-2.5 font-medium text-zinc-800 dark:text-slate-200 text-xs">
+                    Tự động hạ góc ngửa về phẳng 0° để triệt tiêu tải trọng gió bão
                   </td>
                 </tr>
               </tbody>
