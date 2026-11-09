@@ -1026,20 +1026,20 @@ export default function ChartsSection({
             <table className="w-full text-left border-collapse text-sm font-sans">
               <thead className="bg-zinc-50/95 dark:bg-slate-800/95 text-zinc-900 dark:text-white sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-700 text-xs sm:text-[13px] font-bold">
                 <tr>
-                  <th className="py-3 px-3.5">STT</th>
-                  <th className="py-3 px-3.5">Ngày</th>
-                  <th className="py-3 px-3.5 text-right">Tracker (Wh)</th>
-                  <th className="py-3 px-3.5 text-right">Cố định (Wh)</th>
-                  <th className="py-3 px-3.5 text-right">% Gain</th>
-                  <th className="py-3 px-3.5 text-right">Voc Trk (V)</th>
-                  <th className="py-3 px-3.5 text-right">Voc Sta (V)</th>
-                  <th className="py-3 px-3.5 text-right">Isc Trk (A)</th>
-                  <th className="py-3 px-3.5 text-right">Isc Sta (A)</th>
-                  <th className="py-3 px-3.5 text-right">T° Trk (°C)</th>
-                  <th className="py-3 px-3.5 text-right">T° Sta (°C)</th>
-                  <th className="py-3 px-3.5">Ghi chú</th>
-                  <th className="py-3 px-3.5 text-center">Trạng thái</th>
-                  {isAdmin && onOpenDataSettings && <th className="py-3 px-3.5 text-center">Thao tác</th>}
+                  <th className="py-3 px-3.5 whitespace-nowrap">STT</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap">Ngày</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Tracker (Wh)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Cố định (Wh)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">% Gain</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Voc Trk (V)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Voc Sta (V)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Isc Trk (A)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Isc Sta (A)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Trk (°C)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Sta (°C)</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap">Ghi chú</th>
+                  <th className="py-3 px-3.5 text-center whitespace-nowrap">Trạng thái</th>
+                  {isAdmin && onOpenDataSettings && <th className="py-3 px-3.5 text-center whitespace-nowrap">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-sm">
@@ -1056,54 +1056,54 @@ export default function ChartsSection({
                     const isGainPos = row.gainPercent >= 0;
                     return (
                       <tr key={row.date} className="hover:bg-zinc-50/80 dark:hover:bg-slate-800/60 transition-colors">
-                        <td className="py-3 px-3.5 text-zinc-500 dark:text-slate-300 font-medium text-xs sm:text-sm">{idx + 1}</td>
+                        <td className="py-3 px-3.5 text-zinc-500 dark:text-slate-300 font-medium text-xs sm:text-sm whitespace-nowrap">{idx + 1}</td>
                         <td className="py-3 px-3.5 font-bold text-zinc-900 dark:text-white whitespace-nowrap text-sm sm:text-[15px]">{row.date}</td>
-                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(trkWh, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-bold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(staWh, 1)}
                         </td>
-                        <td className={`py-3 px-3.5 text-right font-extrabold text-sm sm:text-[15px] ${isGainPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        <td className={`py-3 px-3.5 text-right font-extrabold text-sm sm:text-[15px] whitespace-nowrap ${isGainPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                           {formatSignedNumber(row.gainPercent, 1, '%')}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.voc_trk, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.voc_sta, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.isc_trk, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-semibold text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.isc_sta, 2)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.temp_trk, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px]">
+                        <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.temp_sta, 1)}
                         </td>
-                        <td className="py-3 px-3.5 text-zinc-900 dark:text-white text-xs sm:text-sm max-w-[140px] truncate" title={row.weather_note || 'Bình thường'}>
+                        <td className="py-3 px-3.5 text-zinc-900 dark:text-white text-xs sm:text-sm max-w-[140px] truncate whitespace-nowrap" title={row.weather_note || 'Bình thường'}>
                           {row.weather_note || 'Bình thường'}
                         </td>
-                        <td className="py-3 px-3.5 text-center">
+                        <td className="py-3 px-3.5 text-center whitespace-nowrap min-w-[90px]">
                           {row.severe_invalid ? (
-                            <span className="px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700/50 rounded-sm">
+                            <span className="inline-block whitespace-nowrap px-2.5 py-1 text-xs font-bold bg-red-100 text-red-800 border border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700/50 rounded-sm">
                               Lỗi
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/50 rounded-sm">
+                            <span className="inline-block whitespace-nowrap px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/50 rounded-sm">
                               Hợp lệ
                             </span>
                           )}
                         </td>
                         {isAdmin && onOpenDataSettings && (
-                          <td className="py-3 px-3.5 text-center">
+                          <td className="py-3 px-3.5 text-center whitespace-nowrap">
                             <button
                               onClick={() => onOpenDataSettings(row.date)}
-                              className="px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                              className="px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer whitespace-nowrap"
                               title={`Chỉnh sửa dữ liệu ngày ${row.date}`}
                             >
                               Sửa

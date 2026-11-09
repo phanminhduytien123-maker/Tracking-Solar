@@ -642,13 +642,13 @@ export default function HistoryDataManagementTab({
                     <td className="py-2 px-2.5 text-right font-semibold text-zinc-900 dark:text-white">{formatDecimal(d.voc_trk, 2)}</td>
                     <td className="py-2 px-2.5 text-right font-semibold text-zinc-900 dark:text-white">{formatDecimal(d.isc_trk, 2)}</td>
                     <td className="py-2 px-2.5 text-right font-medium text-zinc-900 dark:text-white">{formatDecimal(d.temp_trk, 1)}°C</td>
-                    <td className="py-2 px-2.5 text-center">
+                    <td className="py-2 px-2.5 text-center whitespace-nowrap">
                       {d.severe_invalid ? (
-                        <span className="px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800 rounded-sm">
+                        <span className="inline-block whitespace-nowrap px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800 rounded-sm">
                           Lỗi
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-800 rounded-sm">
+                        <span className="inline-block whitespace-nowrap px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-800 rounded-sm">
                           Hợp lệ
                         </span>
                       )}
