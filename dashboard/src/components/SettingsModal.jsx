@@ -774,7 +774,8 @@ void loop() {
                               const onVal = Math.max(1, Math.min(360, Number(lampOnMinInput) || 15));
                               const offVal = Math.max(1, Math.min(360, Number(lampOffMinInput) || 15));
                               onSetLampCustomCycle && onSetLampCustomCycle(onVal, offVal);
-                              setHwConfigFeedback(`✓ Đã áp dụng chu kỳ Đèn 12V: BẬT ${onVal} phút / TẮT ${offVal} phút luân phiên!`);
+                              onSetLampAutoDisabled && onSetLampAutoDisabled(false);
+                              setHwConfigFeedback(`✓ Đã kích hoạt chế độ Tự động và áp dụng chu kỳ Đèn: BẬT ${onVal} phút / TẮT ${offVal} phút luân phiên!`);
                             }}
                             className="px-3.5 py-1 rounded-sm text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white border border-amber-700 shadow-xs cursor-pointer transition-colors shrink-0"
                           >

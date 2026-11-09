@@ -151,6 +151,8 @@ double energyWhTracker = 0.0;
 double energyWhStatic = 0.0;
 float voltTrkLive = 0.0f, currTrkLive = 0.0f, pwrTrkLive = 0.0f;
 float voltStaLive = 0.0f, currStaLive = 0.0f, pwrStaLive = 0.0f;
+float globalShuntTrk = SHUNT_RESISTOR_OHM;
+float globalShuntSta = SHUNT_RESISTOR_OHM;
 unsigned long lastEnergyCalcTime = 0;
 unsigned long lastEnergySaveTime = 0;
 int lastRtcDay = -1;
@@ -1539,16 +1541,30 @@ void updateEnergyAndPower() {
   if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
     if (inaTrackerFound) {
       voltTrkLive = inaTracker.getBusVoltage();
-      currTrkLive = inaTracker.getCurrent_mA() / 1000.0f;
-      if (currTrkLive < 0)
-        currTrkLive = 0.0f;
+      // Đọc dòng trực tiếp từ Shunt Voltage vi sai (I = V_shunt / R_shunt)
+      // Không bị phụ thuộc vào thanh ghi Calibration, không bao giờ bị khóa về 0!
+      float vShuntTrk = inaTracker.getShuntVoltage(); // đơn vị Volt
+      float cTrk = vShuntTrk / (globalShuntTrk > 0.001f ? globalShuntTrk : 0.100f);
+      if (cTrk < 0.0f) cTrk = -cTrk; // Chống ngược cực IN+ / IN-
+      if (cTrk < 0.0001f) {
+        float libCurr = inaTracker.getCurrent();
+        if (libCurr < 0.0f) libCurr = -libCurr;
+        cTrk = libCurr;
+      }
+      currTrkLive = cTrk;
       pwrTrkLive = voltTrkLive * currTrkLive;
     }
     if (inaStaticFound) {
       voltStaLive = inaStatic.getBusVoltage();
-      currStaLive = inaStatic.getCurrent_mA() / 1000.0f;
-      if (currStaLive < 0)
-        currStaLive = 0.0f;
+      float vShuntSta = inaStatic.getShuntVoltage();
+      float cSta = vShuntSta / (globalShuntSta > 0.001f ? globalShuntSta : 0.100f);
+      if (cSta < 0.0f) cSta = -cSta;
+      if (cSta < 0.0001f) {
+        float libCurr = inaStatic.getCurrent();
+        if (libCurr < 0.0f) libCurr = -libCurr;
+        cSta = libCurr;
+      }
+      currStaLive = cSta;
       pwrStaLive = voltStaLive * currStaLive;
     }
     xSemaphoreGive(i2cMutex);
@@ -4114,14 +4130,16 @@ void setup() {
     shuntSta = (float)SHUNT_RESISTOR_OHM;
     ParamRegistry.set("INA_SHUNT_STA", shuntSta);
   }
-  if (maxCurrTrk > 5.0f) {
+  if (maxCurrTrk * shuntTrk > 0.0819f || maxCurrTrk > 1.0f) {
     maxCurrTrk = (float)MAX_EXPECTED_CURRENT_A;
     ParamRegistry.set("INA_MAX_CURR_TRK", maxCurrTrk);
   }
-  if (maxCurrSta > 5.0f) {
+  if (maxCurrSta * shuntSta > 0.0819f || maxCurrSta > 1.0f) {
     maxCurrSta = (float)MAX_EXPECTED_CURRENT_A;
     ParamRegistry.set("INA_MAX_CURR_STA", maxCurrSta);
   }
+  globalShuntTrk = shuntTrk;
+  globalShuntSta = shuntSta;
 
   ParamEntry *peTrk = ParamRegistry.getEntry("INA_SHUNT_TRK");
   if (peTrk && peTrk->status == PARAM_STATUS_UNVERIFIED) {

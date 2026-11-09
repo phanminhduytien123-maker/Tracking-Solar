@@ -1403,24 +1403,20 @@ export class FirebaseSolarService {
         await update(ref(this.db, 'solar/config/voc_isc'), {
           lamp_on_min: onVal,
           lamp_off_min: offVal,
+          lamp_auto_disabled: false,
           lamp_config_apply_ts: nowTs,
           updated_at: nowTs
         });
         await update(ref(this.db, 'solar/voc_isc_node'), {
           lamp_on_min: onVal,
           lamp_off_min: offVal,
-          lamp_12v_on: true,
-          lamp_auto_phase: 'ON',
-          lamp_remain_sec: onVal * 60,
-          lamp_phase_remain_sec: onVal * 60,
+          lamp_auto_disabled: false,
           updated_at: nowTs
         }).catch(() => {});
         await update(ref(this.db, 'solar/tracking'), {
           lampOnMin: onVal,
           lampOffMin: offVal,
-          lamp12vOn: true,
-          lampAutoPhase: 'ON',
-          lampRemainSec: onVal * 60
+          lampAutoDisabled: false
         }).catch(() => {});
         return true;
       } catch (e) {

@@ -31,7 +31,7 @@
 
 // Thông số mạch đo INA226
 #define SHUNT_RESISTOR_OHM     0.100   // Điện trở Shunt R100 trên mạch = 0.1 Ohm
-#define MAX_EXPECTED_CURRENT_A 3.0     // Dòng điện tối đa dự kiến (Ampe)
+#define MAX_EXPECTED_CURRENT_A 0.80    // Dòng điện tối đa dự kiến (Ampe) - R100 (0.1 ohm) * 0.8A = 80mV <= 81.9mV chuẩn INA226
 
 // 2. Chân tín hiệu LED RGB / LED Strip (DIN)
 #define PIN_LED_DIN   18       // D18 (GPIO 18) nối chân DIN của LED

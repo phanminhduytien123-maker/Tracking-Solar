@@ -911,9 +911,7 @@ export default function App() {
         ...prev.system,
         lampOnMin: onVal,
         lampOffMin: offVal,
-        lamp12vOn: true,
-        lampAutoPhase: 'ON',
-        lampRemainSec: onVal * 60
+        lampAutoDisabled: false
       }
     }));
   };
