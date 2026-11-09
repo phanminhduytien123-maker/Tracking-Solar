@@ -758,7 +758,7 @@ export default function ChartsSection({
         <div className="lab-card p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
-              Số liệu đối chứng {history30Days.length >= 28 ? '30 ngày' : `chu kỳ (${history30Days.length} ngày - từ 04/11)`}
+              Số liệu đối chứng {history30Days.length >= 28 ? '30 ngày' : `chu kỳ (${history30Days.length} ngày - từ ${history30Days[0]?.date || '01/11'})`}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-slate-400 font-medium mt-0.5">
               Tổng hợp sản lượng điện, điện áp Voc, dòng Isc và nhiệt độ tấm pin
