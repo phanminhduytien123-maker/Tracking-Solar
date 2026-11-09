@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.2"
+#define CURRENT_FIRMWARE_VERSION "2.1.3"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -2656,6 +2656,8 @@ void pushTelemetryToFirebase() {
   // 3. Dong goi CA 3 VAO 1 BAN TIN ATOMIC DUY NHAT day len /solar
   // Giam 3 lan so lan ket noi HTTPS, chong nghen socket va dam bao dong bo hoan
   // hao!
+  if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
   FirebaseJson root;
   root.set("tracking", trk);
   root.set("static", sta);
@@ -3125,16 +3127,12 @@ void telemetryTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // 0. Tự động phục hồi kết nối WiFi ngầm chủ động nếu bị rớt mạng
-    if (WiFi.status() != WL_CONNECTED) {
-      if (now - lastWifiCheck >= 6000) {
-        lastWifiCheck = now;
-        Serial.println(">> [WIFI RECOVERY] Mat ket noi WiFi -> Khoi dong lai WiFi STA...");
-        WiFi.disconnect();
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-      }
-    } else {
+    // 0. Tự động phục hồi kết nối WiFi ngầm mỗi 5 giây nếu bị rớt mạng
+    if (now - lastWifiCheck >= 5000) {
       lastWifiCheck = now;
+      if (WiFi.status() != WL_CONNECTED) {
+        WiFi.reconnect();
+      }
     }
 
     // Xử lý nạp firmware và can thiệp qua WiFi (ArduinoOTA)
@@ -4228,17 +4226,8 @@ void setup() {
     if (savedDay == dRtc) {
       energyWhTracker = prefs.getFloat("wh_trk", 0.0f);
       energyWhStatic = prefs.getFloat("wh_sta", 0.0f);
-      // Tự động hiệu chỉnh nếu năng lượng trong ngày bị phình to do hệ số 50x cũ
-      if (energyWhTracker > 20.0f) {
-        energyWhTracker /= 50.0f;
-        prefs.putFloat("wh_trk", energyWhTracker);
-      }
-      if (energyWhStatic > 20.0f) {
-        energyWhStatic /= 50.0f;
-        prefs.putFloat("wh_sta", energyWhStatic);
-      }
-      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay (sau hieu chuan Shunt): "
-                    "Tracker=%.2f Wh, Static=%.2f Wh\n",
+      // Khôi phục nguyên vẹn năng lượng tích lũy trong ngày đã lưu trong NVS
+      Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay: Tracker=%.2f Wh, Static=%.2f Wh\n",
                     energyWhTracker, energyWhStatic);
     } else {
       Serial.println(
@@ -4253,15 +4242,15 @@ void setup() {
 
   // 8. Khởi tạo WiFi & Firebase Realtime Database
   Serial.printf(">> Dang ket noi WiFi toi SSID: %s ...\n", WIFI_SSID);
+  Serial.flush();
+  delay(150);
   WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(true);
-  WiFi.setSleep(false); // VÔ HIỆU HÓA MODEM SLEEP -> CÔNG SUẤT RF LUÔN PHÁT TỐI ĐA, CHỐNG RỚT GÓI
+  delay(100);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startWifi = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - startWifi < 2500)) {
-    delay(150);
+  while (WiFi.status() != WL_CONNECTED && (millis() - startWifi < 6000)) {
+    delay(200);
     Serial.print(".");
   }
   if (WiFi.status() == WL_CONNECTED) {
@@ -4275,10 +4264,14 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 3000; // 3s timeout (thay vì 8s) - chống treo luồng khi mạng chập chờn
-  fbConfig.timeout.serverResponse = 3000;
+  fbConfig.timeout.socketConnection = 8000;
+  fbConfig.timeout.serverResponse = 8000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
+  fbdo.setBSSLBufferSize(8192, 1024);
+  fbdo.setResponseSize(4096);
+  cmdFbdo.setBSSLBufferSize(4096, 1024);
+  cmdFbdo.setResponseSize(2048);
   Serial.println(
       ">> [FIREBASE OK] Da san sang day Telemetry len Web Dashboard!\n");
 
@@ -4291,7 +4284,7 @@ void setup() {
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
-                          24576, // 24 KB stack dồi dào cho Firebase TLS + Cloud FOTA mbedTLS
+                          10240, // 10 KB stack cho Firebase TLS
                           NULL,
                           0, // Priority 0 (tskIDLE_PRIORITY) - Time-slice cong
                              // bang voi IDLE0, chong triet de Task Watchdog!
