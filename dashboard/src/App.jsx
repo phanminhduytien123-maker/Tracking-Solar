@@ -139,6 +139,7 @@ export default function App() {
   // Theme Mode (Light / Dark)
   // Mỗi khi mở trang hoặc reload, LUÔN tính toán lại theo mốc giờ thực tế hiện tại
   const [themeMode, setThemeMode] = useState(() => getAutoThemeByTime());
+  const isManualThemeOverrideRef = useRef(false);
 
   // Xóa sạch cache cũ để mỗi lần reload trang luôn tính theo mốc giờ
   useEffect(() => {
@@ -157,8 +158,10 @@ export default function App() {
   }, [themeMode]);
 
   // Kiểm tra định kỳ mỗi 30s để tự động chuyển giao diện nếu qua mốc 18:00 hoặc 04:00
+  // Nếu người dùng đã tự tay bấm nút đổi giao diện trong phiên này (không reload), KHÔNG tự ý revert lại!
   useEffect(() => {
     const timer = setInterval(() => {
+      if (isManualThemeOverrideRef.current) return;
       const expected = getAutoThemeByTime();
       setThemeMode((prev) => (prev !== expected ? expected : prev));
     }, 30000);
@@ -166,6 +169,7 @@ export default function App() {
   }, []);
 
   const toggleTheme = () => {
+    isManualThemeOverrideRef.current = true;
     setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 

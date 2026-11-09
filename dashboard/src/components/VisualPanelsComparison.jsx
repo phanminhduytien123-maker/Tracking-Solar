@@ -256,10 +256,10 @@ export default function VisualPanelsComparison({
             </span>
             <div className="text-xs sm:text-sm">
               {hasValidGain ? (
-                <span className={`font-bold text-base ${comparison.percentGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-bold text-base ${comparison.percentGain >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                   {formatSignedNumber(comparison.percentGain, 1, '%')}
                   {comparison.powerDelta !== null && (
-                    <span className="text-xs text-slate-300 font-normal ml-2">
+                    <span className="text-xs text-zinc-500 dark:text-slate-300 font-normal ml-2">
                       (chênh lệch tức thời {formatSignedNumber(comparison.powerDelta, 1, 'W')})
                     </span>
                   )}
