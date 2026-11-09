@@ -164,9 +164,24 @@ def upload_release_asset(token, release, file_path):
 def trigger_esp32_via_firebase(download_url, version):
     """Send FOTA trigger to Firebase RTDB."""
     print(">>> 5/5: Gui lenh FOTA len Firebase cho ESP32...")
+    
+    # Giai ma redirect 302 cua GitHub Release truoc de lay link direct CDN (release-assets)
+    # Giup ESP32 khong bi loi mat ket noi do khong the tai-tao TLS context qua cross-domain redirect!
+    effective_url = download_url
+    try:
+        head_req = urllib.request.Request(download_url, headers={"User-Agent": "ESP32-HTTP-Client"})
+        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_ctx))
+        with opener.open(head_req, timeout=10) as head_resp:
+            resolved = head_resp.geturl()
+            if resolved and ("release-assets" in resolved or "githubusercontent" in resolved):
+                effective_url = resolved
+                print(f"    [+] Direct CDN Resolved: {effective_url[:75]}...")
+    except Exception as e:
+        print(f"    [!] Khong the giai ma link direct truoc, dung link mac dinh: {e}")
+
     payload = {
         "trigger": True,
-        "url": download_url,
+        "url": effective_url,
         "target_version": version,
         "status": "PENDING",
         "progress": 0,

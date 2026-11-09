@@ -141,9 +141,9 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
 // Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8, SCL: GPIO 9)
-// Tấm xoay Tracker: 0x41 (A0 hàn VCC) | Tấm cố định: 0x40 (Mặc định A0/A1 để hở)
-INA226 inaTracker(0x41, &Wire);
-INA226 inaStatic(0x40, &Wire);
+// Tấm xoay Tracker: 0x40 (Mặc định A0/A1 để hở) | Tấm cố định: 0x41 (A0 hàn VCC)
+INA226 inaTracker(0x40, &Wire);
+INA226 inaStatic(0x41, &Wire);
 bool inaTrackerFound = false;
 bool inaStaticFound = false;
 double energyWhTracker = 0.0;
@@ -1716,10 +1716,10 @@ void scanI2CBus() {
         Serial.print("RTC DS3231 [CHIP CHINH]");
       else if (address == 0x57 || address == 0x50)
         Serial.print("EEPROM AT24C32 (tren module RTC)");
-      else if (address == 0x41)
-        Serial.print("INA226 #1 (Tam Xoay Tracker - A0=VCC)");
       else if (address == 0x40 || address == 0x44)
-        Serial.print("INA226 #2 (Tam Co Dinh Static - Mac dinh A0/A1 ho)");
+        Serial.print("INA226 #1 (Tam Xoay Tracker - Mac dinh A0/A1 ho)");
+      else if (address == 0x41)
+        Serial.print("INA226 #2 (Tam Co Dinh Static - A0=VCC)");
       else
         Serial.print("Thiet bi I2C");
       Serial.println();
@@ -2710,7 +2710,6 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
       if (millis() - lastProgressPrint >= 1500 || pct == 100) {
         lastProgressPrint = millis();
         Serial.printf(">> [FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n", pct, (unsigned)current, (unsigned)total);
-        Firebase.RTDB.setInt(&cmdFbdo, "/solar/ota/progress", pct);
       }
     }
   });
@@ -3143,17 +3142,17 @@ void telemetryTask(void *pvParameters) {
       ArduinoOTA.handle();
     }
 
-    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 2.5s (giảm tải socket)
-    if (now - lastRemoteCheck >= 2500) {
+    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 3.0s (giảm 50% tải socket)
+    if (now - lastRemoteCheck >= 3000) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 10s
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 15s (tránh chiếm socket liên tục)
     static unsigned long lastFotaCheck = 0;
-    if (now - lastFotaCheck >= 10000) {
+    if (now - lastFotaCheck >= 15000) {
       lastFotaCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkSystemOtaTrigger();
@@ -3181,9 +3180,9 @@ void telemetryTask(void *pvParameters) {
       printTelemetryIfChanged();
     }
 
-    // 4. Đẩy Telemetry lên Firebase RTDB đều đặn 1.5s/lần cho Dashboard luôn LIVE mượt mà
+    // 4. Đẩy Telemetry lên Firebase RTDB mỗi 2.0s/lần (cực kỳ ổn định, triệt tiêu nghẽn TLS)
     // (Mục 9)
-    unsigned long fbPushInterval = 1500;
+    unsigned long fbPushInterval = 2000;
     if (now - lastFbPushTime >= fbPushInterval) {
       lastFbPushTime = now;
       pushTelemetryToFirebase();
@@ -4157,11 +4156,11 @@ void setup() {
   }
 
   // Khởi tạo 2 cảm biến đo dòng/áp INA226
-  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x41, Static: 0x40)
+  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x40, Static: 0x41)
   if (inaTracker.begin()) {
     inaTrackerFound = true;
     inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
+    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
                   "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntTrk, maxCurrTrk);
   } else {
@@ -4173,16 +4172,16 @@ void setup() {
                     "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntTrk, maxCurrTrk);
     } else {
-      inaTracker = INA226(0x40, &Wire);
+      inaTracker = INA226(0x41, &Wire);
       if (inaTracker.begin()) {
         inaTrackerFound = true;
         inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
+        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
                       "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                       shuntTrk, maxCurrTrk);
       } else {
         Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
-                       "thu 0x41, 0x44 va 0x40)");
+                       "thu 0x40, 0x44 va 0x41)");
       }
     }
   }
@@ -4190,7 +4189,7 @@ void setup() {
   if (inaStatic.begin()) {
     inaStaticFound = true;
     inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
-    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
+    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
                   "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntSta, maxCurrSta);
   } else {
@@ -4202,16 +4201,16 @@ void setup() {
                     "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntSta, maxCurrSta);
     } else {
-      inaStatic = INA226(0x41, &Wire);
+      inaStatic = INA226(0x40, &Wire);
       if (inaStatic.begin()) {
         inaStaticFound = true;
         inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
-        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
+        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
                       "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                       shuntSta, maxCurrSta);
       } else {
         Serial.println(
-            ">> [INA226 #2 --] Chua tim thay INA226 (0x40, 0x44, 0x41 - Tam Co Dinh)");
+            ">> [INA226 #2 --] Chua tim thay INA226 (0x41, 0x44, 0x40 - Tam Co Dinh)");
       }
     }
   }
@@ -4276,8 +4275,8 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 8000;
-  fbConfig.timeout.serverResponse = 8000;
+  fbConfig.timeout.socketConnection = 3000; // 3s timeout (thay vì 8s) - chống treo luồng khi mạng chập chờn
+  fbConfig.timeout.serverResponse = 3000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
   Serial.println(
