@@ -24,7 +24,7 @@ sys.stdout.reconfigure(line_buffering=True)
 # Configurations
 REPO_OWNER = "phanminhduytien123-maker"
 REPO_NAME = "Tracking-Solar"
-DEFAULT_TAG = "v2.1.2"
+DEFAULT_TAG = "v2.1.4"
 FIRMWARE_BIN = r"C:\tmp_pio_build\root\esp32_devkit_test\firmware.bin"
 FIREBASE_URL = "https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app"
 OTA_NODE = f"{FIREBASE_URL}/solar/ota.json"

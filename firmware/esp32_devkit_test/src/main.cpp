@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.3"
+#define CURRENT_FIRMWARE_VERSION "2.1.4"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
