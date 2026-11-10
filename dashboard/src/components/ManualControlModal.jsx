@@ -24,6 +24,7 @@ export default function ManualControlModal({
   onSetSleepDisabled,
   onSetLampAutoDisabled,
   onSetLampManualState,
+  onSetEsp2AutoCutoff,
   motors,
   isExperimentLocked = false
 }) {
@@ -561,6 +562,55 @@ export default function ManualControlModal({
                     }`}
                   >
                     TẮT ĐÈN 12V
+                  </button>
+                </div>
+              </div>
+
+              {/* Tự động ngắt nguồn ESP32 #2 (Node đo Voc/Isc) ban đêm */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2.5 rounded-sm border border-zinc-200">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-900 block">
+                      Tự động ngắt nguồn ESP32 #2 ban đêm (Relay GPIO 5):
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-sm text-[10px] font-bold border ${
+                        system?.esp2PowerOn !== false
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : 'bg-rose-50 text-rose-800 border-rose-300'
+                      }`}
+                    >
+                      {system?.esp2PowerOn !== false ? 'NGUỒN ON' : 'NGUỒN OFF'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500 block">
+                    {system?.esp2AutoCutoff !== false
+                      ? 'Đang BẬT: Cắt sạch nguồn ESP2 từ 18:01 tối đến 04:01 sáng để tiết kiệm ắc quy.'
+                      : 'Đang TẮT: ESP32 #2 luôn được cấp nguồn hoạt động 24/24.'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true)}
+                    className={`px-2.5 py-1 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                      system?.esp2AutoCutoff !== false
+                        ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                        : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    Bật (Tự ngắt 18h01)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false)}
+                    className={`px-2.5 py-1 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
+                      system?.esp2AutoCutoff === false
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                        : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
+                    }`}
+                  >
+                    Tắt (Chạy 24/24)
                   </button>
                 </div>
               </div>

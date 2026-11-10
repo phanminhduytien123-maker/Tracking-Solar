@@ -913,6 +913,21 @@ export default function App() {
     }));
   };
 
+  const handleSetEsp2AutoCutoff = (enabled) => {
+    const isEn = Boolean(enabled);
+    localStorage.setItem('solar_esp2_auto_cutoff', isEn ? 'true' : 'false');
+    if (dataSource === 'firebase') {
+      firebaseServiceRef.current.setEsp2AutoCutoff(isEn);
+    }
+    setTelemetry((prev) => ({
+      ...prev,
+      system: {
+        ...prev.system,
+        esp2AutoCutoff: isEn
+      }
+    }));
+  };
+
   const handleJog = (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
@@ -1168,6 +1183,7 @@ export default function App() {
         onSetLampAutoDisabled={handleSetLampAutoDisabled}
         onSetLampManualState={handleSetLampManualState}
         onSetLampCustomCycle={handleSetLampCustomCycle}
+        onSetEsp2AutoCutoff={handleSetEsp2AutoCutoff}
         motors={telemetry.motors}
         isExperimentLocked={isExperimentLocked}
       />
@@ -1216,6 +1232,7 @@ export default function App() {
         onSetLampAutoDisabled={handleSetLampAutoDisabled}
         onSetLampManualState={handleSetLampManualState}
         onSetLampCustomCycle={handleSetLampCustomCycle}
+        onSetEsp2AutoCutoff={handleSetEsp2AutoCutoff}
       />
 
       {/* 4. FOOTER */}

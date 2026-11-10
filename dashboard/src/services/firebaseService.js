@@ -21,6 +21,11 @@ export function getCleanZeroTelemetry() {
       source: 'none',       // 'device' | 'mock' | 'unknown' | 'none'
       isMock: false,
       connStatus: 'DISCONNECTED', // 'LIVE' | 'STALE' | 'DISCONNECTED'
+      esp1Online: false,
+      esp2Online: false,
+      esp2PowerOn: true,
+      esp2AutoCutoff: true,
+      esp2RelayState: 'ON',
       mode: '--',
       state: 'DISCONNECTED',
       displayState: 'MẤT KẾT NỐI',
@@ -1051,6 +1056,16 @@ export class FirebaseSolarService {
     }
 
     // Trạng thái kết nối của ESP32 #1 (Tracker + INA226) và ESP32 #2 (Node Voc/Isc & Đèn 12V)
+    const esp2PowerOn = tracking.esp2_power_on !== undefined
+      ? Boolean(tracking.esp2_power_on)
+      : true;
+    const esp2AutoCutoff = tracking.esp2_auto_cutoff !== undefined
+      ? Boolean(tracking.esp2_auto_cutoff)
+      : ((fbData.config && fbData.config.esp2_power && fbData.config.esp2_power.auto_cutoff !== undefined)
+        ? Boolean(fbData.config.esp2_power.auto_cutoff)
+        : true);
+    const esp2RelayState = tracking.esp2_relay_state || (esp2PowerOn ? 'ON' : 'OFF');
+
     const esp1Online = (trkConnStatus === 'LIVE');
     let vocNodeAgeMs = Infinity;
     if (this.lastVocNodeReceivedTime > 0) {
@@ -1058,7 +1073,7 @@ export class FirebaseSolarService {
     } else if (vocIscNode.updated_at && Number(vocIscNode.updated_at) > 1700000000000) {
       vocNodeAgeMs = Math.max(0, serverTimeNow - Number(vocIscNode.updated_at));
     }
-    const esp2Online = Boolean(vocIscNode.online && vocNodeAgeMs <= 45000);
+    const esp2Online = esp2PowerOn && Boolean(vocIscNode.online && vocNodeAgeMs <= 45000);
 
     const computedPingMs = isSystemOnline
       ? (this.livePingMs !== null ? this.livePingMs : 22)
@@ -1074,6 +1089,9 @@ export class FirebaseSolarService {
         connStatus: trkConnStatus,
         esp1Online,
         esp2Online,
+        esp2PowerOn,
+        esp2AutoCutoff,
+        esp2RelayState,
         packetAgeMs: Number.isFinite(trkAgeMs) ? Math.round(trkAgeMs) : null,
         mode: tracking.mode || '--',
         state: rawState,
@@ -1357,6 +1375,28 @@ export class FirebaseSolarService {
       cmd: 'set_relay_interval',
       interval_sec: sec,
       value: sec
+    });
+  }
+
+  async setEsp2AutoCutoff(enabled) {
+    const isEn = Boolean(enabled);
+    if (this.db) {
+      try {
+        await update(ref(this.db, 'solar/config/esp2_power'), {
+          auto_cutoff: isEn,
+          updated_at: Date.now()
+        });
+        await update(ref(this.db, 'solar/tracking'), {
+          esp2_auto_cutoff: isEn
+        });
+      } catch (e) {
+        console.warn('[Firebase setEsp2AutoCutoff update node warn]', e);
+      }
+    }
+    return this.sendCommand({
+      cmd: 'set_esp2_auto_cutoff',
+      enabled: isEn,
+      state: isEn
     });
   }
 

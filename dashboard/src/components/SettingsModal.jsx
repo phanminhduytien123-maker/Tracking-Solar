@@ -38,7 +38,8 @@ export default function SettingsModal({
   onSetRelayInterval = null,
   onSetLampAutoDisabled = null,
   onSetLampManualState = null,
-  onSetLampCustomCycle = null
+  onSetLampCustomCycle = null,
+  onSetEsp2AutoCutoff = null
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
   const [copiedTab, setCopiedTab] = useState(null);
@@ -867,6 +868,62 @@ void loop() {
                             }`}
                           >
                             TẮT ĐÈN 12V
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4. Tự động ngắt nguồn ESP32 #2 (Node đo Voc/Isc) ban đêm (Relay GPIO 5) */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-zinc-900 block">
+                              4. Tự động ngắt nguồn ESP32 #2 (Node Voc/Isc) ban đêm (Relay GPIO 5)
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-sm text-[10px] font-bold border ${
+                                latestTelemetry?.system?.esp2PowerOn !== false
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : 'bg-rose-50 text-rose-800 border-rose-300'
+                              }`}
+                            >
+                              Nguồn ESP2: {latestTelemetry?.system?.esp2PowerOn !== false ? 'ĐANG CẤP (ON)' : 'ĐÃ NGẮT (OFF)'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-zinc-600 block leading-relaxed">
+                            • <b>BẬT (Mặc định)</b>: Tự động phát xung ngắt relay để cắt hoàn toàn nguồn 5V của ESP32 #2 lúc <b>18:01</b> tối (tiết kiệm điện năng ắc quy ban đêm), tự đóng lại nguồn lúc <b>04:01</b> sáng.<br />
+                            • <b>TẮT</b>: Vô hiệu hóa tính năng ngắt đêm — ESP32 #2 sẽ luôn được cấp nguồn chạy <b>24/24</b> liên tục.
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true);
+                              setHwConfigFeedback('Đã BẬT tự động ngắt nguồn ESP2 ban đêm: Hệ thống sẽ tự ngắt lúc 18:01 và bật lại lúc 04:01!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
+                              latestTelemetry?.system?.esp2AutoCutoff !== false
+                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
+                            }`}
+                          >
+                            BẬT (Tự ngắt đêm 18h01)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false);
+                              setHwConfigFeedback('Đã TẮT tự động ngắt nguồn ESP2 ban đêm: ESP32 #2 sẽ luôn được cấp nguồn chạy 24/24!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
+                              latestTelemetry?.system?.esp2AutoCutoff === false
+                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
+                            }`}
+                          >
+                            TẮT (Chạy 24/24)
                           </button>
                         </div>
                       </div>

@@ -204,6 +204,15 @@ static unsigned long lastMinuteRecordTime = 0;
 
 #define HOME_ACTIVE_LEVEL LOW // Chân kéo INPUT_PULLUP: Chạm Home = LOW
 
+// -------------------------------------------------------------------------
+// RELAY CÁCH LY QUANG ĐIỀU KHIỂN NGUỒN ESP32 #2 (NODE VOC/ISC)
+// -------------------------------------------------------------------------
+#define PIN_RELAY_ESP2_PWR 5 // GPIO 5 (J1 Pin 9) - Đóng/ngắt nguồn 5V nuôi ESP32 #2
+bool esp2AutoCutoffEnabled = true; // Mặc định: BẬT tự động ngắt đêm 18:01, bật sáng 04:01
+bool esp2PowerOn = true;          // Trạng thái nguồn thực tế: true = ON (HIGH), false = OFF (LOW)
+void applyEsp2Power(bool powerOn);
+void updateEsp2PowerBySchedule(bool forceLog = false);
+
 // Chiều quay cơ khí:
 #define DIR_TOWARD_HOME LOW // Chiều tiến vào công tắc Home
 #define DIR_AWAY_HOME HIGH  // Chiều lùi ra xa công tắc Home
@@ -1476,6 +1485,42 @@ void moveToAfternoonHoldPosition() {
   }
 }
 
+// -------------------------------------------------------------------------
+// ĐIỀU KHIỂN ĐÓNG / NGẮT NGUỒN ESP32 #2 (NODE ĐO VOC/ISC) QUA RELAY GPIO 5
+// -------------------------------------------------------------------------
+void applyEsp2Power(bool powerOn) {
+  esp2PowerOn = powerOn;
+  // Tiếp điểm NO (Normally Open): HIGH = Kích đóng relay (Cấp nguồn), LOW = Nhả relay (Ngắt nguồn sạch sẽ 0W)
+  digitalWrite(PIN_RELAY_ESP2_PWR, powerOn ? HIGH : LOW);
+}
+
+void updateEsp2PowerBySchedule(bool forceLog) {
+  int curY = 0, curM = 0, curD = 0, curH = 12, curMin = 0, curS = 0;
+  float curT = 25.0f;
+  if (!readDS3231(curY, curM, curD, curH, curMin, curS, curT)) {
+    return;
+  }
+
+  // Khung giờ ngắt nguồn ESP2: từ 18:01:00 tối đến 04:00:59 sáng
+  bool isNightWindow = (curH == 18 && curMin >= 1) || (curH > 18) || (curH < 4) || (curH == 4 && curMin < 1);
+  bool targetPower = true;
+
+  if (esp2AutoCutoffEnabled && isNightWindow) {
+    targetPower = false; // Ban đêm: Ngắt nguồn
+  } else {
+    targetPower = true;  // Ban ngày hoặc khi tắt tính năng tự ngắt: Luôn cấp nguồn
+  }
+
+  if (targetPower != esp2PowerOn || forceLog) {
+    applyEsp2Power(targetPower);
+    Serial.printf("\n>> [ESP2 POWER RELAY GPIO 5] %s nguon ESP32 #2 (%02d:%02d:%02d) | AutoCutoff: %s\n",
+                  targetPower ? "CAP (ON)" : "NGAT (OFF)",
+                  curH, curMin, curS,
+                  esp2AutoCutoffEnabled ? "ENABLED" : "DISABLED");
+    telemetryDirty = true;
+  }
+}
+
 // Giám sát phát hiện kẹt động cơ (Stall Detection) & mất nguồn 24V (Mục 8)
 void checkStallProtection() {
   static unsigned long m1MoveStartTime = 0;
@@ -2580,6 +2625,9 @@ void pushTelemetryToFirebase() {
   trk.set("tz", "UTC+7");
   trk.set("online", true);
   trk.set("source", "device"); // Cờ bảo mật xác nhận dữ liệu từ thiết bị thật
+  trk.set("esp2_auto_cutoff", (bool)esp2AutoCutoffEnabled);
+  trk.set("esp2_power_on", (bool)esp2PowerOn);
+  trk.set("esp2_relay_state", esp2PowerOn ? "ON" : "OFF");
 
   // Dữ liệu dòng, áp, công suất, năng lượng lấy từ bộ cập nhật độc lập (A4)
   trk.set("voltage", voltTrkLive);
@@ -2662,6 +2710,11 @@ void pushTelemetryToFirebase() {
   root.set("tracking", trk);
   root.set("static", sta);
   root.set("algorithm", algoJson);
+  if (!esp2PowerOn) {
+    FirebaseJson vocOffline;
+    vocOffline.set("online", false);
+    root.set("voc_isc_node", vocOffline);
+  }
   if (!Firebase.RTDB.updateNode(&fbdo, "/solar", &root)) {
     static unsigned long lastPushErrPrint = 0;
     if (millis() - lastPushErrPrint >= 5000) {
@@ -3080,6 +3133,25 @@ void checkRemoteFirebaseCommands() {
                       (unsigned long)relayIntervalSec);
         shouldAck = true;
       }
+      // 8D. LỆNH CÀI ĐẶT TỰ ĐỘNG ĐÓNG/NGẮT NGUỒN ESP32 #2 BAN ĐÊM (RELAY GPIO 5)
+      else if (cmd.equalsIgnoreCase("set_esp2_auto_cutoff") || cmd.equalsIgnoreCase("set_esp2_cutoff")) {
+        bool enabled = true;
+        json.get(jsonData, "enabled");
+        if (jsonData.success) {
+          enabled = jsonData.boolValue;
+        } else {
+          json.get(jsonData, "state");
+          if (jsonData.success) enabled = jsonData.boolValue;
+        }
+        esp2AutoCutoffEnabled = enabled;
+        prefs.putBool("esp2_cut", esp2AutoCutoffEnabled);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/config/esp2_power/auto_cutoff", esp2AutoCutoffEnabled);
+        Firebase.RTDB.setBool(&cmdFbdo, "/solar/tracking/esp2_auto_cutoff", esp2AutoCutoffEnabled);
+        updateEsp2PowerBySchedule(true);
+        Serial.printf(">> [REMOTE] Da cap nhat tu dong ngat nguon ESP2 ban dem = %s (Luu NVS)!\n",
+                      esp2AutoCutoffEnabled ? "BAT (Ngat luc 18h01, bat luc 04h01)" : "TAT (Chay 24/24)");
+        shouldAck = true;
+      }
       // 9. LỆNH CẬP NHẬT FIRMWARE TỪ XA QUA CLOUD (FOTA)
       else if (cmd.equalsIgnoreCase("fota") || cmd.equalsIgnoreCase("fota_update") || cmd.equalsIgnoreCase("ota_cloud")) {
         String fotaUrl = "";
@@ -3127,11 +3199,23 @@ void telemetryTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // 0. Tự động phục hồi kết nối WiFi ngầm mỗi 5 giây nếu bị rớt mạng
+    // 0. Tự động phục hồi kết nối WiFi ngầm thông minh mỗi 5 giây nếu bị rớt mạng
+    static unsigned long wifiDisconnectStartMs = 0;
     if (now - lastWifiCheck >= 5000) {
       lastWifiCheck = now;
       if (WiFi.status() != WL_CONNECTED) {
-        WiFi.reconnect();
+        if (wifiDisconnectStartMs == 0) wifiDisconnectStartMs = now;
+        if (now - wifiDisconnectStartMs < 15000) {
+          WiFi.reconnect();
+        } else {
+          // Mất mạng quá 15s: Tái tạo kết nối từ gốc (tránh kẹt ESP-IDF station state)
+          WiFi.disconnect(true);
+          delay(100);
+          WiFi.mode(WIFI_STA);
+          WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        }
+      } else {
+        wifiDisconnectStartMs = 0;
       }
     }
 
@@ -4085,6 +4169,15 @@ void setup() {
                 disableNightSleep ? "ON (Khong ngu dem)" : "OFF (Ngu 18h-04h)",
                 (unsigned long)relayIntervalSec, lastAfternoonPhi, lastAfternoonEps);
 
+  // Khởi tạo chân Relay nguồn ESP32 #2 (GPIO 5)
+  pinMode(PIN_RELAY_ESP2_PWR, OUTPUT);
+  esp2AutoCutoffEnabled = prefs.getBool("esp2_cut", true); // Mặc định: BẬT tự động ngắt đêm 18h01, bật sáng 04h01
+  applyEsp2Power(true); // An toàn: Luôn đóng relay cấp nguồn khi khởi động
+  Serial.printf(">> [ESP2 POWER INIT] GPIO %d = %s | AutoCutoff = %s\n",
+                PIN_RELAY_ESP2_PWR,
+                esp2PowerOn ? "HIGH (ON)" : "LOW (OFF)",
+                esp2AutoCutoffEnabled ? "BAT (18h01-04h01)" : "TAT (24/24)");
+
   if (isHome1Triggered())
     resetEncoder1(0);
   if (isHome2Triggered())
@@ -4238,6 +4331,8 @@ void setup() {
       prefs.putFloat("wh_sta", 0.0f);
       prefs.putInt("wh_day", dRtc);
     }
+    // Cập nhật trạng thái đóng/ngắt nguồn ESP2 theo giờ RTC thực tế
+    updateEsp2PowerBySchedule(true);
   }
 
   // 8. Khởi tạo WiFi & Firebase Realtime Database
@@ -5587,6 +5682,7 @@ void loop() {
   static unsigned long lastNightCheckMs = 0;
   if (!isTestSleepMode && !isEmergencyCoverActive && (millis() - lastNightCheckMs >= 3000)) {
     lastNightCheckMs = millis();
+    updateEsp2PowerBySchedule();
     int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
     float curTemp = 0.0f;
     if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
