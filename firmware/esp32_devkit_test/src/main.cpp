@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.4"
+#define CURRENT_FIRMWARE_VERSION "2.1.5"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -141,9 +141,9 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
 // Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8, SCL: GPIO 9)
-// Tấm xoay Tracker: 0x40 (Mặc định A0/A1 để hở) | Tấm cố định: 0x41 (A0 hàn VCC)
-INA226 inaTracker(0x40, &Wire);
-INA226 inaStatic(0x41, &Wire);
+// Tấm xoay Tracker: 0x41 (A0 hàn VCC) | Tấm cố định: 0x40 (Mặc định A0/A1 để hở)
+INA226 inaTracker(0x41, &Wire);
+INA226 inaStatic(0x40, &Wire);
 bool inaTrackerFound = false;
 bool inaStaticFound = false;
 double energyWhTracker = 0.0;
@@ -205,11 +205,11 @@ static unsigned long lastMinuteRecordTime = 0;
 #define HOME_ACTIVE_LEVEL LOW // Chân kéo INPUT_PULLUP: Chạm Home = LOW
 
 // -------------------------------------------------------------------------
-// RELAY CÁCH LY QUANG ĐIỀU KHIỂN NGUỒN ESP32 #2 (NODE VOC/ISC)
+// RELAY F (KÊNH 6 TRÊN BỘ RELAY 6 KÊNH) ĐIỀU KHIỂN NGUỒN ESP32 #2 (NODE VOC/ISC)
 // -------------------------------------------------------------------------
-#define PIN_RELAY_ESP2_PWR 5 // GPIO 5 (J1 Pin 9) - Đóng/ngắt nguồn 5V nuôi ESP32 #2
+#define PIN_RELAY_ESP2_PWR 5 // GPIO 5 - Kích Relay F (Module Active LOW, dùng tiếp điểm COM-NC)
 bool esp2AutoCutoffEnabled = true; // Mặc định: BẬT tự động ngắt đêm 18:01, bật sáng 04:01
-bool esp2PowerOn = true;          // Trạng thái nguồn thực tế: true = ON (HIGH), false = OFF (LOW)
+bool esp2PowerOn = true;          // Trạng thái nguồn thực tế: true = CẤP NGUỒN (HIGH), false = NGẮT (LOW)
 void applyEsp2Power(bool powerOn);
 void updateEsp2PowerBySchedule(bool forceLog = false);
 
@@ -1486,11 +1486,13 @@ void moveToAfternoonHoldPosition() {
 }
 
 // -------------------------------------------------------------------------
-// ĐIỀU KHIỂN ĐÓNG / NGẮT NGUỒN ESP32 #2 (NODE ĐO VOC/ISC) QUA RELAY GPIO 5
+// ĐIỀU KHIỂN ĐÓNG / NGẮT NGUỒN ESP32 #2 QUA RELAY F (KÊNH 6, ACTIVE LOW, TIẾP ĐIỂM NC)
 // -------------------------------------------------------------------------
 void applyEsp2Power(bool powerOn) {
   esp2PowerOn = powerOn;
-  // Tiếp điểm NO (Normally Open): HIGH = Kích đóng relay (Cấp nguồn), LOW = Nhả relay (Ngắt nguồn sạch sẽ 0W)
+  // Module Relay Active LOW + Tiếp điểm NC (Normally Closed):
+  //   - powerOn = true  -> Xuất HIGH -> Relay F nhả -> Tiếp điểm NC đóng -> Cấp nguồn ESP2 (0W cuộn hút ban ngày)
+  //   - powerOn = false -> Xuất LOW  -> Relay F hút -> Tiếp điểm NC hở   -> Ngắt nguồn ESP2 an toàn
   digitalWrite(PIN_RELAY_ESP2_PWR, powerOn ? HIGH : LOW);
 }
 
@@ -1761,10 +1763,10 @@ void scanI2CBus() {
         Serial.print("RTC DS3231 [CHIP CHINH]");
       else if (address == 0x57 || address == 0x50)
         Serial.print("EEPROM AT24C32 (tren module RTC)");
-      else if (address == 0x40 || address == 0x44)
-        Serial.print("INA226 #1 (Tam Xoay Tracker - Mac dinh A0/A1 ho)");
       else if (address == 0x41)
-        Serial.print("INA226 #2 (Tam Co Dinh Static - A0=VCC)");
+        Serial.print("INA226 #1 (Tam Xoay Tracker - A0=VCC)");
+      else if (address == 0x40 || address == 0x44)
+        Serial.print("INA226 #2 (Tam Co Dinh Static - Mac dinh A0/A1 ho)");
       else
         Serial.print("Thiet bi I2C");
       Serial.println();
@@ -2722,6 +2724,12 @@ void pushTelemetryToFirebase() {
       Serial.printf(">> [FIREBASE PUSH ERR] %s (HTTP code: %d)\n", fbdo.errorReason().c_str(), fbdo.httpCode());
     }
   }
+
+  // Thu hoi bo nho dynamic memory ngay lap tuc, chong phan manh Heap cho TLS
+  root.clear();
+  trk.clear();
+  sta.clear();
+  algoJson.clear();
 }
 
 // =========================================================================
@@ -3224,17 +3232,18 @@ void telemetryTask(void *pvParameters) {
       ArduinoOTA.handle();
     }
 
-    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 3.0s (giảm 50% tải socket)
-    if (now - lastRemoteCheck >= 3000) {
+    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 5.0s
+    // So le thời gian: chỉ chạy khi cách lần push Telemetry ít nhất 2.0s để tránh nghẽn socket song song
+    if (now - lastRemoteCheck >= 5000 && (now - lastFbPushTime >= 2000)) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 15s (tránh chiếm socket liên tục)
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 60s (tiết kiệm băng thông TLS)
     static unsigned long lastFotaCheck = 0;
-    if (now - lastFotaCheck >= 15000) {
+    if (now - lastFotaCheck >= 60000) {
       lastFotaCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkSystemOtaTrigger();
@@ -3262,18 +3271,20 @@ void telemetryTask(void *pvParameters) {
       printTelemetryIfChanged();
     }
 
-    // 4. Đẩy Telemetry lên Firebase RTDB mỗi 2.0s/lần (cực kỳ ổn định, triệt tiêu nghẽn TLS)
+    // 4. Đẩy Telemetry lên Firebase RTDB mỗi 5.0s/lần (cực kỳ ổn định, triệt tiêu nghẽn TLS & heap fragmentation)
     // (Mục 9)
-    unsigned long fbPushInterval = 2000;
+    unsigned long fbPushInterval = 5000;
     if (now - lastFbPushTime >= fbPushInterval) {
       lastFbPushTime = now;
       pushTelemetryToFirebase();
     }
 
     // 5. Xả hàng đợi LittleFS Offline khi có kết nối Firebase (Mục 2 & Mục 9)
+    // Giãn cách 2.0s/bản tin và chỉ xả khi không trùng nhịp push Telemetry để giữ socket an toàn
     if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
       if (OfflineQueue.getPendingCount() > 0 &&
-          (now - lastQueueDrainTime >= 200)) {
+          (now - lastQueueDrainTime >= 2000) &&
+          (now - lastFbPushTime >= 1500)) {
         lastQueueDrainTime = now;
         MinuteRecord pendingRec;
         if (OfflineQueue.peekRecord(pendingRec)) {
@@ -3305,6 +3316,7 @@ void telemetryTask(void *pvParameters) {
                           (unsigned long)pendingRec.epoch_ts,
                           (unsigned int)OfflineQueue.getPendingCount());
           }
+          hJson.clear();
         }
       }
     }
@@ -4247,11 +4259,11 @@ void setup() {
   }
 
   // Khởi tạo 2 cảm biến đo dòng/áp INA226
-  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x40, Static: 0x41)
+  // Khởi tạo 2 cảm biến đo dòng/áp INA226 (Tracker: 0x41, Static: 0x40)
   if (inaTracker.begin()) {
     inaTrackerFound = true;
     inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
+    Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
                   "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntTrk, maxCurrTrk);
   } else {
@@ -4263,16 +4275,16 @@ void setup() {
                     "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntTrk, maxCurrTrk);
     } else {
-      inaTracker = INA226(0x41, &Wire);
+      inaTracker = INA226(0x40, &Wire);
       if (inaTracker.begin()) {
         inaTrackerFound = true;
         inaTracker.setMaxCurrentShunt(maxCurrTrk, shuntTrk);
-        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x41 - Tam Xoay "
+        Serial.printf(">> [INA226 #1 OK] Da tim thay INA226 (0x40 - Tam Xoay "
                       "Tracker)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                       shuntTrk, maxCurrTrk);
       } else {
         Serial.println(">> [INA226 #1 --] Chua tim thay INA226 (Tam Tracker - da "
-                       "thu 0x40, 0x44 va 0x41)");
+                       "thu 0x41, 0x44 va 0x40)");
       }
     }
   }
@@ -4280,7 +4292,7 @@ void setup() {
   if (inaStatic.begin()) {
     inaStaticFound = true;
     inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
-    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
+    Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
                   "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                   shuntSta, maxCurrSta);
   } else {
@@ -4292,16 +4304,16 @@ void setup() {
                     "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                     shuntSta, maxCurrSta);
     } else {
-      inaStatic = INA226(0x40, &Wire);
+      inaStatic = INA226(0x41, &Wire);
       if (inaStatic.begin()) {
         inaStaticFound = true;
         inaStatic.setMaxCurrentShunt(maxCurrSta, shuntSta);
-        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x40 - Tam Co Dinh "
+        Serial.printf(">> [INA226 #2 OK] Da tim thay INA226 (0x41 - Tam Co Dinh "
                       "Static)! Shunt: %.4f ohm, MaxCurr: %.1f A\n",
                       shuntSta, maxCurrSta);
       } else {
         Serial.println(
-            ">> [INA226 #2 --] Chua tim thay INA226 (0x41, 0x44, 0x40 - Tam Co Dinh)");
+            ">> [INA226 #2 --] Chua tim thay INA226 (0x40, 0x44, 0x41 - Tam Co Dinh)");
       }
     }
   }
@@ -4379,10 +4391,9 @@ void setup() {
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
-                          10240, // 10 KB stack cho Firebase TLS
+                          16384, // 16 KB stack phong phu chong tran Stack khi BearSSL & JSON xu ly
                           NULL,
-                          0, // Priority 0 (tskIDLE_PRIORITY) - Time-slice cong
-                             // bang voi IDLE0, chong triet de Task Watchdog!
+                          1, // Priority 1 (tren IDLE0, duoi WiFi stack, dam bao khong chiem dung Core 0)
                           &telemetryTaskHandle,
                           0 // Core 0 (PRO_CPU)
   );

@@ -24,12 +24,20 @@ sys.stdout.reconfigure(line_buffering=True)
 # Configurations
 REPO_OWNER = "phanminhduytien123-maker"
 REPO_NAME = "Tracking-Solar"
-DEFAULT_TAG = "v2.1.4"
+DEFAULT_TAG = "v2.1.5"
 FIRMWARE_BIN = r"C:\tmp_pio_build\root\esp32_devkit_test\firmware.bin"
 FIREBASE_URL = "https://final-project---tracking-solar-default-rtdb.asia-southeast1.firebasedatabase.app"
 OTA_NODE = f"{FIREBASE_URL}/solar/ota.json"
 
 ssl_ctx = ssl._create_unverified_context()
+
+def get_current_branch():
+    try:
+        b = subprocess.check_output(["git", "branch", "--show-current"]).decode("utf-8").strip()
+        if b: return b
+    except Exception:
+        pass
+    return "Solar-Tracking-ver1"
 
 def get_github_token():
     """Retrieve GitHub credentials automatically from Windows Credential Manager."""
@@ -49,9 +57,10 @@ def get_github_token():
 
 def push_git_changes():
     """Push local commits to GitHub before releasing."""
-    print(">>> 1/5: Dong bo commit moi nhat len GitHub...")
+    branch = get_current_branch()
+    print(f">>> 1/5: Dong bo commit moi nhat len GitHub ({branch})...")
     try:
-        subprocess.run(["git", "push", "origin", "Backup_4_11"], check=True)
+        subprocess.run(["git", "push", "origin", branch], check=True)
         print("    [V] Git push thanh cong.")
     except Exception as e:
         print(f"    [!] Canh bao git push: {e} (Tiep tuc)")
@@ -96,9 +105,10 @@ def get_or_create_release(token, tag_name):
             print(f"[!] Loi kiem tra release: {e}")
 
     # Create new release
+    branch = get_current_branch()
     payload = {
         "tag_name": tag_name,
-        "target_commitish": "Backup_4_11",
+        "target_commitish": branch,
         "name": f"Firmware Release {tag_name}",
         "body": f"Ban cap nhat tu dong FOTA cho Solar Tracker vao {time.strftime('%Y-%m-%d %H:%M:%S')}.",
         "draft": False,
