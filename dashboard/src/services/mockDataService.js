@@ -61,38 +61,38 @@ export function generateRealistic30DaysDataset() {
 
     const daySeed = (dNum * 7 + 13) % 10;
     let weatherType = 'Nắng tốt';
-    let baseWhTrk = 224;
-    let baseWhSta = 168;
-    let vocTrk = 21.65;
-    let vocSta = 21.08;
-    let iscTrk = 1.86;
-    let iscSta = 1.40;
+    let baseWhTrk = 55.4;
+    let baseWhSta = 41.5;
+    let vocTrk = 15.20;
+    let vocSta = 14.85;
+    let iscTrk = 0.78;
+    let iscSta = 0.65;
     let tempTrk = 42.5;
     let tempSta = 45.2;
 
     if (daySeed === 3 || daySeed === 7) {
       weatherType = 'Mây rải rác';
-      baseWhTrk = 186;
-      baseWhSta = 143;
-      vocTrk = 21.35;
-      vocSta = 20.85;
-      iscTrk = 1.56;
-      iscSta = 1.22;
+      baseWhTrk = 46.5;
+      baseWhSta = 35.8;
+      vocTrk = 14.80;
+      vocSta = 14.50;
+      iscTrk = 0.68;
+      iscSta = 0.58;
       tempTrk = 38.0;
       tempSta = 40.8;
     } else if (daySeed === 5) {
       weatherType = 'Mưa dông chiều';
-      baseWhTrk = 138;
-      baseWhSta = 110;
-      vocTrk = 20.75;
-      vocSta = 20.35;
-      iscTrk = 1.18;
-      iscSta = 0.94;
+      baseWhTrk = 34.2;
+      baseWhSta = 27.0;
+      vocTrk = 14.20;
+      vocSta = 13.90;
+      iscTrk = 0.52;
+      iscSta = 0.44;
       tempTrk = 33.2;
       tempSta = 34.6;
     }
 
-    const jitter = ((dNum % 5) - 2) * 3.2;
+    const jitter = ((dNum % 5) - 2) * 0.8;
     const trkWh = parseFloat((baseWhTrk + jitter).toFixed(1));
     const staWh = parseFloat((baseWhSta + jitter * 0.7).toFixed(1));
     const diffWh = parseFloat((trkWh - staWh).toFixed(1));

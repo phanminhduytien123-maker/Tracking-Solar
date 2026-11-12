@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.5"
+#define CURRENT_FIRMWARE_VERSION "2.1.6"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -3160,6 +3160,24 @@ void checkRemoteFirebaseCommands() {
                       esp2AutoCutoffEnabled ? "BAT (Ngat luc 18h01, bat luc 04h01)" : "TAT (Chay 24/24)");
         shouldAck = true;
       }
+      // 8E. LỆNH ĐIỀU CHỈNH / ĐẢO NĂNG LƯỢNG TÍCH LŨY (Wh) TỪ XA
+      else if (cmd.equalsIgnoreCase("swap_energy")) {
+        double tmp = energyWhTracker;
+        energyWhTracker = energyWhStatic;
+        energyWhStatic = tmp;
+        prefs.putFloat("wh_trk", (float)energyWhTracker);
+        prefs.putFloat("wh_sta", (float)energyWhStatic);
+        Serial.printf(">> [REMOTE] Da dao energy: Tracker=%.2f Wh, Static=%.2f Wh\n", energyWhTracker, energyWhStatic);
+        shouldAck = true;
+      }
+      else if (cmd.equalsIgnoreCase("set_energy")) {
+        if (json.get(jsonData, "wh_trk")) energyWhTracker = jsonData.doubleValue;
+        if (json.get(jsonData, "wh_sta")) energyWhStatic = jsonData.doubleValue;
+        prefs.putFloat("wh_trk", (float)energyWhTracker);
+        prefs.putFloat("wh_sta", (float)energyWhStatic);
+        Serial.printf(">> [REMOTE] Da set energy: Tracker=%.2f Wh, Static=%.2f Wh\n", energyWhTracker, energyWhStatic);
+        shouldAck = true;
+      }
       // 9. LỆNH CẬP NHẬT FIRMWARE TỪ XA QUA CLOUD (FOTA)
       else if (cmd.equalsIgnoreCase("fota") || cmd.equalsIgnoreCase("fota_update") || cmd.equalsIgnoreCase("ota_cloud")) {
         String fotaUrl = "";
@@ -4331,6 +4349,16 @@ void setup() {
     if (savedDay == dRtc) {
       energyWhTracker = prefs.getFloat("wh_trk", 0.0f);
       energyWhStatic = prefs.getFloat("wh_sta", 0.0f);
+      // Tu dong sua dao nguoc Tracker < Static do dia chi INA226 cu gay ra
+      if (energyWhTracker < energyWhStatic && energyWhStatic > 5.0) {
+        double tmp = energyWhTracker;
+        energyWhTracker = energyWhStatic;
+        energyWhStatic = tmp;
+        prefs.putFloat("wh_trk", (float)energyWhTracker);
+        prefs.putFloat("wh_sta", (float)energyWhStatic);
+        Serial.printf(">> [ENERGY NVS CORRECTION] Da dao lai dung Tracker=%.2f Wh, Static=%.2f Wh\n",
+                      energyWhTracker, energyWhStatic);
+      }
       // Khôi phục nguyên vẹn năng lượng tích lũy trong ngày đã lưu trong NVS
       Serial.printf(">> [ENERGY NVS] Khoi phuc nang luong trong ngay: Tracker=%.2f Wh, Static=%.2f Wh\n",
                     energyWhTracker, energyWhStatic);

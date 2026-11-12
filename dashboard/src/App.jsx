@@ -501,8 +501,8 @@ export default function App() {
                 let merged = historyList.map((item) => {
                   if (customMap.has(item.date)) {
                     const c = customMap.get(item.date);
-                    const trkWh = (c.trackingWh && c.trackingWh > (item.trackingWh || 0)) ? c.trackingWh : (item.trackingWh || c.trackingWh || 0);
-                    const staWh = (c.staticWh && c.staticWh > (item.staticWh || 0)) ? c.staticWh : (item.staticWh || c.staticWh || 0);
+                    const trkWh = (c.trackingWh !== undefined && c.trackingWh !== null) ? c.trackingWh : (item.trackingWh || 0);
+                    const staWh = (c.staticWh !== undefined && c.staticWh !== null) ? c.staticWh : (item.staticWh || 0);
                     return { ...item, ...c, trackingWh: trkWh, staticWh: staWh };
                   }
                   return item;

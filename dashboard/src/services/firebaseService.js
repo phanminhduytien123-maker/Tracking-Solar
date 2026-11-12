@@ -566,9 +566,9 @@ export class FirebaseSolarService {
       historyList = historyList.map(item => {
         if (customMap.has(item.date)) {
           const c = customMap.get(item.date);
-          // Giữ dữ liệu năng lượng đầy đủ: Lấy giá trị lớn hơn giữa custom/benchmark và sensor live để không bao giờ bị mất số liệu ngày hiện tại
-          const trkWh = (c.trackingWh && c.trackingWh > (item.trackingWh || 0)) ? c.trackingWh : (item.trackingWh || c.trackingWh || 0);
-          const staWh = (c.staticWh && c.staticWh > (item.staticWh || 0)) ? c.staticWh : (item.staticWh || c.staticWh || 0);
+          // Uu tien gia tri tuy bien / chuan hoa tu customHistory
+          const trkWh = (c.trackingWh !== undefined && c.trackingWh !== null) ? c.trackingWh : (item.trackingWh || 0);
+          const staWh = (c.staticWh !== undefined && c.staticWh !== null) ? c.staticWh : (item.staticWh || 0);
           const diffWh = parseFloat((trkWh - staWh).toFixed(1));
           const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
           const expectedStaWh = 1.018 * staWh;
