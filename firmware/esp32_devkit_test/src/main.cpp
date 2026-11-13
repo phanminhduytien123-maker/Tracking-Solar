@@ -26,7 +26,7 @@
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.6"
+#define CURRENT_FIRMWARE_VERSION "2.1.7"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -3259,9 +3259,9 @@ void telemetryTask(void *pvParameters) {
       }
     }
 
-    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 60s (tiết kiệm băng thông TLS)
+    // Kiểm tra cờ kích hoạt FOTA từ xa qua nhánh /solar/ota mỗi 15s (phản hồi nhanh)
     static unsigned long lastFotaCheck = 0;
-    if (now - lastFotaCheck >= 60000) {
+    if (now - lastFotaCheck >= 15000) {
       lastFotaCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkSystemOtaTrigger();
@@ -4399,8 +4399,8 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 8000;
-  fbConfig.timeout.serverResponse = 8000;
+  fbConfig.timeout.socketConnection = 3000;
+  fbConfig.timeout.serverResponse = 3000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
   fbdo.setBSSLBufferSize(8192, 1024);
@@ -4410,10 +4410,9 @@ void setup() {
   Serial.println(
       ">> [FIREBASE OK] Da san sang day Telemetry len Web Dashboard!\n");
 
-  // 8. Đăng ký Task Watchdog bảo vệ Core 1 (Mục 2) & Khởi tạo Background Task
+  // 8. Đăng ký Task Watchdog bảo vệ Core 1 & Khởi tạo Background Task
   // trên Core 0
-  esp_task_wdt_init(15, true); // Timeout 15s (thay vì 5s quá nhạy), panic reset
-                               // nếu Core 1 bị treo (Mục 2)
+  esp_task_wdt_init(30, true); // Timeout 30s (thay vì 15s quá nhạy), chống reset oan khi mạng lag
   esp_task_wdt_add(NULL); // Đăng ký loop() task hiện tại vào Watchdog
 
   if (!i2cMutex)

@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.5"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.6"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -34,7 +34,7 @@
 #define PIN_ADC_ISC_STA     5   // ADC1_CH4: ACS712 #1 (Tấm Cố Định - qua cầu 10k/20k)
 
 // Chân điều khiển Module Relay A, B, C, D (Đo Voc/Isc ban ngày)
-#define PIN_RELAY_A_CUT     14  // Relay A (Ngắt tải Tấm Xoay) - hoặc gộp A+C
+#define PIN_RELAY_A_CUT     38  // Relay A (Ngắt tải Tấm Xoay) - Đổi từ GPIO 14 sang GPIO 38 để High-Z khi mất nguồn
 #define PIN_RELAY_C_CUT     40  // Relay C (Ngắt tải Tấm Cố Định) - dự phòng nếu tách riêng
 #define PIN_RELAY_B_ISC     41  // Relay B (Ngắn mạch đo Isc Tấm Xoay) - hoặc gộp B+D
 #define PIN_RELAY_D_ISC     39  // Relay D (Ngắn mạch đo Isc Tấm Cố Định) - dự phòng nếu tách riêng
@@ -776,8 +776,8 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 8000;
-  fbConfig.timeout.serverResponse = 8000;
+  fbConfig.timeout.socketConnection = 3000;
+  fbConfig.timeout.serverResponse = 3000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
 
@@ -795,8 +795,8 @@ void setup() {
   });
   ArduinoOTA.begin();
 
-  // BƯỚC 7: Watchdog bảo vệ 10 giây
-  esp_task_wdt_init(10, true);
+  // BƯỚC 7: Watchdog bảo vệ 30 giây (chống reset oan khi mạng lag)
+  esp_task_wdt_init(30, true);
   esp_task_wdt_add(NULL);
 
   lastCycleFinishMs = millis();
@@ -819,9 +819,9 @@ void loop() {
     }
   }
 
-  // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 2 giây (khi đang ở MEAS_IDLE)
+  // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 15 giây (khi đang ở MEAS_IDLE)
   static unsigned long lastFirebaseSyncMs = 0;
-  if (measState == MEAS_IDLE && (millis() - lastFirebaseSyncMs >= 2000)) {
+  if (measState == MEAS_IDLE && (millis() - lastFirebaseSyncMs >= 15000)) {
     lastFirebaseSyncMs = millis();
     pollSystemStateAndConfig();
   }
