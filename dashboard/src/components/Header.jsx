@@ -246,9 +246,9 @@ export default function Header({
               <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
             </div>
 
-            {/* Trạng thái Đèn 12V (Relay Kênh 5 - Relay E) đặt ngay cạnh Đồng hồ */}
+            {/* Trạng thái Đèn (Relay Kênh 5 - Relay E) đặt ngay cạnh Đồng hồ */}
             <div className="flex items-center gap-1.5">
-              <span>Đèn 12V:</span>
+              <span>Đèn:</span>
               <span
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs font-bold border ${
                   system?.lamp12vOn

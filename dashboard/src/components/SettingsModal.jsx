@@ -705,11 +705,11 @@ void loop() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="text-xs font-bold text-zinc-900 block">
-                            3. Điều khiển & Cài đặt Chu kỳ Đèn 12V (Relay Kênh 5 / Kênh E - GPIO 42)
+                            3. Điều khiển & Cài đặt Chu kỳ Đèn (Relay Kênh 5 / Kênh E - GPIO 42)
                           </span>
                           <span className="text-[11px] text-zinc-600 block">
                             {latestTelemetry?.system?.lampAutoDisabled
-                              ? 'Đang BẬT vô hiệu hóa tự động: Đèn tắt khi kích hoạt; cho phép Bật/Tắt đèn 12V bằng tay bên dưới.'
+                              ? 'Đang bật chế độ Thủ công: Đèn tắt khi kích hoạt; cho phép Bật/Tắt đèn bằng tay bên dưới.'
                               : `Đang ở chế độ Tự động: Luân phiên BẬT ${latestTelemetry?.system?.lampOnMin || 15} phút rồi TẮT ${latestTelemetry?.system?.lampOffMin || 15} phút lặp lại liên tục khi hệ thống ngủ.`}
                           </span>
                         </div>
@@ -721,7 +721,7 @@ void loop() {
                                 : 'bg-zinc-100 border-zinc-300 text-zinc-700'
                             }`}
                           >
-                            Đèn 12V: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                            Đèn: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
                           </span>
                           {!latestTelemetry?.system?.lampAutoDisabled && latestTelemetry?.system?.lampRemainSec > 0 && (
                             <span className="px-2 py-0.5 rounded-sm bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-semibold">
@@ -826,12 +826,12 @@ void loop() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-zinc-100">
                         <div>
                           <span className="text-xs font-semibold text-zinc-800 block">
-                            Bật / Tắt Đèn 12V bằng tay:
+                            Bật / Tắt Đèn bằng tay:
                           </span>
                           <span className="text-[11px] text-zinc-500">
                             {latestTelemetry?.system?.lampAutoDisabled
-                              ? 'Đang mở khóa điều khiển tay — Nhấn để Bật hoặc Tắt đèn 12V ngay lập tức.'
-                              : 'Cần nhấn [BẬT Vô hiệu hóa (Chỉnh tay)] ở trên để bật/tắt đèn bằng tay.'}
+                              ? 'Đang mở khóa điều khiển tay — Nhấn để Bật hoặc Tắt đèn ngay lập tức.'
+                              : 'Cần chuyển sang chế độ [Thủ công] ở trên để bật/tắt đèn bằng tay.'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
@@ -840,7 +840,7 @@ void loop() {
                             disabled={!latestTelemetry?.system?.lampAutoDisabled}
                             onClick={() => {
                               onSetLampManualState && onSetLampManualState(true);
-                              setHwConfigFeedback('Đã gửi lệnh BẬT ĐÈN 12V (Relay Kênh 5) bằng tay!');
+                              setHwConfigFeedback('Đã gửi lệnh BẬT ĐÈN (Relay Kênh 5) bằng tay!');
                             }}
                             className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
                               !latestTelemetry?.system?.lampAutoDisabled
@@ -850,14 +850,14 @@ void loop() {
                                   : 'bg-white text-zinc-800 hover:bg-emerald-50 border-zinc-300 cursor-pointer'
                             }`}
                           >
-                            BẬT ĐÈN 12V
+                            BẬT ĐÈN
                           </button>
                           <button
                             type="button"
                             disabled={!latestTelemetry?.system?.lampAutoDisabled}
                             onClick={() => {
                               onSetLampManualState && onSetLampManualState(false);
-                              setHwConfigFeedback('Đã gửi lệnh TẮT ĐÈN 12V (Relay Kênh 5) bằng tay!');
+                              setHwConfigFeedback('Đã gửi lệnh TẮT ĐÈN (Relay Kênh 5) bằng tay!');
                             }}
                             className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
                               !latestTelemetry?.system?.lampAutoDisabled
@@ -867,7 +867,7 @@ void loop() {
                                   : 'bg-white text-zinc-800 hover:bg-zinc-100 border-zinc-300 cursor-pointer'
                             }`}
                           >
-                            TẮT ĐÈN 12V
+                            TẮT ĐÈN
                           </button>
                         </div>
                       </div>

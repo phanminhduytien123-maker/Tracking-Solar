@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
-import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, Moon, Sun, RefreshCw } from 'lucide-react';
+import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, Moon, Sun, RefreshCw, HelpCircle } from 'lucide-react';
 import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
+
+function HelpTip({ text }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1 text-zinc-400 hover:text-zinc-600 cursor-help" title={text}>
+      <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+      <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 hidden group-hover:block z-50 w-60 sm:w-64 p-2 bg-zinc-900 text-white text-[11px] font-normal leading-relaxed rounded-xs shadow-lg text-left">
+        {text}
+        <span className="absolute top-full left-3 -mt-1 border-4 border-transparent border-t-zinc-900" />
+      </span>
+    </span>
+  );
+}
 
 export default function ManualControlModal({
   isOpen,
@@ -370,18 +382,16 @@ export default function ManualControlModal({
 
           {/* 5. THỬ NGHIỆM CHU TRÌNH NGỦ ĐÔNG & THỨC DẬY */}
           <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-1">
-              <label className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-zinc-800 flex items-center gap-1">
                 <span>5. Thử nghiệm chu trình Ngủ đông & Thức dậy</span>
+                <HelpTip text="Luôn tự động Home 2 trục trước khi thực hiện các tác vụ thử nghiệm chu trình ngủ và thức dậy." />
               </label>
-              <span className="text-[11px] text-zinc-500 font-normal">
-                (Luôn tự động Home 2 trục trước khi thực hiện)
-              </span>
             </div>
 
             {isSleeping && (
-              <div className="text-[11px] text-indigo-700 bg-indigo-50/80 border border-indigo-200 px-2.5 py-1 rounded-xs font-medium flex items-center gap-1.5">
-                <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <div className="text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-300 px-2.5 py-1.5 rounded-xs font-medium flex items-center gap-1.5">
+                <Moon className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
                 <span>Hệ thống đang ở trạng thái ngủ đông. Nút <b>[Test Wake Up]</b> đã sẵn sàng để thử nghiệm thức dậy!</span>
               </div>
             )}
@@ -391,16 +401,11 @@ export default function ManualControlModal({
               <button
                 type="button"
                 onClick={onTestSleep}
-                className="p-2.5 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-300 text-indigo-950 rounded-sm text-left transition-colors cursor-pointer"
-                title="Homing 2 trục -> Đưa giàn pin vào thế ngủ ngay lập tức (không ảnh hưởng giờ RTC)"
+                className="p-2.5 bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                title="Home 2 trục ➔ Đưa giàn pin vào thế ngủ an toàn ngay lập tức (không ảnh hưởng giờ RTC)"
               >
-                <div className="flex items-center gap-1.5 font-bold text-xs text-indigo-900">
-                  <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span>1. Test Ngủ</span>
-                </div>
-                <div className="text-[11px] text-indigo-700/80 mt-1 leading-tight">
-                  Home 2 trục ➔ Vào thế ngủ an toàn ngay
-                </div>
+                <Moon className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                <span>1. Test Ngủ</span>
               </button>
 
               {/* Nút 2: Test Wake Up */}
@@ -408,211 +413,176 @@ export default function ManualControlModal({
                 type="button"
                 disabled={!isSleeping}
                 onClick={onTestWake}
-                className={`p-2.5 border rounded-sm text-left transition-colors ${
+                className={`p-2.5 border rounded-sm font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors ${
                   isSleeping
-                    ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-950 cursor-pointer shadow-xs'
+                    ? 'bg-white hover:bg-zinc-50 border-zinc-300 text-zinc-800 cursor-pointer shadow-2xs'
                     : 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed opacity-60'
                 }`}
-                title={isSleeping ? "Homing 2 trục -> Quay đón bình minh" : "Chỉ khả dụng khi hệ thống đang ở trạng thái ngủ"}
+                title={isSleeping ? "Home 2 trục ➔ Quay đón bình minh" : "Chỉ khả dụng khi hệ thống đang ở trạng thái ngủ"}
               >
-                <div className="flex items-center gap-1.5 font-bold text-xs">
-                  <Sun className={`w-3.5 h-3.5 shrink-0 ${isSleeping ? 'text-amber-600' : 'text-zinc-400'}`} />
-                  <span>2. Test Wake Up</span>
-                </div>
-                <div className={`text-[11px] mt-1 leading-tight ${isSleeping ? 'text-amber-700/80' : 'text-zinc-400'}`}>
-                  {isSleeping ? 'Home 2 trục ➔ Quay đón bình minh' : 'Chỉ khả dụng khi đang ngủ'}
-                </div>
+                <Sun className={`w-3.5 h-3.5 shrink-0 ${isSleeping ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                <span>2. Test Wake Up</span>
               </button>
 
               {/* Nút 3: Quay về trạng thái thật (Reset) */}
               <button
                 type="button"
                 onClick={onResumeReal}
-                className="p-2.5 bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 rounded-sm text-left transition-colors cursor-pointer"
-                title="Homing 2 trục -> Khôi phục bám theo thời gian thực RTC/NOAA"
+                className="p-2.5 bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                title="Home 2 trục ➔ Khôi phục bám theo thời gian thực RTC/NOAA"
               >
-                <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-900">
-                  <RefreshCw className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>3. Về trạng thái thật</span>
-                </div>
-                <div className="text-[11px] text-emerald-700/80 mt-1 leading-tight">
-                  Home 2 trục ➔ Bám mặt trời theo giờ RTC
-                </div>
+                <RefreshCw className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                <span>3. Về trạng thái thật</span>
               </button>
             </div>
 
             {/* Tắt / Bật Vô hiệu hóa khả năng ngủ đêm */}
             <div className="pt-2 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <span className="text-xs font-bold text-zinc-900 block">
-                  Vô hiệu hóa khả năng ngủ đêm (Giữ bước vị trí chiều)
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-zinc-900">
+                  Chế độ ngủ đêm (18:00 – 04:00)
                 </span>
-                <span className="text-[11px] text-zinc-500 block">
-                  {system?.sleepDisabled
-                    ? 'Đang BẬT: Tới 18h vẫn không ngủ; nếu đang trời tối sẽ giữ bước ở vị trí cuối buổi chiều.'
-                    : 'Đang TẮT: Hệ thống tự động ngủ đêm từ 18:00 đến 04:00 (Relay tự ngắt khi ngủ).'}
-                </span>
+                <HelpTip text="Bật: Tự động đưa giàn pin về thế nghỉ an toàn và ngắt relay từ 18:00 đến 04:00 để tiết kiệm điện. Tắt: Giữ nguyên vị trí giàn pin ở góc chiều, không ngủ." />
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(true)}
-                  className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                    system?.sleepDisabled
-                      ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                      : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
+                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(false)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                    !system?.sleepDisabled
+                      ? 'bg-zinc-800 text-white border-zinc-800'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                   }`}
                 >
-                  Bật (Tắt ngủ)
+                  Bật
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(false)}
-                  className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                    !system?.sleepDisabled
-                      ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                      : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
+                  onClick={() => onSetSleepDisabled && onSetSleepDisabled(true)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                    system?.sleepDisabled
+                      ? 'bg-zinc-800 text-white border-zinc-800'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                   }`}
                 >
-                  Tắt (Ngủ 18h)
+                  Tắt
                 </button>
               </div>
             </div>
 
-            {/* Vô hiệu hóa bật/tắt đèn 12V tự động & Điều khiển Đèn 12V bằng tay (Relay Kênh 5 - Relay E) */}
+            {/* Điều khiển Đèn */}
             <div className="pt-2.5 border-t border-zinc-200 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-zinc-900">
-                      Vô hiệu hóa bật/tắt Đèn 12V tự động (Relay Kênh 5 / Kênh E)
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-xs text-[11px] font-bold border ${
-                        system?.lamp12vOn
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : 'bg-zinc-100 text-zinc-700 border-zinc-300'
-                      }`}
-                    >
-                      Đèn 12V: {system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-zinc-500 block mt-0.5">
-                    {system?.lampAutoDisabled
-                      ? 'Đang BẬT vô hiệu hóa tự động: Đèn tự động tắt khi mới kích hoạt; có thể Bật/Tắt đèn 12V bằng tay.'
-                      : `Đang TẮT vô hiệu hóa (Chế độ Tự động): Luân phiên BẬT ${system?.lampOnMin || 15}p / TẮT ${system?.lampOffMin || 15}p khi ngủ.`}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-900">
+                    Điều khiển đèn
+                  </span>
+                  <HelpTip text="Tự động: Đèn tự động bật/tắt luân phiên 15 phút khi giàn pin ngủ đêm. Thủ công: Cho phép người dùng bật hoặc tắt đèn trực tiếp bằng tay." />
+                  <span className="px-2 py-0.5 rounded-xs text-[11px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                    Đèn: {system?.lamp12vOn ? 'BẬT' : 'TẮT'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(true)}
-                    className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                      system?.lampAutoDisabled
-                        ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                        : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
+                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(false)}
+                    className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                      !system?.lampAutoDisabled
+                        ? 'bg-zinc-800 text-white border-zinc-800'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                     }`}
                   >
-                    Bật (Chỉnh tay)
+                    Tự động
                   </button>
                   <button
                     type="button"
-                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(false)}
-                    className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                      !system?.lampAutoDisabled
-                        ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                        : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
+                    onClick={() => onSetLampAutoDisabled && onSetLampAutoDisabled(true)}
+                    className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                      system?.lampAutoDisabled
+                        ? 'bg-zinc-800 text-white border-zinc-800'
+                        : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                     }`}
                   >
-                    Tắt (Tự động luân phiên)
+                    Thủ công
                   </button>
                 </div>
               </div>
 
-              {/* Hàng nút Bật / Tắt đèn 12V bằng tay */}
+              {/* Hàng nút Bật / Tắt đèn bằng tay */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2 rounded-sm border border-zinc-200">
-                <span className="text-xs font-semibold text-zinc-800">
-                  Điều khiển Đèn 12V bằng tay {system?.lampAutoDisabled ? '(Đã mở khóa)' : '(Chỉ hoạt động khi Bật vô hiệu hóa tự động)'}:
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-zinc-800">
+                    Công tắc đèn {system?.lampAutoDisabled ? '(Thủ công)' : '(Khóa khi Tự động)'}:
+                  </span>
+                  <HelpTip text="Bật hoặc tắt đèn chủ động bằng tay. Chỉ khả dụng khi chọn chế độ Thủ công ở trên." />
+                </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     disabled={!system?.lampAutoDisabled}
                     onClick={() => onSetLampManualState && onSetLampManualState(true)}
-                    className={`px-3 py-1 rounded-sm text-xs font-bold border transition-colors ${
+                    className={`px-3 py-1 rounded-sm text-xs font-semibold border transition-colors ${
                       !system?.lampAutoDisabled
                         ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
                         : system?.lamp12vOn
-                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs cursor-pointer'
-                          : 'bg-white hover:bg-emerald-50 text-zinc-800 border-zinc-300 cursor-pointer'
+                          ? 'bg-zinc-800 text-white border-zinc-800 cursor-pointer'
+                          : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300 cursor-pointer'
                     }`}
                   >
-                    BẬT ĐÈN 12V
+                    Bật đèn
                   </button>
                   <button
                     type="button"
                     disabled={!system?.lampAutoDisabled}
                     onClick={() => onSetLampManualState && onSetLampManualState(false)}
-                    className={`px-3 py-1 rounded-sm text-xs font-bold border transition-colors ${
+                    className={`px-3 py-1 rounded-sm text-xs font-semibold border transition-colors ${
                       !system?.lampAutoDisabled
                         ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
                         : !system?.lamp12vOn
-                          ? 'bg-zinc-800 text-white border-zinc-900 shadow-xs cursor-pointer'
-                          : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 cursor-pointer'
+                          ? 'bg-zinc-800 text-white border-zinc-800 cursor-pointer'
+                          : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300 cursor-pointer'
                     }`}
                   >
-                    TẮT ĐÈN 12V
+                    Tắt đèn
                   </button>
                 </div>
               </div>
+            </div>
 
-              {/* Tự động ngắt nguồn ESP32 #2 (Node đo Voc/Isc) ban đêm */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2.5 rounded-sm border border-zinc-200">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-zinc-900 block">
-                      Tự động ngắt nguồn ESP32 #2 ban đêm (Relay GPIO 5):
-                    </span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded-sm text-[10px] font-bold border ${
-                        system?.esp2PowerOn !== false
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-rose-50 text-rose-800 border-rose-300'
-                      }`}
-                    >
-                      {system?.esp2PowerOn !== false ? 'NGUỒN ON' : 'NGUỒN OFF'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-zinc-500 block">
-                    {system?.esp2AutoCutoff !== false
-                      ? 'Đang BẬT: Cắt sạch nguồn ESP2 từ 18:01 tối đến 04:01 sáng để tiết kiệm ắc quy.'
-                      : 'Đang TẮT: ESP32 #2 luôn được cấp nguồn hoạt động 24/24.'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true)}
-                    className={`px-2.5 py-1 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                      system?.esp2AutoCutoff !== false
-                        ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                        : 'bg-white hover:bg-blue-50 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    Bật (Tự ngắt 18h01)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false)}
-                    className={`px-2.5 py-1 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                      system?.esp2AutoCutoff === false
-                        ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                        : 'bg-white hover:bg-amber-50 text-zinc-700 border-zinc-300'
-                    }`}
-                  >
-                    Tắt (Chạy 24/24)
-                  </button>
-                </div>
+            {/* Tự động ngắt nguồn ESP32 #2 (Node đo Voc/Isc) ban đêm */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2.5 rounded-sm border border-zinc-200">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-zinc-900 block">
+                  Tự ngắt nguồn ESP32 #2 ban đêm
+                </span>
+                <HelpTip text="Bật: Tự động ngắt nguồn ESP32 #2 từ 18:01 tối đến 04:01 sáng để tiết kiệm ắc quy. Tắt: ESP32 #2 luôn được cấp nguồn hoạt động 24/24." />
+                <span className="px-1.5 py-0.5 rounded-xs text-[10px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                  {system?.esp2PowerOn !== false ? 'Nguồn: ON' : 'Nguồn: OFF'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                    system?.esp2AutoCutoff !== false
+                      ? 'bg-zinc-800 text-white border-zinc-800'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
+                  }`}
+                >
+                  Bật
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false)}
+                  className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                    system?.esp2AutoCutoff === false
+                      ? 'bg-zinc-800 text-white border-zinc-800'
+                      : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
+                  }`}
+                >
+                  Tắt
+                </button>
               </div>
             </div>
           </div>
