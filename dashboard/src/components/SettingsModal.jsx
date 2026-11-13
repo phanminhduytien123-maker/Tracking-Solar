@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, HelpCircle } from 'lucide-react';
 import { getStoredUsers, fetchCloudUsers, lockUser1Hour, lockUserPermanent, restoreUser } from '../services/userService';
 import InstallationLocationTab from './InstallationLocationTab';
 import HistoryDataManagementTab from './HistoryDataManagementTab';
+
+function HelpTip({ text }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1 text-zinc-400 hover:text-zinc-600 cursor-help" title={text}>
+      <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+      <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 hidden group-hover:block z-50 w-60 sm:w-64 p-2 bg-zinc-900 text-white text-[11px] font-normal leading-relaxed rounded-xs shadow-lg text-left">
+        {text}
+        <span className="absolute top-full left-3 -mt-1 border-4 border-transparent border-t-zinc-900" />
+      </span>
+    </span>
+  );
+}
 
 export default function SettingsModal({
   isOpen,
@@ -352,23 +364,17 @@ export default function SettingsModal({
                     </div>
                   </div>
 
-                  {/* CẤU HÌNH PHẦN CỨNG: VÔ HIỆU HÓA NGỦ ĐÊM & TẦN SUẤT NHẢY RELAY ĐO VOC/ISC */}
-                  <div className="p-3.5 rounded-sm bg-blue-50/40 border border-blue-200 space-y-3.5">
-                    <div className="flex items-center justify-between border-b border-blue-200/80 pb-2">
-                      <div>
-                        <span className="text-xs font-bold text-blue-950 block">
-                          Cấu hình Vận hành Ngủ đêm &amp; Chu kỳ Relay đo Voc / Isc
+                  {/* CẤU HÌNH PHẦN CỨNG: NGỦ ĐÊM, RELAY & ĐÈN */}
+                  <div className="p-3.5 rounded-sm bg-zinc-50 border border-zinc-200 space-y-3">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-zinc-900">
+                          Cấu hình vận hành &amp; Relay
                         </span>
-                        <span className="text-[11px] text-zinc-600 block">
-                          Đồng bộ trực tiếp xuống ESP32-S3 #1 (Tracker) và ESP32-S3 #2 (Node đo Voc/Isc)
-                        </span>
+                        <HelpTip text="Các thiết lập đồng bộ trực tiếp xuống firmware ESP32-S3 #1 (Tracker) và ESP32-S3 #2 (Đo Voc/Isc)." />
                       </div>
-                      <span className={`px-2 py-0.5 rounded-sm text-[11px] font-bold border ${
-                        latestTelemetry?.system?.sleepDisabled
-                          ? 'bg-amber-100 text-amber-900 border-amber-300'
-                          : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                      }`}>
-                        {latestTelemetry?.system?.sleepDisabled ? '● Đã tắt ngủ đêm (Giữ bước chiều)' : '● Ngủ tự động 18:00'}
+                      <span className="px-2 py-0.5 rounded-xs text-[11px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                        {latestTelemetry?.system?.sleepDisabled ? 'Đã tắt ngủ đêm' : 'Ngủ tự động 18:00'}
                       </span>
                     </div>
 
@@ -385,64 +391,57 @@ export default function SettingsModal({
                       </div>
                     )}
 
-                    {/* 1. Nút bật/tắt vô hiệu hóa khả năng ngủ */}
-                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-bold text-zinc-900 block">
-                            1. Vô hiệu hóa khả năng ngủ trên hệ thống
-                          </span>
-                          <span className="text-[11px] text-zinc-600 block leading-relaxed">
-                            • Khi <b>BẬT</b>: Nếu đang trời tối, tấm pin lập tức quay về <b>giữ bước ở vị trí cuối cùng buổi chiều</b>; nếu đang trời sáng thì dù tới <b>18h vẫn không ngủ</b>.<br />
-                            • Khi <b>TẮT</b>: Hệ thống tự động về vị trí ngủ đêm an toàn từ 18:00 đến 04:00 sáng.
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetSleepDisabled && onSetSleepDisabled(true);
-                              setHwConfigFeedback('Đã BẬT vô hiệu hóa ngủ đêm: Tấm pin sẽ giữ bước ở vị trí cuối buổi chiều và không ngủ lúc 18h!');
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
-                              latestTelemetry?.system?.sleepDisabled
-                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
-                            }`}
-                          >
-                            BẬT (Không ngủ)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetSleepDisabled && onSetSleepDisabled(false);
-                              setHwConfigFeedback('Đã TẮT vô hiệu hóa ngủ đêm: Hệ thống sẽ tự động ngủ đêm lúc 18:00 như bình thường.');
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
-                              !latestTelemetry?.system?.sleepDisabled
-                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
-                            }`}
-                          >
-                            TẮT (Ngủ 18h)
-                          </button>
-                        </div>
+                    {/* 1. Chế độ ngủ đêm */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-zinc-900">
+                          1. Chế độ ngủ đêm (18:00 – 04:00)
+                        </span>
+                        <HelpTip text="Bật: Tự động đưa giàn pin về thế an toàn và ngắt relay từ 18:00 đến 04:00 để tiết kiệm điện. Tắt: Giữ nguyên vị trí giàn pin ở góc chiều, không ngủ lúc 18h." />
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSetSleepDisabled && onSetSleepDisabled(false);
+                            setHwConfigFeedback('Đã BẬT tự động ngủ đêm: Hệ thống sẽ tự động ngủ lúc 18:00.');
+                          }}
+                          className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                            !latestTelemetry?.system?.sleepDisabled
+                              ? 'bg-zinc-800 text-white border-zinc-800'
+                              : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                          }`}
+                        >
+                          Bật
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSetSleepDisabled && onSetSleepDisabled(true);
+                            setHwConfigFeedback('Đã TẮT ngủ đêm: Tấm pin sẽ giữ bước ở vị trí cuối buổi chiều.');
+                          }}
+                          className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                            latestTelemetry?.system?.sleepDisabled
+                              ? 'bg-zinc-800 text-white border-zinc-800'
+                              : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                          }`}
+                        >
+                          Tắt
+                        </button>
                       </div>
                     </div>
 
-                    {/* 2. Điều chỉnh tần suất nhảy 1 chu kỳ Relay (Mặc định 10s) */}
+                    {/* 2. Chu kỳ Relay đo Voc & Isc */}
                     <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <span className="text-xs font-bold text-zinc-900 block">
-                            2. Tần suất nhảy 1 chu kỳ Relay đo Voc &amp; Isc (Mặc định: 10s)
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-zinc-900">
+                            2. Chu kỳ Relay đo Voc &amp; Isc
                           </span>
-                          <span className="text-[11px] text-zinc-600 block">
-                            Relay chỉ nhảy khi <b>không trong giờ ngủ</b>. Trong giờ ngủ đêm, cả 4 Relay tự động khóa hoàn toàn (không nhảy).
-                          </span>
+                          <HelpTip text="Khoảng thời gian giãn cách giữa các lần nhảy relay đo Voc và Isc (mặc định 10s). Trong giờ ngủ đêm, cả 4 relay tự động khóa hoàn toàn để bảo vệ thiết bị." />
                         </div>
-                        <span className="px-2 py-0.5 rounded-sm bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
-                          Chu kỳ hiện tại: {latestTelemetry?.system?.relayIntervalSec || relaySecInput || 10} giây
+                        <span className="px-2 py-0.5 rounded-xs text-[11px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                          Hiện tại: {latestTelemetry?.system?.relayIntervalSec || relaySecInput || 10}s
                         </span>
                       </div>
 
@@ -462,8 +461,8 @@ export default function SettingsModal({
                               }}
                               className={`px-2.5 py-1 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
                                 isCurrent
-                                  ? 'bg-blue-700 text-white border-blue-800'
-                                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                                  ? 'bg-zinc-800 text-white border-zinc-800'
+                                  : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                               }`}
                             >
                               {sec}s{sec === 10 ? ' (Mặc định)' : ''}
@@ -473,7 +472,7 @@ export default function SettingsModal({
                       </div>
 
                       {/* Ô nhập tùy chỉnh + Nút Lưu */}
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
                         <label className="text-xs font-semibold text-zinc-700 shrink-0">
                           Tùy chỉnh (3 – 3600 giây):
                         </label>
@@ -484,7 +483,7 @@ export default function SettingsModal({
                           step="1"
                           value={relaySecInput}
                           onChange={(e) => setRelaySecInput(e.target.value)}
-                          className="w-24 bg-white border border-zinc-300 rounded-sm px-2.5 py-1 text-xs font-bold text-zinc-900 font-mono"
+                          className="w-20 bg-white border border-zinc-300 rounded-sm px-2.5 py-1 text-xs font-bold text-zinc-900 font-mono"
                         />
                         <button
                           type="button"
@@ -494,79 +493,145 @@ export default function SettingsModal({
                             onSetRelayInterval && onSetRelayInterval(validSec);
                             setHwConfigFeedback(`Đã lưu và áp dụng chu kỳ nhảy Relay = ${validSec} giây xuống hệ thống!`);
                           }}
-                          className="px-3 py-1 rounded-sm text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white cursor-pointer"
+                          className="px-3 py-1 rounded-sm text-xs font-semibold bg-zinc-800 hover:bg-zinc-900 text-white cursor-pointer"
                         >
-                          Lưu &amp; Áp dụng chu kỳ
+                          Lưu chu kỳ
                         </button>
                       </div>
                     </div>
 
-                    {/* 3. Đèn 12V (Relay Kênh 5 - Relay E): Cấu hình chu kỳ Bật/Tắt & Vô hiệu hóa tự động & Bật/Tắt bằng tay */}
-                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-3">
-                      {/* Tiêu đề & Trạng thái hiện tại */}
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <span className="text-xs font-bold text-zinc-900 block">
-                            3. Điều khiển & Cài đặt Chu kỳ Đèn (Relay Kênh 5 / Kênh E - GPIO 42)
+                    {/* 3. Điều khiển & Chu kỳ Đèn */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-zinc-900">
+                            3. Điều khiển đèn
                           </span>
-                          <span className="text-[11px] text-zinc-600 block">
-                            {latestTelemetry?.system?.lampAutoDisabled
-                              ? 'Đang bật chế độ Thủ công: Đèn tắt khi kích hoạt; cho phép Bật/Tắt đèn bằng tay bên dưới.'
-                              : `Đang ở chế độ Tự động: Luân phiên BẬT ${latestTelemetry?.system?.lampOnMin || 15} phút rồi TẮT ${latestTelemetry?.system?.lampOffMin || 15} phút lặp lại liên tục khi hệ thống ngủ.`}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-sm border text-xs font-bold ${
-                              latestTelemetry?.system?.lamp12vOn
-                                ? 'bg-amber-100 border-amber-300 text-amber-900'
-                                : 'bg-zinc-100 border-zinc-300 text-zinc-700'
-                            }`}
-                          >
-                            Đèn: {latestTelemetry?.system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                          <HelpTip text="Tự động: Đèn tự động bật/tắt luân phiên 15 phút khi giàn pin ngủ đêm. Thủ công: Cho phép người dùng bật hoặc tắt đèn trực tiếp bằng tay." />
+                          <span className="px-2 py-0.5 rounded-xs text-[11px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                            Đèn: {latestTelemetry?.system?.lamp12vOn ? 'BẬT' : 'TẮT'}
                           </span>
                           {!latestTelemetry?.system?.lampAutoDisabled && latestTelemetry?.system?.lampRemainSec > 0 && (
-                            <span className="px-2 py-0.5 rounded-sm bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-semibold">
+                            <span className="text-zinc-500 text-[11px] font-mono">
                               (còn {Math.floor(Number(latestTelemetry.system.lampRemainSec) / 60)}p {Number(latestTelemetry.system.lampRemainSec) % 60}s)
                             </span>
                           )}
                         </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetLampAutoDisabled && onSetLampAutoDisabled(false);
+                              setHwConfigFeedback(`Đã chuyển sang chế độ Tự động: Đèn bật ${latestTelemetry?.system?.lampOnMin || 15}p / tắt ${latestTelemetry?.system?.lampOffMin || 15}p khi ngủ.`);
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-800 text-white border-zinc-800'
+                                : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                            }`}
+                          >
+                            Tự động
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSetLampAutoDisabled && onSetLampAutoDisabled(true);
+                              setHwConfigFeedback('Đã chuyển sang chế độ Thủ công: Mở khóa công tắc Bật/Tắt đèn!');
+                            }}
+                            className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                              latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-800 text-white border-zinc-800'
+                                : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                            }`}
+                          >
+                            Thủ công
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Công tắc Bật / Tắt Đèn bằng tay */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-zinc-100">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-zinc-800">
+                            Công tắc đèn {latestTelemetry?.system?.lampAutoDisabled ? '(Thủ công)' : '(Khóa khi Tự động)'}:
+                          </span>
+                          <HelpTip text="Bật hoặc tắt đèn chủ động bằng tay. Chỉ khả dụng khi chọn chế độ Thủ công." />
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
+                            onClick={() => {
+                              onSetLampManualState && onSetLampManualState(true);
+                              setHwConfigFeedback('Đã gửi lệnh BẬT ĐÈN bằng tay!');
+                            }}
+                            className={`px-3 py-1 rounded-sm text-xs font-semibold border transition-colors ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                                : latestTelemetry?.system?.lamp12vOn
+                                  ? 'bg-zinc-800 text-white border-zinc-800 cursor-pointer'
+                                  : 'bg-white text-zinc-800 hover:bg-zinc-50 border-zinc-300 cursor-pointer'
+                            }`}
+                          >
+                            Bật đèn
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
+                            onClick={() => {
+                              onSetLampManualState && onSetLampManualState(false);
+                              setHwConfigFeedback('Đã gửi lệnh TẮT ĐÈN bằng tay!');
+                            }}
+                            className={`px-3 py-1 rounded-sm text-xs font-semibold border transition-colors ${
+                              !latestTelemetry?.system?.lampAutoDisabled
+                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
+                                : !latestTelemetry?.system?.lamp12vOn
+                                  ? 'bg-zinc-800 text-white border-zinc-800 cursor-pointer'
+                                  : 'bg-white text-zinc-800 hover:bg-zinc-50 border-zinc-300 cursor-pointer'
+                            }`}
+                          >
+                            Tắt đèn
+                          </button>
+                        </div>
                       </div>
 
                       {/* Khối Cài đặt Chu kỳ BẬT / TẮT luân phiên tự do */}
-                      <div className="p-2.5 rounded-sm bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="p-2.5 rounded-sm bg-zinc-50 border border-zinc-200 space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-1">
-                          <span className="text-xs font-bold text-slate-800">
-                            ⚙ Cài đặt chu kỳ BẬT / TẮT luân phiên tự động:
-                          </span>
-                          <span className="text-[11px] text-slate-500 font-medium">
-                            Hiện hành: BẬT <strong className="text-amber-700">{latestTelemetry?.system?.lampOnMin || 15}p</strong> ➔ TẮT <strong className="text-zinc-700">{latestTelemetry?.system?.lampOffMin || 15}p</strong>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-zinc-800">
+                              Chu kỳ tự động khi ngủ:
+                            </span>
+                            <HelpTip text="Cài đặt thời gian Bật và Tắt luân phiên của đèn trong suốt thời gian giàn pin ngủ đêm." />
+                          </div>
+                          <span className="text-[11px] text-zinc-500 font-medium">
+                            Hiện hành: BẬT {latestTelemetry?.system?.lampOnMin || 15}p ➔ TẮT {latestTelemetry?.system?.lampOffMin || 15}p
                           </span>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
                           <div className="flex items-center gap-1.5">
-                            <label className="text-xs text-zinc-700 font-medium">Thời gian BẬT:</label>
+                            <label className="text-xs text-zinc-600 font-medium">Thời gian BẬT:</label>
                             <input
                               type="number"
                               min="1"
                               max="360"
                               value={lampOnMinInput}
                               onChange={(e) => setLampOnMinInput(Math.max(1, Math.min(360, Number(e.target.value) || 1)))}
-                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white focus:outline-none focus:border-amber-500"
+                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white"
                             />
                             <span className="text-xs text-zinc-500">phút</span>
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            <label className="text-xs text-zinc-700 font-medium">Thời gian TẮT:</label>
+                            <label className="text-xs text-zinc-600 font-medium">Thời gian TẮT:</label>
                             <input
                               type="number"
                               min="1"
                               max="360"
                               value={lampOffMinInput}
                               onChange={(e) => setLampOffMinInput(Math.max(1, Math.min(360, Number(e.target.value) || 1)))}
-                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white focus:outline-none focus:border-blue-500"
+                              className="w-16 px-2 py-1 text-xs text-center font-bold border border-zinc-300 rounded-sm bg-white"
                             />
                             <span className="text-xs text-zinc-500">phút</span>
                           </div>
@@ -578,156 +643,56 @@ export default function SettingsModal({
                               const offVal = Math.max(1, Math.min(360, Number(lampOffMinInput) || 15));
                               onSetLampCustomCycle && onSetLampCustomCycle(onVal, offVal);
                               onSetLampAutoDisabled && onSetLampAutoDisabled(false);
-                              setHwConfigFeedback(`✓ Đã kích hoạt chế độ Tự động và áp dụng chu kỳ Đèn: BẬT ${onVal} phút / TẮT ${offVal} phút luân phiên!`);
+                              setHwConfigFeedback(`✓ Đã áp dụng chu kỳ Đèn: BẬT ${onVal}p / TẮT ${offVal}p!`);
                             }}
-                            className="px-3.5 py-1 rounded-sm text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white border border-amber-700 shadow-xs cursor-pointer transition-colors shrink-0"
+                            className="px-3 py-1 rounded-sm text-xs font-semibold bg-zinc-800 hover:bg-zinc-900 text-white cursor-pointer transition-colors shrink-0"
                           >
-                            ✓ Áp dụng chu kỳ Đèn (OK)
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Nút Bật / Tắt Vô hiệu hóa bật tắt đèn tự động */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-zinc-100">
-                        <span className="text-xs font-semibold text-zinc-800">
-                          Chế độ Vô hiệu hóa bật/tắt đèn tự động:
-                        </span>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetLampAutoDisabled && onSetLampAutoDisabled(true);
-                              setHwConfigFeedback('Đã BẬT vô hiệu hóa đèn tự động: Đèn 12V đã chuyển về TẮT và mở khóa nút Bật/Tắt bằng tay!');
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                              latestTelemetry?.system?.lampAutoDisabled
-                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
-                            }`}
-                          >
-                            BẬT Vô hiệu hóa (Chỉnh tay)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetLampAutoDisabled && onSetLampAutoDisabled(false);
-                              setHwConfigFeedback(`Đã TẮT vô hiệu hóa tự động: Đèn 12V bắt đầu chu kỳ BẬT ${latestTelemetry?.system?.lampOnMin || 15}p / TẮT ${latestTelemetry?.system?.lampOffMin || 15}p!`);
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition-colors cursor-pointer ${
-                              !latestTelemetry?.system?.lampAutoDisabled
-                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
-                            }`}
-                          >
-                            TẮT Vô hiệu hóa (Tự động luân phiên)
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Nút Bật / Tắt Đèn 12V bằng tay (chỉ khả dụng khi đã BẬT Vô hiệu hóa tự động) */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-zinc-100">
-                        <div>
-                          <span className="text-xs font-semibold text-zinc-800 block">
-                            Bật / Tắt Đèn bằng tay:
-                          </span>
-                          <span className="text-[11px] text-zinc-500">
-                            {latestTelemetry?.system?.lampAutoDisabled
-                              ? 'Đang mở khóa điều khiển tay — Nhấn để Bật hoặc Tắt đèn ngay lập tức.'
-                              : 'Cần chuyển sang chế độ [Thủ công] ở trên để bật/tắt đèn bằng tay.'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
-                            onClick={() => {
-                              onSetLampManualState && onSetLampManualState(true);
-                              setHwConfigFeedback('Đã gửi lệnh BẬT ĐÈN (Relay Kênh 5) bằng tay!');
-                            }}
-                            className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
-                              !latestTelemetry?.system?.lampAutoDisabled
-                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
-                                : latestTelemetry?.system?.lamp12vOn
-                                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs cursor-pointer'
-                                  : 'bg-white text-zinc-800 hover:bg-emerald-50 border-zinc-300 cursor-pointer'
-                            }`}
-                          >
-                            BẬT ĐÈN
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!latestTelemetry?.system?.lampAutoDisabled}
-                            onClick={() => {
-                              onSetLampManualState && onSetLampManualState(false);
-                              setHwConfigFeedback('Đã gửi lệnh TẮT ĐÈN (Relay Kênh 5) bằng tay!');
-                            }}
-                            className={`px-3.5 py-1.5 rounded-sm text-xs font-bold border transition-colors ${
-                              !latestTelemetry?.system?.lampAutoDisabled
-                                ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed opacity-60'
-                                : !latestTelemetry?.system?.lamp12vOn
-                                  ? 'bg-zinc-800 text-white border-zinc-900 shadow-xs cursor-pointer'
-                                  : 'bg-white text-zinc-800 hover:bg-zinc-100 border-zinc-300 cursor-pointer'
-                            }`}
-                          >
-                            TẮT ĐÈN
+                            Lưu chu kỳ
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* 4. Tự động ngắt nguồn ESP32 #2 (Node đo Voc/Isc) ban đêm (Relay GPIO 5) */}
-                    <div className="p-3 rounded-sm bg-white border border-zinc-200 space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-zinc-900 block">
-                              4. Tự động ngắt nguồn ESP32 #2 (Node Voc/Isc) ban đêm (Relay GPIO 5)
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-sm text-[10px] font-bold border ${
-                                latestTelemetry?.system?.esp2PowerOn !== false
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : 'bg-rose-50 text-rose-800 border-rose-300'
-                              }`}
-                            >
-                              Nguồn ESP2: {latestTelemetry?.system?.esp2PowerOn !== false ? 'ĐANG CẤP (ON)' : 'ĐÃ NGẮT (OFF)'}
-                            </span>
-                          </div>
-                          <span className="text-[11px] text-zinc-600 block leading-relaxed">
-                            • <b>BẬT (Mặc định)</b>: Tự động phát xung ngắt relay để cắt hoàn toàn nguồn 5V của ESP32 #2 lúc <b>18:01</b> tối (tiết kiệm điện năng ắc quy ban đêm), tự đóng lại nguồn lúc <b>04:01</b> sáng.<br />
-                            • <b>TẮT</b>: Vô hiệu hóa tính năng ngắt đêm — ESP32 #2 sẽ luôn được cấp nguồn chạy <b>24/24</b> liên tục.
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true);
-                              setHwConfigFeedback('Đã BẬT tự động ngắt nguồn ESP2 ban đêm: Hệ thống sẽ tự ngắt lúc 18:01 và bật lại lúc 04:01!');
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
-                              latestTelemetry?.system?.esp2AutoCutoff !== false
-                                ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-blue-50 border-zinc-300'
-                            }`}
-                          >
-                            BẬT (Tự ngắt đêm 18h01)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false);
-                              setHwConfigFeedback('Đã TẮT tự động ngắt nguồn ESP2 ban đêm: ESP32 #2 sẽ luôn được cấp nguồn chạy 24/24!');
-                            }}
-                            className={`px-3 py-1.5 rounded-sm text-xs font-bold transition-colors cursor-pointer border ${
-                              latestTelemetry?.system?.esp2AutoCutoff === false
-                                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                                : 'bg-white text-zinc-700 hover:bg-amber-50 border-zinc-300'
-                            }`}
-                          >
-                            TẮT (Chạy 24/24)
-                          </button>
-                        </div>
+                    {/* 4. Tự ngắt nguồn ESP32 #2 ban đêm */}
+                    <div className="p-3 rounded-sm bg-white border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-900 block">
+                          4. Tự ngắt nguồn ESP32 #2 ban đêm
+                        </span>
+                        <HelpTip text="Bật: Tự động ngắt nguồn ESP32 #2 từ 18:01 tối đến 04:01 sáng để tiết kiệm ắc quy. Tắt: ESP32 #2 luôn được cấp nguồn hoạt động 24/24." />
+                        <span className="px-1.5 py-0.5 rounded-xs text-[10px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
+                          Nguồn ESP2: {latestTelemetry?.system?.esp2PowerOn !== false ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(true);
+                            setHwConfigFeedback('Đã BẬT tự động ngắt nguồn ESP2 ban đêm (18:01 – 04:01).');
+                          }}
+                          className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                            latestTelemetry?.system?.esp2AutoCutoff !== false
+                              ? 'bg-zinc-800 text-white border-zinc-800'
+                              : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                          }`}
+                        >
+                          Bật
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSetEsp2AutoCutoff && onSetEsp2AutoCutoff(false);
+                            setHwConfigFeedback('Đã TẮT tự động ngắt nguồn ESP2: Cấp nguồn 24/24.');
+                          }}
+                          className={`px-3 py-1.5 rounded-sm text-xs font-semibold border transition-colors cursor-pointer ${
+                            latestTelemetry?.system?.esp2AutoCutoff === false
+                              ? 'bg-zinc-800 text-white border-zinc-800'
+                              : 'bg-white text-zinc-700 hover:bg-zinc-50 border-zinc-300'
+                          }`}
+                        >
+                          Tắt
+                        </button>
                       </div>
                     </div>
                   </div>
