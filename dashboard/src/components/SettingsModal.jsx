@@ -41,8 +41,7 @@ export default function SettingsModal({
   onSetLampCustomCycle = null,
   onSetEsp2AutoCutoff = null
 }) {
-  const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'esp32_trk' | 'esp32_fix' | 'json'
-  const [copiedTab, setCopiedTab] = useState(null);
+  const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'data_history' | 'json'
   const [isExperimentLocked, setIsExperimentLocked] = useState(() => localStorage.getItem('solar_experiment_locked') === 'true');
   const [relaySecInput, setRelaySecInput] = useState(() => Number(latestTelemetry?.system?.relayIntervalSec || localStorage.getItem('solar_relay_interval_sec') || 10));
   const [lampOnMinInput, setLampOnMinInput] = useState(() => Number(latestTelemetry?.system?.lampOnMin || localStorage.getItem('solar_lamp_on_min') || 15));
@@ -136,185 +135,6 @@ export default function SettingsModal({
 
   if (!isOpen) return null;
 
-  const esp32TrackerCode = `// =========================================================================
-// ESP32-S3 #1: DUAL-AXIS SOLAR TRACKER (FUZZY-PID & PSO)
-// Arduino IDE Libraries:
-// 1. Firebase ESP Client by Mobizt
-// 2. Adafruit  INA226
-// 3. ArduinoJson
-// =========================================================================
-#include <WiFi.h>
-#include <Firebase_ESP_Client.h>
-#include <Adafruit_ INA226.h>
-#include <addons/TokenHelper.h>
-#include <addons/RTDBHelper.h>
-
-#define WIFI_SSID "YOUR_WIFI_NAME"
-#define WIFI_PASSWORD "YOUR_WIFI_PASS"
-
-#define API_KEY "${firebaseConfig.apiKey || 'YOUR_FIREBASE_API_KEY'}"
-#define DATABASE_URL "${firebaseConfig.databaseURL || 'https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app/'}"
-
-FirebaseData fbdo;
-FirebaseData fbdoStream;
-FirebaseAuth auth;
-FirebaseConfig config;
-Adafruit_ INA226  INA226_trk(0x40);
-
-#define LDR_TOP 4
-#define LDR_BOTTOM 5
-#define LDR_LEFT 6
-#define LDR_RIGHT 7
-
-float currentAzimuth = 140.0;
-float currentElevation = 45.0;
-float totalEnergyWh = 0.0;
-unsigned long lastSend = 0;
-String currentMode = "AUTO";
-
-void streamCallback(FirebaseStream data) {
-  if (data.dataType() == "string" || data.dataType() == "json") {
-    Serial.println("[Firebase Stream] Lenh dieu khien: " + data.stringData());
-  }
-}
-
-void streamTimeoutCallback(bool timeout) {
-  if (timeout) Serial.println("[Firebase Stream] Timeout, retrying...");
-}
-
-void setup() {
-  Serial.begin(115200);
-   INA226_trk.begin();
-
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\\nWiFi Connected! IP: " + WiFi.localIP().toString());
-
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-  config.signer.test_mode = true;
-
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
-
-  Firebase.RTDB.beginStream(&fbdoStream, "/solar/control");
-  Firebase.RTDB.setStreamCallback(&fbdoStream, streamCallback, streamTimeoutCallback);
-}
-
-void loop() {
-  if (millis() - lastSend > 1000) {
-    lastSend = millis();
-
-    float voltage =  INA226_trk.getBusVoltage_V();
-    float current =  INA226_trk.getCurrent_mA() / 1000.0;
-    float power = voltage * current;
-    totalEnergyWh += (power * (1.0 / 3600.0));
-
-    int ldrT = analogRead(LDR_TOP);
-    int ldrB = analogRead(LDR_BOTTOM);
-    int ldrL = analogRead(LDR_LEFT);
-    int ldrR = analogRead(LDR_RIGHT);
-
-    FirebaseJson json;
-    json.set("voltage", voltage);
-    json.set("current", current);
-    json.set("power", power);
-    json.set("dailyEnergy", totalEnergyWh / 1000.0);
-    json.set("azimuthAngle", currentAzimuth);
-    json.set("elevationAngle", currentElevation);
-    json.set("targetAzimuth", currentAzimuth + 0.5);
-    json.set("targetElevation", currentElevation + 0.3);
-    json.set("ldrTop", ldrT);
-    json.set("ldrBottom", ldrB);
-    json.set("ldrLeft", ldrL);
-    json.set("ldrRight", ldrR);
-    json.set("mode", currentMode);
-    json.set("status", "TRACKING_ACTIVE");
-    json.set("lastUpdate", (double)millis());
-
-    if (Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &json)) {
-      Serial.println("[ESP32-1] Sent tracking telemetry!");
-    } else {
-      Serial.println("[ESP32-1] Error: " + fbdo.errorReason());
-    }
-  }
-}`;
-
-  const esp32FixedCode = `// =========================================================================
-// ESP32-S3 #2: FIXED SOLAR PANEL (STATIC COMPARISON)
-// =========================================================================
-#include <WiFi.h>
-#include <Firebase_ESP_Client.h>
-#include <Adafruit_ INA226.h>
-
-#define WIFI_SSID "YOUR_WIFI_NAME"
-#define WIFI_PASSWORD "YOUR_WIFI_PASS"
-
-#define API_KEY "${firebaseConfig.apiKey || 'YOUR_FIREBASE_API_KEY'}"
-#define DATABASE_URL "${firebaseConfig.databaseURL || 'https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app/'}"
-
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
-Adafruit_ INA226  INA226_sta(0x41);
-
-float totalEnergyWh = 0.0;
-unsigned long lastSend = 0;
-
-void setup() {
-  Serial.begin(115200);
-   INA226_sta.begin();
-
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-  config.signer.test_mode = true;
-
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
-}
-
-void loop() {
-  if (millis() - lastSend > 1000) {
-    lastSend = millis();
-
-    float voltage =  INA226_sta.getBusVoltage_V();
-    float current =  INA226_sta.getCurrent_mA() / 1000.0;
-    float power = voltage * current;
-    totalEnergyWh += (power * (1.0 / 3600.0));
-
-    FirebaseJson json;
-    json.set("voltage", voltage);
-    json.set("current", current);
-    json.set("power", power);
-    json.set("dailyEnergy", totalEnergyWh / 1000.0);
-    json.set("fixedAzimuth", 180.0);
-    json.set("fixed_tilt_beta", 15.0);
-    json.set("fixed_elevation_eps", 75.0);
-    json.set("fixedElevation", 75.0);
-    json.set("lastUpdate", (double)millis());
-
-    if (Firebase.RTDB.updateNode(&fbdo, "/solar/static", &json)) {
-      Serial.println("[ESP32-2] Sent static panel data!");
-    }
-  }
-}`;
-
-  const handleCopyCode = (code, key) => {
-    navigator.clipboard.writeText(code);
-    setCopiedTab(key);
-    setTimeout(() => setCopiedTab(null), 2000);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
       <div className="bg-white border border-zinc-300 rounded-sm w-full max-w-3xl max-h-[92vh] flex flex-col shadow-sm text-zinc-900">
@@ -326,7 +146,7 @@ void loop() {
               Cấu hình hệ thống
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Nguồn dữ liệu, tọa độ trạm đo, quản lý người dùng và mã nhúng ESP32
+              Nguồn dữ liệu, tọa độ trạm đo, quản lý người dùng và cấu trúc dữ liệu
             </p>
           </div>
           <button
@@ -384,24 +204,6 @@ void loop() {
               )}
             </button>
           )}
-          <button
-            onClick={() => setActiveTab('esp32_trk')}
-            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'esp32_trk'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-              }`}
-          >
-            Code ESP32 tấm xoay
-          </button>
-          <button
-            onClick={() => setActiveTab('esp32_fix')}
-            className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'esp32_fix'
-                ? 'border-blue-700 text-blue-700 bg-white'
-                : 'border-transparent text-zinc-600 hover:text-zinc-900'
-              }`}
-          >
-            Code ESP32 tấm cố định
-          </button>
           <button
             onClick={() => setActiveTab('json')}
             className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'json'
@@ -1202,46 +1004,6 @@ void loop() {
                   })}
               </div>
 
-            </div>
-          )}
-
-          {/* TAB 4: ESP32-1 TRACKER CODE */}
-          {activeTab === 'esp32_trk' && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-zinc-700">
-                  Mã nguồn C++ cho ESP32-S3 tấm xoay:
-                </span>
-                <button
-                  onClick={() => handleCopyCode(esp32TrackerCode, 'trk')}
-                  className="px-3 py-1 rounded-sm bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-800 border border-zinc-300 cursor-pointer"
-                >
-                  {copiedTab === 'trk' ? 'Đã sao chép!' : 'Sao chép mã'}
-                </button>
-              </div>
-              <pre className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 text-xs font-mono text-zinc-800 overflow-x-auto max-h-[360px] leading-relaxed">
-                {esp32TrackerCode}
-              </pre>
-            </div>
-          )}
-
-          {/* TAB 5: ESP32-2 FIXED PANEL CODE */}
-          {activeTab === 'esp32_fix' && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-zinc-700">
-                  Mã nguồn C++ cho ESP32-S3 tấm cố định:
-                </span>
-                <button
-                  onClick={() => handleCopyCode(esp32FixedCode, 'fix')}
-                  className="px-3 py-1 rounded-sm bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-800 border border-zinc-300 cursor-pointer"
-                >
-                  {copiedTab === 'fix' ? 'Đã sao chép!' : 'Sao chép mã'}
-                </button>
-              </div>
-              <pre className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 text-xs font-mono text-zinc-800 overflow-x-auto max-h-[360px] leading-relaxed">
-                {esp32FixedCode}
-              </pre>
             </div>
           )}
 
