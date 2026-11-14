@@ -25,8 +25,9 @@
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
+#include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.7"
+#define CURRENT_FIRMWARE_VERSION "2.1.8"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -41,6 +42,9 @@
 #include <esp_sleep.h>
 #include <esp_task_wdt.h>
 
+// Giám sát sức khỏe truyền thông & Dual-Core Cross Watchdog
+volatile unsigned long lastCore0HeartbeatMs = 0;
+volatile unsigned long lastSuccessfulFbPushMs = 0;
 
 Preferences prefs;
 
@@ -2723,6 +2727,8 @@ void pushTelemetryToFirebase() {
       lastPushErrPrint = millis();
       Serial.printf(">> [FIREBASE PUSH ERR] %s (HTTP code: %d)\n", fbdo.errorReason().c_str(), fbdo.httpCode());
     }
+  } else {
+    lastSuccessfulFbPushMs = millis();
   }
 
   // Thu hoi bo nho dynamic memory ngay lap tuc, chong phan manh Heap cho TLS
@@ -3225,23 +3231,52 @@ void telemetryTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // 0. Tự động phục hồi kết nối WiFi ngầm thông minh mỗi 5 giây nếu bị rớt mạng
+    // Cập nhật nhịp tim Core 0 liên tục cho Core 1 giám sát (Dual-Core Watchdog)
+    lastCore0HeartbeatMs = now;
+
+    // 0. Tự động phục hồi kết nối WiFi ngầm thông minh (chống nghẽn Driver ESP-IDF)
     static unsigned long wifiDisconnectStartMs = 0;
-    if (now - lastWifiCheck >= 5000) {
-      lastWifiCheck = now;
-      if (WiFi.status() != WL_CONNECTED) {
-        if (wifiDisconnectStartMs == 0) wifiDisconnectStartMs = now;
-        if (now - wifiDisconnectStartMs < 15000) {
-          WiFi.reconnect();
-        } else {
-          // Mất mạng quá 15s: Tái tạo kết nối từ gốc (tránh kẹt ESP-IDF station state)
-          WiFi.disconnect(true);
-          delay(100);
-          WiFi.mode(WIFI_STA);
-          WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-        }
-      } else {
-        wifiDisconnectStartMs = 0;
+    static unsigned long lastWifiAttemptMs = 0;
+    if (WiFi.status() != WL_CONNECTED) {
+      if (wifiDisconnectStartMs == 0) wifiDisconnectStartMs = now;
+
+      // Nếu mất mạng liên tục quá 3 phút (180s) -> Tự động restart để làm sạch Wi-Fi Radio
+      if (now - wifiDisconnectStartMs > 180000UL) {
+        Serial.println("\n>> [WIFI FATAL] Mat ket noi WiFi qua 3 phut! Tu dong restart chip...");
+        delay(500);
+        ESP.restart();
+      }
+
+      // Thử kết nối lại với giãn cách an toàn tối thiểu 15 giây (chống spam WiFi.begin làm hỏng Driver)
+      if (now - lastWifiAttemptMs >= 15000) {
+        lastWifiAttemptMs = now;
+        Serial.println(">> [WIFI RECONNECT] Dang thu ket noi lai WiFi (an toan)...");
+        WiFi.disconnect(false);
+        delay(100);
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      }
+    } else {
+      wifiDisconnectStartMs = 0;
+    }
+
+    // Tự động khôi phục nếu Firebase mất kết nối quá 5 phút dù Wi-Fi vẫn báo connected
+    if (WiFi.status() == WL_CONNECTED) {
+      if (lastSuccessfulFbPushMs > 0 && (now - lastSuccessfulFbPushMs > 300000UL)) {
+        Serial.println("\n>> [FIREBASE FATAL] 5 phut lien tuc khong day duoc Telemetry len Firebase! Tu dong restart chip...");
+        delay(500);
+        ESP.restart();
+      }
+    }
+
+    // Giám sát phân mảnh bộ nhớ RAM Heap
+    static unsigned long lastHeapCheckMs = 0;
+    if (now - lastHeapCheckMs >= 30000) {
+      lastHeapCheckMs = now;
+      uint32_t largestBlock = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+      if (largestBlock < 12000 && largestBlock > 0) {
+        Serial.printf("\n>> [HEAP CRITICAL] RAM phan manh nang (khoi lon nhat: %u bytes < 12KB)! Tu dong restart...\n", largestBlock);
+        delay(500);
+        ESP.restart();
       }
     }
 
@@ -4948,6 +4983,33 @@ void handleCliCommand(const String &cmdStr) {
 void loop() {
   // 1. Reset Task Watchdog bảo vệ Core 1 (Mục 2)
   esp_task_wdt_reset();
+
+  // 1B. Giám sát Cross-Core Watchdog: Nếu Core 0 bị treo mạng / BearSSL > 90 giây mà không cập nhật heartbeat
+  if (lastCore0HeartbeatMs > 0 && (millis() - lastCore0HeartbeatMs > 90000UL)) {
+    Serial.println("\n>> [FATAL WATCHDOG] Core 0 (TelemetryTask) bi dong bang > 90s! Dang thuc hien Reset phan cung...");
+    delay(500);
+    ESP.restart();
+  }
+
+  // 1C. Khởi động bảo dưỡng định kỳ ban đêm (02:30 sáng khi hệ thống đang ngủ đông)
+  static bool maintenanceRebootDoneToday = false;
+  static unsigned long lastMaintenanceCheckMs = 0;
+  if (millis() - lastMaintenanceCheckMs >= 10000) {
+    lastMaintenanceCheckMs = millis();
+    int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+    float curT = 0.0f;
+    if (readDS3231(curY, curM, curD, curH, curMin, curS, curT)) {
+      if (curH == 2 && curMin == 30 && !maintenanceRebootDoneToday &&
+          (systemFsmState == FSM_STATE_PREP_SLEEP || systemFsmState == FSM_STATE_LIGHT_SLEEP)) {
+        maintenanceRebootDoneToday = true;
+        Serial.println("\n>> [NIGHTLY MAINTENANCE] Khoi dong bao duong 02:30 sang lam sach RAM va Socket...");
+        delay(500);
+        ESP.restart();
+      } else if (curH != 2) {
+        maintenanceRebootDoneToday = false;
+      }
+    }
+  }
 
   // 2. Giám sát phát hiện kẹt động cơ & mất nguồn 24V (Mục 8)
   checkStallProtection();
