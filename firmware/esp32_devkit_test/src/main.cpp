@@ -27,7 +27,7 @@
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.8"
+#define CURRENT_FIRMWARE_VERSION "2.1.9"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -1494,10 +1494,21 @@ void moveToAfternoonHoldPosition() {
 // -------------------------------------------------------------------------
 void applyEsp2Power(bool powerOn) {
   esp2PowerOn = powerOn;
-  // Module Relay Active LOW + Tiếp điểm NC (Normally Closed):
-  //   - powerOn = true  -> Xuất HIGH -> Relay F nhả -> Tiếp điểm NC đóng -> Cấp nguồn ESP2 (0W cuộn hút ban ngày)
-  //   - powerOn = false -> Xuất LOW  -> Relay F hút -> Tiếp điểm NC hở   -> Ngắt nguồn ESP2 an toàn
-  digitalWrite(PIN_RELAY_ESP2_PWR, powerOn ? HIGH : LOW);
+  pinMode(PIN_RELAY_ESP2_PWR, OUTPUT);
+  // Giải pháp 2: Tăng cường độ khóa Mass cực đại (40mA) cho GPIO 5 chống sụt áp / trôi áp
+  gpio_set_drive_capability((gpio_num_t)PIN_RELAY_ESP2_PWR, GPIO_DRIVE_CAP_3);
+  
+  if (powerOn) {
+    gpio_pulldown_dis((gpio_num_t)PIN_RELAY_ESP2_PWR);
+    gpio_pullup_en((gpio_num_t)PIN_RELAY_ESP2_PWR);
+    digitalWrite(PIN_RELAY_ESP2_PWR, HIGH);
+    gpio_set_level((gpio_num_t)PIN_RELAY_ESP2_PWR, 1);
+  } else {
+    gpio_pullup_dis((gpio_num_t)PIN_RELAY_ESP2_PWR);
+    gpio_pulldown_en((gpio_num_t)PIN_RELAY_ESP2_PWR); // Khóa kéo cứng xuống Mass chống nhả relay khi sụt dòng
+    digitalWrite(PIN_RELAY_ESP2_PWR, LOW);
+    gpio_set_level((gpio_num_t)PIN_RELAY_ESP2_PWR, 0);
+  }
 }
 
 void updateEsp2PowerBySchedule(bool forceLog) {
@@ -4415,6 +4426,7 @@ void setup() {
   Serial.flush();
   delay(150);
   WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_15dBm); // Giảm đỉnh xung phát Wi-Fi xuống ~200mA (chống sụt áp cho Relay GPIO 5)
   delay(100);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
