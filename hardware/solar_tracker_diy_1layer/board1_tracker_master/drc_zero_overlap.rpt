@@ -1,0 +1,26 @@
+** Drc report for board1_tracker_master.kicad_pcb **
+** Created on 2026-11-14T14:17:29 **
+** Report includes: Errors, Warnings **
+
+** Found 2 DRC violations **
+[starved_thermal]: Thermal relief connection to zone incomplete (layer B.Cu; 1 spokes connected to isolated island)
+    Local override; error
+    @(10.0000 mm, 10.0000 mm): Zone [/GND] on B.Cu, priority 0
+    @(90.5000 mm, 145.0000 mm): PTH pad 2 [/GND] of J_TEMT_EXT1
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(100.0000 mm, 15.0000 mm): Circle on Edge.Cuts
+    @(101.5000 mm, 10.2500 mm): Rectangle of U_LM2596_ESP1 on F.Silkscreen
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

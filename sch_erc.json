@@ -1,0 +1,1342 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-11T23:12:51",
+    "ignored_checks": [
+        {
+            "description": "Global label only appears once in the schematic",
+            "key": "single_global_label"
+        },
+        {
+            "description": "Four connection points are joined together",
+            "key": "four_way_junction"
+        },
+        {
+            "description": "SPICE model issue",
+            "key": "simulation_model_issue"
+        },
+        {
+            "description": "Assigned footprint doesn't match footprint filters",
+            "key": "footprint_filter"
+        }
+    ],
+    "included_severities": [
+        "error",
+        "warning"
+    ],
+    "kicad_version": "10.0.8",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/a2ecf7ae-228c-47ea-a7ac-41653e2eef7c",
+            "violations": [
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_PWR_GRID12V1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 30.0
+                            },
+                            "uuid": "4fd16a5f-6234-456d-a99f-b661d0179c79"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_PWR_BAT12V1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 50.0
+                            },
+                            "uuid": "85f220ec-f56d-48c9-a976-863ce89251d2"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol U_MINI560 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 77.46
+                            },
+                            "uuid": "6750de30-4985-418b-8735-589eafd7ca12"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 112.46
+                            },
+                            "uuid": "d611d5a0-8529-496e-b974-5fbade24279f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP2 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 152.54
+                            },
+                            "uuid": "5da50158-8866-4e24-ab20-8e841142b758"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_M1_AZ1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 192.54
+                            },
+                            "uuid": "dc29c25d-ee60-4329-bf1d-62dbd6d967eb"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_M2_EL1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 217.46
+                            },
+                            "uuid": "099c7fb2-ea30-416a-b971-3f3cb78c7d1f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ENC1_AZ1 Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 250.0
+                            },
+                            "uuid": "44c31c64-7586-4fdb-a7ac-8eb49b67b15c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ENC2_EL1 Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 280.0
+                            },
+                            "uuid": "5640e4a1-6789-4c3e-af15-a247751003c0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_SW1 Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 312.54
+                            },
+                            "uuid": "48cf5648-e566-4efc-9b3d-6d1182b51706"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_SW2 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 34.92,
+                                "y": 330.0
+                            },
+                            "uuid": "de7c74a8-af7e-4ccb-b907-8c89cc2b6224"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_PWR_GRID12V1 [Conn_01x02]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 30.0
+                            },
+                            "uuid": "a9ed551d-01b5-477b-95ef-90d9b0c23696"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_PWR_BAT12V1 [Conn_01x02]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 50.0
+                            },
+                            "uuid": "08d79cc2-a5c0-49ba-8474-b1ec34f11797"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol U_MINI560 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 80.0
+                            },
+                            "uuid": "289489ec-60f8-458f-a7c5-0c7ab17d158e"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol U_MINI560 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 80.0
+                            },
+                            "uuid": "289489ec-60f8-458f-a7c5-0c7ab17d158e"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 115.0
+                            },
+                            "uuid": "cd263565-4d73-4b6a-94c0-8995b02fdfd6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 115.0
+                            },
+                            "uuid": "cd263565-4d73-4b6a-94c0-8995b02fdfd6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP2 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 150.0
+                            },
+                            "uuid": "0d1a7ef6-2ba2-48f7-9235-4664dbab1666"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol U_LM2596_ESP2 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 150.0
+                            },
+                            "uuid": "0d1a7ef6-2ba2-48f7-9235-4664dbab1666"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_M1_AZ1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 190.0
+                            },
+                            "uuid": "3b278c9e-3686-4d03-be52-5c22d5215f25"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_M2_EL1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 220.0
+                            },
+                            "uuid": "ea6b9285-94e6-4724-9de9-6b63d45effae"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ENC1_AZ1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 250.0
+                            },
+                            "uuid": "02fafebd-b2b9-4107-86d5-99e4db36a23f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ENC2_EL1 [Conn_01x04]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 280.0
+                            },
+                            "uuid": "437ef181-035a-4f3c-874d-0a9c05da629f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_SW1 [Conn_01x02]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 310.0
+                            },
+                            "uuid": "aa205c9e-67cc-4b0d-8cdc-7cee847a052b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_SW2 [Conn_01x02]",
+                            "pos": {
+                                "x": 40.0,
+                                "y": 330.0
+                            },
+                            "uuid": "dd54a297-3bb1-48dd-b124-5bb89f510f26"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC1_A1 Pin 1 [Passive, Line]",
+                            "pos": {
+                                "x": 90.0,
+                                "y": 246.19
+                            },
+                            "uuid": "5a58abc5-c060-4b09-ab09-7fb5b2d8466e"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC1_A1 [R]",
+                            "pos": {
+                                "x": 90.0,
+                                "y": 250.0
+                            },
+                            "uuid": "f79fc092-5c22-4da2-bf72-fefbe862de71"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC2_A1 [R]",
+                            "pos": {
+                                "x": 90.0,
+                                "y": 280.0
+                            },
+                            "uuid": "e550b3b6-ffd8-4ac1-ac85-7b6678a17184"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC2_A1 Pin 2 [Passive, Line]",
+                            "pos": {
+                                "x": 90.0,
+                                "y": 283.81
+                            },
+                            "uuid": "c00ceee3-e3d0-45c0-a2d5-0dc4b4a875d6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC1_B1 [R]",
+                            "pos": {
+                                "x": 98.0,
+                                "y": 250.0
+                            },
+                            "uuid": "88e01076-8c56-4739-aa35-b2f0c9f3b356"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC1_B1 Pin 2 [Passive, Line]",
+                            "pos": {
+                                "x": 98.0,
+                                "y": 253.81
+                            },
+                            "uuid": "d8619d40-7cd5-44c5-9903-31cec6d31869"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC2_B1 Pin 1 [Passive, Line]",
+                            "pos": {
+                                "x": 98.0,
+                                "y": 276.19
+                            },
+                            "uuid": "8b5b4583-3dd1-4143-9523-5fb580018902"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_ENC2_B1 [R]",
+                            "pos": {
+                                "x": 98.0,
+                                "y": 280.0
+                            },
+                            "uuid": "f29a0809-6607-4837-97b3-65b5984ffab6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "Label 'RESET_1'",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 79.68
+                            },
+                            "uuid": "f0e7ccf4-85c3-495f-832f-7bfd72a002f7"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP1_L1 Pin 13 [Pin_13, Passive, Line]",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 105.08
+                            },
+                            "uuid": "777398da-a056-40de-8c4c-4ee41ea340c3"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA1_TRK1 Pin 7 [Pin_7, Passive, Line]",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 192.62
+                            },
+                            "uuid": "19d456a0-547b-4402-b9e1-341994761d5d"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA2_STA1 Pin 5 [Pin_5, Passive, Line]",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 217.54
+                            },
+                            "uuid": "b2872168-e287-4248-9db5-d49700b7f5e6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_RTC1 Pin 5 [Pin_5, Passive, Line]",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 255.08
+                            },
+                            "uuid": "f35ea113-0d6c-4dad-9095-75fc1cc7d267"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMT_EXT1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 114.92,
+                                "y": 285.0
+                            },
+                            "uuid": "edf2b2bb-9d22-43bb-898f-b1693a802d39"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP1_L1 [Conn_01x22]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 100.0
+                            },
+                            "uuid": "c12d489e-bd9f-47a4-a524-f33c639bc283"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA1_TRK1 [Conn_01x08]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 185.0
+                            },
+                            "uuid": "584510dc-53c7-4fd0-9a5f-a99daeb004d1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x08' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA1_TRK1 [Conn_01x08]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 185.0
+                            },
+                            "uuid": "584510dc-53c7-4fd0-9a5f-a99daeb004d1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA2_STA1 [Conn_01x08]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 215.0
+                            },
+                            "uuid": "eb0df0e5-1936-4d25-a161-52e86d3ad5e1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x08' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_INA2_STA1 [Conn_01x08]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 215.0
+                            },
+                            "uuid": "eb0df0e5-1936-4d25-a161-52e86d3ad5e1"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_RTC1 [Conn_01x06]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 250.0
+                            },
+                            "uuid": "a38b9efc-6294-4c45-ad2f-a740d1d53683"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x06' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_RTC1 [Conn_01x06]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 250.0
+                            },
+                            "uuid": "a38b9efc-6294-4c45-ad2f-a740d1d53683"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x06' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMT_EXT1 [Conn_01x06]",
+                            "pos": {
+                                "x": 120.0,
+                                "y": 285.0
+                            },
+                            "uuid": "ba5a073b-2299-45d7-9cb7-fe22a75c0047"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP1_R1 Pin 12 [Pin_12, Passive, Line]",
+                            "pos": {
+                                "x": 164.92,
+                                "y": 102.54
+                            },
+                            "uuid": "685a5967-01e6-4ca8-8497-cdfd6c316371"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP1_R1 [Conn_01x22]",
+                            "pos": {
+                                "x": 170.0,
+                                "y": 100.0
+                            },
+                            "uuid": "c0969f80-a97b-4c6f-b726-982d71eea84b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "Label 'RESET_2'",
+                            "pos": {
+                                "x": 224.92,
+                                "y": 79.68
+                            },
+                            "uuid": "579f50fe-1a2e-4a9a-9efa-9075e2271a67"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP2_L1 Pin 4 [Pin_4, Passive, Line]",
+                            "pos": {
+                                "x": 224.92,
+                                "y": 82.22
+                            },
+                            "uuid": "3db507fb-1a67-4911-a784-cc34d745c763"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP2_L1 [Conn_01x22]",
+                            "pos": {
+                                "x": 230.0,
+                                "y": 100.0
+                            },
+                            "uuid": "860a29d0-7325-4be1-9a0d-38ebb3b0347c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP2_R1 Pin 22 [Pin_22, Passive, Line]",
+                            "pos": {
+                                "x": 274.92,
+                                "y": 127.94
+                            },
+                            "uuid": "87d56c9e-4dc8-404a-b140-8a651202a8f2"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ESP2_R1 [Conn_01x22]",
+                            "pos": {
+                                "x": 280.0,
+                                "y": 100.0
+                            },
+                            "uuid": "fcb013b1-dafb-4c81-8037-cde4be880e23"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_RELAY_CTRL1 Pin 5 [Pin_5, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 52.54
+                            },
+                            "uuid": "fc2c63ae-0f89-4dfd-8d83-7ea65d9fdcd6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_RL6_ESP2_PWR Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 87.54
+                            },
+                            "uuid": "562928dd-3344-46c5-b7ee-de307b756c9f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS1_TRK1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 123.81
+                            },
+                            "uuid": "1675421b-62c2-41e8-b3eb-649a12cfaf95"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS2_STA1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 148.81
+                            },
+                            "uuid": "1a92440d-0aca-4f11-bb3b-f6f2a494e5ae"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ1_TRK1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 178.81
+                            },
+                            "uuid": "7cdc3040-6c19-41e7-8515-ff83fa358283"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ2_STA1 Pin 3 [Pin_3, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 198.81
+                            },
+                            "uuid": "28084eb7-9c85-4857-9161-e3a9c241b543"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_PV_TRK_IN1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 220.0
+                            },
+                            "uuid": "7624f991-7acf-4a9b-8f0a-621fd0cad7ba"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "Label 'PV_TRK_PLUS'",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 220.0
+                            },
+                            "uuid": "e40c0d45-d0cc-4c3b-880d-70bd75ffe1f6"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMP_TRK1 Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 246.27
+                            },
+                            "uuid": "237de462-dda8-4b39-8c9e-33e754ac1ca0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_PV_STA_IN1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 275.0
+                            },
+                            "uuid": "9a3b20a0-bc5d-4da1-a88c-06cd1b5f001f"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "Label 'PV_STA_PLUS'",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 275.0
+                            },
+                            "uuid": "a07f3df0-932c-4816-a82f-742e16ec6279"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMP_STA1 Pin 2 [Pin_2, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 301.27
+                            },
+                            "uuid": "48f32730-ac67-4811-9425-d00b3d415951"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol J_LAMP12V_OUT1 Pin 1 [Pin_1, Passive, Line]",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 330.0
+                            },
+                            "uuid": "61813b68-f2da-42fe-a005-15b91f7fd372"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Label connected to only one pin",
+                    "items": [
+                        {
+                            "description": "Label '+12V_LAMP'",
+                            "pos": {
+                                "x": 334.92,
+                                "y": 330.0
+                            },
+                            "uuid": "612d3fb1-2227-4e4c-bbbc-bcf9785cd4b5"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "isolated_pin_label"
+                },
+                {
+                    "description": "Symbol 'Conn_01x08' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_RELAY_CTRL1 [Conn_01x08]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 50.0
+                            },
+                            "uuid": "385a710b-3d23-45ec-bc99-240bc5175d4a"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_RL6_ESP2_PWR [Conn_01x02]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 85.0
+                            },
+                            "uuid": "3abfd6f1-c499-4ca6-acee-0296c0afc39e"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS1_TRK1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 120.0
+                            },
+                            "uuid": "44b69fe5-8b20-427a-bfdc-f46019e6dc3c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS1_TRK1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 120.0
+                            },
+                            "uuid": "44b69fe5-8b20-427a-bfdc-f46019e6dc3c"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS2_STA1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 145.0
+                            },
+                            "uuid": "460755de-8490-4187-9d0b-e894b495a78b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_ACS2_STA1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 145.0
+                            },
+                            "uuid": "460755de-8490-4187-9d0b-e894b495a78b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ1_TRK1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 175.0
+                            },
+                            "uuid": "55f70dc7-0ee1-4971-8763-5376d518a5bc"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ1_TRK1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 175.0
+                            },
+                            "uuid": "55f70dc7-0ee1-4971-8763-5376d518a5bc"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "The current configuration does not include the footprint library 'custom_footprints'",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ2_STA1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 195.0
+                            },
+                            "uuid": "1102cc23-c92a-461c-b2a6-edf126f4c878"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "footprint_link_issues"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_FZ2_STA1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 195.0
+                            },
+                            "uuid": "1102cc23-c92a-461c-b2a6-edf126f4c878"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_PV_TRK_IN1 [Conn_01x02]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 220.0
+                            },
+                            "uuid": "c16e0a8e-4770-4261-8fec-1b6dfb9c4ba0"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMP_TRK1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 245.0
+                            },
+                            "uuid": "11631839-9ba4-486d-a8a6-12614f252e22"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_PV_STA_IN1 [Conn_01x02]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 275.0
+                            },
+                            "uuid": "03c91d02-e26a-4175-99db-7752aa7baf3b"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_TEMP_STA1 [Conn_01x03]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 300.0
+                            },
+                            "uuid": "963c2455-a13a-44ab-8d85-3db5e9a146ec"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'",
+                    "items": [
+                        {
+                            "description": "Symbol J_LAMP12V_OUT1 [Conn_01x02]",
+                            "pos": {
+                                "x": 340.0,
+                                "y": 330.0
+                            },
+                            "uuid": "ea0515b5-a91e-4b83-b14b-5d41d71a9d44"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_TEMP_TRK1 [R]",
+                            "pos": {
+                                "x": 365.0,
+                                "y": 245.0
+                            },
+                            "uuid": "c78a10f1-4073-4dd3-9fe2-2d3c86a44381"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_TEMP_TRK1 Pin 2 [Passive, Line]",
+                            "pos": {
+                                "x": 365.0,
+                                "y": 248.81
+                            },
+                            "uuid": "0b552a66-b4e3-44ce-bca5-978236899c11"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                },
+                {
+                    "description": "Symbol 'R' doesn't match copy in library 'Device'",
+                    "items": [
+                        {
+                            "description": "Symbol R_TEMP_STA1 [R]",
+                            "pos": {
+                                "x": 365.0,
+                                "y": 300.0
+                            },
+                            "uuid": "d55cdf2d-b4e4-4852-829b-df1a1e1b06f8"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol pin or wire end off connection grid",
+                    "items": [
+                        {
+                            "description": "Symbol R_TEMP_STA1 Pin 2 [Passive, Line]",
+                            "pos": {
+                                "x": 365.0,
+                                "y": 303.81
+                            },
+                            "uuid": "1d1a654f-633a-4b57-9895-1726a3b46218"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "endpoint_off_grid"
+                }
+            ]
+        }
+    ],
+    "source": "solar_tracker_mainboard.kicad_sch"
+}

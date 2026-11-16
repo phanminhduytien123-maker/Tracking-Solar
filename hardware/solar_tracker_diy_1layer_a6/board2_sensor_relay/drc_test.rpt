@@ -1,0 +1,346 @@
+** Drc report for board2_sensor_relay.kicad_pcb **
+** Created on 2026-11-14T17:44:54 **
+** Report includes: Errors, Warnings **
+
+** Found 85 DRC violations **
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(48.0000 mm, 71.0000 mm): Track [/+3.3V_ESP2] on F.Cu, length 47.6200 mm
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(48.0000 mm, 71.0000 mm): Track [/+3.3V_ESP2] on F.Cu, length 47.6200 mm
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(88.0000 mm, 68.0000 mm): Track [/TEMP_TRK] on B.Cu, length 36.0000 mm
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(88.0000 mm, 68.0000 mm): Track [/TEMP_TRK] on B.Cu, length 36.0000 mm
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(52.0000 mm, 68.0000 mm): Track [/TEMP_TRK] on B.Cu, length 23.7800 mm
+[items_not_allowed]: Items not allowed
+    Local override; error
+    @(52.0000 mm, 68.0000 mm): Track [/TEMP_TRK] on B.Cu, length 23.7800 mm
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.0000 mm)
+    Rule: board setup constraints hole; error
+    @(28.0000 mm, 16.0000 mm): Track [/+12V_BAT] on F.Cu, length 60.0000 mm
+    @(30.7500 mm, 17.0000 mm): NPTH pad of U_LM2596_ESP2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(22.0000 mm, 88.0000 mm): Footprint J_ACS2_STA1
+    @(22.0000 mm, 60.0000 mm): Footprint J_ACS1_TRK1
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(98.0000 mm, 78.0000 mm): Footprint J_TEMP_TRK1
+    @(88.0000 mm, 78.0000 mm): Footprint R_TEMP_TRK1
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(95.6200 mm, 78.0000 mm): PTH pad 2 [/+3.3V_ESP2] of R_TEMP_TRK1
+    @(98.0000 mm, 78.0000 mm): Footprint J_TEMP_TRK1
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(60.0000 mm, 32.0000 mm): Footprint U_LM2596_ESP2
+    @(22.0000 mm, 60.0000 mm): Footprint J_ACS1_TRK1
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(10.0000 mm, 162.0000 mm): Segment on Edge.Cuts
+    @(20.0000 mm, 30.2400 mm): Track [/+3.3V_ESP1] on F.Cu, length 10.0000 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(10.0000 mm, 162.0000 mm): Segment on Edge.Cuts
+    @(10.0000 mm, 158.5000 mm): Track [/+3.3V_ESP1] on F.Cu, length 56.0000 mm
+[copper_edge_clearance]: Board edge clearance violation (board setup constraints edge clearance 0.5000 mm; actual 0.0000 mm)
+    Rule: board setup constraints edge; error
+    @(10.0000 mm, 162.0000 mm): Segment on Edge.Cuts
+    @(10.0000 mm, 30.2400 mm): Track [/+3.3V_ESP1] on F.Cu, length 128.2600 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(76.0000 mm, 131.7800 mm): Track [/GND] on F.Cu, length 1.6267 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(28.0000 mm, 16.0000 mm): Track [/+12V_BAT] on F.Cu, length 60.0000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(86.0000 mm, 114.0000 mm): Track [/RL_CUT_38] on B.Cu, length 12.0000 mm
+[track_dangling]: Track has unconnected end
+    Local override; warning
+    @(86.0000 mm, 116.5400 mm): Track [/RL_B_ISC] on B.Cu, length 12.0000 mm
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(10.0000 mm, 162.0000 mm): Segment on Edge.Cuts
+    @(14.0000 mm, 30.0000 mm): PCB text 'G 12V CUT 3V3' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(10.0000 mm, 162.0000 mm): Segment on Edge.Cuts
+    @(20.0000 mm, 159.0000 mm): PCB text 'B2 - SENSOR & RELAY (A6 1-LAYER)' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.0000 mm, 15.0000 mm): Circle on Edge.Cuts
+    @(15.2800 mm, 14.7000 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.0000 mm, 15.0000 mm): Circle on Edge.Cuts
+    @(15.2800 mm, 32.9000 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(15.0000 mm, 15.0000 mm): Circle on Edge.Cuts
+    @(15.9000 mm, 12.3400 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(14.0000 mm, 30.0000 mm): PCB text 'G 12V CUT 3V3' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7500 mm)
+    Rule: board setup constraints silk text height; warning
+    @(105.0000 mm, 28.0000 mm): PCB text 'PRE NC JD' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.5000 mm, 103.5000 mm): Rectangle of J_FZ1_TRK1 on F.Silkscreen
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.5000 mm, 129.5000 mm): Rectangle of J_FZ2_STA1 on F.Silkscreen
+    @(33.0000 mm, 132.0000 mm): PCB text '10k/15k + 104' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.5000 mm, 103.5000 mm): Rectangle of J_FZ1_TRK1 on F.Silkscreen
+    @(33.0000 mm, 106.0000 mm): PCB text '10k/15k + 104' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(105.3200 mm, 25.3400 mm): Segment of J_RELAY_PWR on F.Silkscreen
+    @(105.0000 mm, 28.0000 mm): PCB text 'PRE NC JD' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(106.3200 mm, 33.0800 mm): Reference field of J_RELAY_PWR
+    @(105.0000 mm, 28.0000 mm): PCB text 'PRE NC JD' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(28.2500 mm, 14.5000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(60.0000 mm, 14.0000 mm): PCB text 'LM2596 #2: 12V BAT -> 5V ESP2' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(102.3000 mm, 25.3400 mm): Segment of J_RELAY_PWR on F.Silkscreen
+    @(105.0000 mm, 28.0000 mm): PCB text 'PRE NC JD' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.6800 mm, 57.4600 mm): Reference field of J_PV_TRK_IN1
+    @(92.0000 mm, 60.0000 mm): PCB text 'PV+ PV-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(98.0000 mm, 53.0000 mm): PCB text 'PV TRK IN' on F.Silkscreen
+    @(95.7000 mm, 62.6600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(98.0000 mm, 53.0000 mm): PCB text 'PV TRK IN' on F.Silkscreen
+    @(100.6000 mm, 62.6600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 62.6600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+    @(92.0000 mm, 60.0000 mm): PCB text 'PV+ PV-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.5000 mm, 44.5000 mm): Rectangle of J_ACS1_TRK1 on F.Silkscreen
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(33.0000 mm, 50.0000 mm): PCB text '10k/20k + 104' on F.Silkscreen
+    @(28.2500 mm, 14.5000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(48.0000 mm, 71.2300 mm): Reference field of J_ESP2_L1
+    @(60.7000 mm, 72.0000 mm): PCB text 'ESP32 SENSOR NODE' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(33.0000 mm, 50.0000 mm): PCB text '10k/20k + 104' on F.Silkscreen
+    @(15.5000 mm, 44.5000 mm): Rectangle of J_ACS1_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.5000 mm, 44.5000 mm): Rectangle of J_ACS1_TRK1 on F.Silkscreen
+    @(28.2500 mm, 14.5000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(93.2800 mm, 107.3400 mm): Segment of J_TEMP_STA1 on F.Silkscreen
+    @(98.0000 mm, 107.0000 mm): PCB text 'DS18B20 STA' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(93.2800 mm, 109.7000 mm): Segment of J_TEMP_STA1 on F.Silkscreen
+    @(98.0000 mm, 107.0000 mm): PCB text 'DS18B20 STA' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.4000 mm, 107.3400 mm): Segment of J_TEMP_STA1 on F.Silkscreen
+    @(98.0000 mm, 107.0000 mm): PCB text 'DS18B20 STA' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.7000 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(98.0000 mm, 72.0000 mm): PCB text 'DS18B20 TRK' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(98.0000 mm, 72.0000 mm): PCB text 'DS18B20 TRK' on F.Silkscreen
+    @(100.6000 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(102.1000 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(98.0000 mm, 72.0000 mm): PCB text 'DS18B20 TRK' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(102.7200 mm, 65.1800 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(98.0000 mm, 72.0000 mm): PCB text 'DS18B20 TRK' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.8100 mm, 75.6300 mm): Reference field of R_TEMP_TRK1
+    @(92.6800 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(88.5400 mm, 76.6300 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+    @(92.6800 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(88.5400 mm, 79.3700 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.7000 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(91.8100 mm, 75.6300 mm): Reference field of R_TEMP_TRK1
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.6800 mm, 93.4600 mm): Reference field of J_PV_STA_IN1
+    @(92.0000 mm, 96.0000 mm): PCB text 'PV+ PV-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(98.0000 mm, 89.0000 mm): PCB text 'PV STA IN' on F.Silkscreen
+    @(95.7000 mm, 98.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(100.6000 mm, 98.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+    @(98.0000 mm, 89.0000 mm): PCB text 'PV STA IN' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.0000 mm, 96.0000 mm): PCB text 'PV+ PV-' on F.Silkscreen
+    @(92.6800 mm, 98.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.8100 mm, 75.6300 mm): Reference field of R_TEMP_TRK1
+    @(91.6800 mm, 72.9200 mm): Reference field of J_TEMP_TRK1
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(88.5400 mm, 76.6300 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+    @(91.6800 mm, 72.9200 mm): Reference field of J_TEMP_TRK1
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(63.6300 mm, 153.9700 mm): Reference field of R_RL6_PU1
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(64.6300 mm, 157.2400 mm): Segment of R_RL6_PU1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(72.6200 mm, 141.2700 mm): Segment of J_RELAY_CTRL1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(75.3800 mm, 141.2700 mm): Segment of J_RELAY_CTRL1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(72.0700 mm, 75.2700 mm): Segment of J_ESP2_R1 on F.Silkscreen
+    @(76.0000 mm, 105.0000 mm): PCB text 'ULN2003A (ANTI-LEAK)' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(76.0000 mm, 105.0000 mm): PCB text 'ULN2003A (ANTI-LEAK)' on F.Silkscreen
+    @(74.7300 mm, 75.2700 mm): Segment of J_ESP2_R1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(67.3700 mm, 157.2400 mm): Segment of R_RL6_PU1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.6800 mm, 131.4600 mm): Reference field of J_LAMP12V_OUT1
+    @(92.0000 mm, 134.0000 mm): PCB text '12V+ 12V-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.7000 mm, 136.6600 mm): Segment of J_LAMP12V_OUT1 on F.Silkscreen
+    @(92.0000 mm, 134.0000 mm): PCB text '12V+ 12V-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.7000 mm, 136.6600 mm): Segment of J_LAMP12V_OUT1 on F.Silkscreen
+    @(98.0000 mm, 127.0000 mm): PCB text 'DEN 12V' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 136.6600 mm): Segment of J_LAMP12V_OUT1 on F.Silkscreen
+    @(92.0000 mm, 134.0000 mm): PCB text '12V+ 12V-' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(100.6000 mm, 136.6600 mm): Segment of J_LAMP12V_OUT1 on F.Silkscreen
+    @(98.0000 mm, 127.0000 mm): PCB text 'DEN 12V' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(15.2800 mm, 32.9000 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+    @(14.0000 mm, 30.0000 mm): PCB text 'G 12V CUT 3V3' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(14.0000 mm, 30.0000 mm): PCB text 'G 12V CUT 3V3' on F.Silkscreen
+    @(17.4000 mm, 12.3400 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(20.0000 mm, 18.0000 mm): PCB text 'BUS IN (B1)' on F.Silkscreen
+    @(15.9000 mm, 12.3400 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(20.0000 mm, 18.0000 mm): PCB text 'BUS IN (B1)' on F.Silkscreen
+    @(17.4000 mm, 12.3400 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(22.3000 mm, 12.3400 mm): Segment of J_BUS_LINK2 on F.Silkscreen
+    @(20.0000 mm, 18.0000 mm): PCB text 'BUS IN (B1)' on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(33.0000 mm, 78.0000 mm): PCB text '10k/20k + 104' on F.Silkscreen
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(73.4000 mm, 71.2300 mm): Reference field of J_ESP2_R1
+    @(60.7000 mm, 72.0000 mm): PCB text 'ESP32 SENSOR NODE' on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+    @(19.4600 mm, 72.0000 mm): PTH pad 1 [/+5V_ESP2] of J_ACS1_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+    @(22.0000 mm, 72.0000 mm): PTH pad 2 [/RAW_ISC_TRK] of J_ACS1_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(15.5000 mm, 72.5000 mm): Rectangle of J_ACS2_STA1 on F.Silkscreen
+    @(24.5400 mm, 72.0000 mm): PTH pad 3 [/GND] of J_ACS1_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(98.0000 mm, 72.0000 mm): PCB text 'DS18B20 TRK' on F.Silkscreen
+    @(98.0000 mm, 72.9200 mm): PTH pad 2 [/TEMP_TRK] of J_TEMP_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(95.7000 mm, 80.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(95.6200 mm, 78.0000 mm): PTH pad 2 [/+3.3V_ESP2] of R_TEMP_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(76.0000 mm, 105.0000 mm): PCB text 'ULN2003A (ANTI-LEAK)' on F.Silkscreen
+    @(73.4000 mm, 104.4800 mm): PTH pad 13 [unconnected-(J_ESP2_R1-Pin_13-Pad13] of J_ESP2_R1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(74.0000 mm, 152.7000 mm): PTH pad 6 [/RL_DRV_IN5] of J_RELAY_CTRL1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(74.0000 mm, 154.0000 mm): PCB text 'REMOVE VCC-JD-VCC JUMPER!' on F.Silkscreen
+    @(74.0000 mm, 155.2400 mm): PTH pad 7 [/ESP1_CUT_ESP2] of J_RELAY_CTRL1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

@@ -34,3 +34,4 @@ with urllib.request.urlopen(req, timeout=60) as resp:
 # Save URL to a file
 with open('scratch/fota_url_v217.txt', 'w') as f:
     f.write(url)
+

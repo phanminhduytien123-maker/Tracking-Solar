@@ -128,7 +128,7 @@ def add_styled_table(doc, caption_text, headers, rows_data):
     return tbl
 
 def add_heading_2(doc, text):
-    p = doc.add_paragraph(text, style='Heading 2')
+    p = doc.add_paragraph(text.strip(), style='Heading 2')
     p.paragraph_format.space_before = Pt(14)
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.line_spacing = 1.5
@@ -142,7 +142,7 @@ def add_heading_2(doc, text):
     return p
 
 def add_heading_3(doc, text):
-    p = doc.add_paragraph(text, style='Heading 3')
+    p = doc.add_paragraph(text.strip(), style='Heading 3')
     p.paragraph_format.space_before = Pt(10)
     p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.line_spacing = 1.5
@@ -155,7 +155,7 @@ def add_heading_3(doc, text):
     return p
 
 def add_heading_4(doc, text):
-    p = doc.add_paragraph(text, style='Heading 4')
+    p = doc.add_paragraph(text.strip(), style='Heading 4')
     p.paragraph_format.space_before = Pt(8)
     p.paragraph_format.space_after = Pt(3)
     p.paragraph_format.line_spacing = 1.5

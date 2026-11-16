@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.6"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.7"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -198,16 +198,21 @@ bool isSystemCurrentlySleeping() {
   if (remoteSleepDisabled) {
     return false; // Đã bật Vô hiệu hóa ngủ đêm -> Hệ thống không ngủ
   }
-  if (remoteIsSleeping) {
-    return true;  // ESP32 #1 báo đang ở trạng thái SLEEP / TEST_SLEEP
-  }
-  // Kiểm tra thêm khung giờ ngủ đêm (18:00 tối đến 05:00 sáng) qua NTP dự phòng
+  // Kiểm tra khung giờ qua NTP: Ban ngày (từ 06:00 đến 17:59) thì TUYỆT ĐỐI KHÔNG NGỦ
+  // Tự động giải phóng cờ kẹt ngủ sáng sớm nếu ESP1 bị trễ nhịp
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 50)) {
     int curH = timeinfo.tm_hour;
+    if (curH >= 6 && curH < 18) {
+      remoteIsSleeping = false; // Xóa cờ kẹt ngủ đêm
+      return false;
+    }
     if (curH >= 18 || curH < 5) {
       return true;
     }
+  }
+  if (remoteIsSleeping) {
+    return true;  // ESP32 #1 báo đang ở trạng thái SLEEP / TEST_SLEEP
   }
   return false;
 }
@@ -322,8 +327,15 @@ void pollSystemStateAndConfig() {
       String st = d.stringValue;
       if (st.equalsIgnoreCase("SLEEP") || st.equalsIgnoreCase("DEEP_SLEEP")) {
         remoteIsSleeping = true;
+      } else if (st.equalsIgnoreCase("TRACKING") || st.equalsIgnoreCase("HOLD_15M") ||
+                 st.equalsIgnoreCase("MAX_HOLD") || st.equalsIgnoreCase("DAWN_POLL") ||
+                 st.equalsIgnoreCase("IDLE")) {
+        remoteIsSleeping = false;
       }
       remoteMotorsMoving = st.equalsIgnoreCase("MOVING") || st.equalsIgnoreCase("HOMING");
+    } else {
+      // Nếu gói tin không có field state -> không coi là đang quay motor
+      remoteMotorsMoving = false;
     }
 
     json.get(d, "sleepDisabled");

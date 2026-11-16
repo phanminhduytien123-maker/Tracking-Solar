@@ -1,0 +1,30 @@
+** Drc report for solar_tracker_mainboard.kicad_pcb **
+** Created on 2026-11-11T17:49:30 **
+** Report includes: Errors, Warnings **
+
+** Found 4 DRC violations **
+[lib_footprint_mismatch]: Footprint 'PinSocket_1x22_P2.54mm_Vertical' does not match copy in library 'Connector_PinSocket_2.54mm'
+    Local override; warning
+    @(45.0000 mm, 55.0000 mm): Footprint J_ESP1_L1
+[lib_footprint_mismatch]: Footprint 'PinSocket_1x22_P2.54mm_Vertical' does not match copy in library 'Connector_PinSocket_2.54mm'
+    Local override; warning
+    @(70.4000 mm, 55.0000 mm): Footprint J_ESP1_R1
+[lib_footprint_mismatch]: Footprint 'PinSocket_1x22_P2.54mm_Vertical' does not match copy in library 'Connector_PinSocket_2.54mm'
+    Local override; warning
+    @(175.0000 mm, 55.0000 mm): Footprint J_ESP2_L1
+[lib_footprint_mismatch]: Footprint 'PinSocket_1x22_P2.54mm_Vertical' does not match copy in library 'Connector_PinSocket_2.54mm'
+    Local override; warning
+    @(200.4000 mm, 55.0000 mm): Footprint J_ESP2_R1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

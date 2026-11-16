@@ -27,7 +27,7 @@
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.1.9"
+#define CURRENT_FIRMWARE_VERSION "2.2.0"
 
 #include <FastAccelStepper.h>
 #include <Firebase_ESP_Client.h>
@@ -4426,7 +4426,7 @@ void setup() {
   Serial.flush();
   delay(150);
   WiFi.mode(WIFI_STA);
-  WiFi.setTxPower(WIFI_POWER_15dBm); // Giảm đỉnh xung phát Wi-Fi xuống ~200mA (chống sụt áp cho Relay GPIO 5)
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Phát công suất cực đại ~20dBm đảm bảo sóng xuyên tường/mái tôn ổn định 100%
   delay(100);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -4446,22 +4446,18 @@ void setup() {
   fbConfig.api_key = API_KEY;
   fbConfig.database_url = DATABASE_URL;
   fbConfig.signer.test_mode = true;
-  fbConfig.timeout.socketConnection = 3000;
-  fbConfig.timeout.serverResponse = 3000;
+  fbConfig.timeout.socketConnection = 4000;
+  fbConfig.timeout.serverResponse = 4000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
-  fbdo.setBSSLBufferSize(8192, 1024);
+  fbdo.setBSSLBufferSize(8192, 4096); // Nâng Tx buffer lên 4096 bytes để chứa trọn vẹn bản tin Atomic ~2.6KB
   fbdo.setResponseSize(4096);
-  cmdFbdo.setBSSLBufferSize(4096, 1024);
+  cmdFbdo.setBSSLBufferSize(4096, 2048);
   cmdFbdo.setResponseSize(2048);
   Serial.println(
       ">> [FIREBASE OK] Da san sang day Telemetry len Web Dashboard!\n");
 
-  // 8. Đăng ký Task Watchdog bảo vệ Core 1 & Khởi tạo Background Task
-  // trên Core 0
-  esp_task_wdt_init(30, true); // Timeout 30s (thay vì 15s quá nhạy), chống reset oan khi mạng lag
-  esp_task_wdt_add(NULL); // Đăng ký loop() task hiện tại vào Watchdog
-
+  // 8. Khoi tao Background Task tren Core 0
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
@@ -4541,7 +4537,12 @@ void setup() {
     systemFsmState = FSM_STATE_TRACKING;
   }
 
-  // 11. In Menu
+  // 11. Đăng ký Task Watchdog 30s bảo vệ Core 1 trước khi bắt đầu loop()
+  // (Đặt ở cuối setup để quá trình khởi động/homing ban đầu không bị Watchdog ngắt oan)
+  esp_task_wdt_init(30, true);
+  esp_task_wdt_add(NULL);
+
+  // 12. In Menu
   printMenu();
   requestTelemetryPrint();
   Serial.print("\n[CLI]> ");

@@ -14,19 +14,19 @@ CH4_DATA = {
                 "Để đánh giá toàn diện tính khả thi, độ ổn định và hiệu năng chuyển đổi năng lượng của hệ thống trong điều kiện vận hành thực tế, đề tài đã tiến hành chế tạo, lắp ráp hoàn thiện mô hình thực nghiệm và triển khai đo đạc đối chứng dài hạn tại sân thượng cơ sở đào tạo ở Quận 7, Thành phố Hồ Chí Minh (tọa độ địa lý: 10.7831° Vĩ Bắc, 106.6721° Kinh Đông) [3].",
                 "Mô hình thực nghiệm bao gồm hai giàn pin mặt trời sử dụng cùng loại module quang điện đơn tinh thể (Monocrystalline Silicon) với công suất danh định giống hệt nhau:",
                 "1. Giàn pin bám mặt trời thông minh hai trục (Smart Dual-Axis Solar Tracker): Được lắp đặt trên cơ cấu giàn quay hai trục truyền động bởi hai động cơ bước NEMA 23 và điều khiển bởi vi điều khiển ESP32-S3 #1 ứng dụng giải thuật mờ lai Fuzzy-PID tối ưu hóa bằng PSO kết hợp mô hình thiên văn NOAA.",
-                "2. Giàn pin cố định đối chứng (Fixed Panel): Được lắp đặt cố định hướng về phía Nam địa lý (Góc phương vị Azimuth = 180°), góc nghiêng cố định so với phương ngang là 15° (tương ứng góc ngửa Elevation = 75°). Đây là góc lắp đặt cố định tối ưu kinh điển đã được chuẩn hóa cho khu vực Thành phố Hồ Chí Minh nhằm tối đa hóa bức xạ thu nhận trung bình cả năm [1].",
+                "2. Giàn pin cố định đối chứng (Fixed Panel): Được lắp đặt cố định hướng về phía Nam địa lý (Góc xoay = 180°), góc nghiêng cố định so với phương ngang là 15° (tương ứng góc ngửa = 75°). Đây là góc lắp đặt cố định tối ưu kinh điển đã được chuẩn hóa cho khu vực Thành phố Hồ Chí Minh nhằm tối đa hóa bức xạ thu nhận trung bình cả năm [1].",
                 "Trước khi đưa hệ thống ra vận hành thực địa ngoài trời, toàn bộ hệ thống cơ điện tử và cảm biến bắt buộc phải trải qua quy trình kiểm chuẩn 16 bước tự động (Bench Wizard từ B0 đến B15) thông qua giao diện dòng lệnh Serial Monitor CLI nhằm kiểm tra an toàn và định chuẩn phần cứng theo đúng cẩm nang vận hành Bench Manual [B1]."
             ],
             "table_caption": "Bảng 4.1: Danh mục 16 bước kiểm chuẩn tự động Bench Wizard (B0 - B15) trên bàn thử nghiệm",
             "table_headers": ["Bước kiểm chuẩn", "Hạng mục kiểm tra", "Phương pháp thực hiện", "Tiêu chuẩn đánh giá ĐẠT (PASS)"],
             "table_rows": [
                 ["B0", "Kiểm tra phát xung Driver DM556", "Phát 1.000 xung kiểm tra cấu hình SW", "Động cơ quay êm, SW3=ON, SW8=ON, SW4=OFF (Half-Current)"],
-                ["B1", "Kiểm tra chiều quay & phân cực DIR", "Kích xung DIR HIGH/LOW cho 2 trục", "Trục Azimuth quay theo chiều KĐH, Elevation nâng lên trời"],
+                ["B1", "Kiểm tra chiều quay & phân cực DIR", "Kích xung DIR HIGH/LOW cho 2 trục", "Trục xoay quay theo chiều KĐH, Trục ngửa nâng lên trời"],
                 ["B2", "Kiểm chuẩn vị trí lắp Encoder", "Bài test 2.560 xung đo delta góc", "Xác định tỷ số truyền: trục tải 0.15°/cnt vs trục motor 0.05°/cnt"],
                 ["B3", "Kiểm chuẩn ngưỡng trượt bước động", "Đo độ trễ pha động cơ (Dynamic Lag)", "Thiết lập ngưỡng Stall Threshold = max(300, lag x 1.5)"],
                 ["B4", "Kiểm tra công tắc hành trình gốc Home", "Quay chậm tiếp cận công tắc cơ khí", "Tiếp điểm đóng dứt khoát, ngắt động cơ tức thì (Active-LOW)"],
                 ["B5", "Kiểm chuẩn Homing hai giai đoạn", "Nhanh 1500Hz -> Lùi 1000p -> Chậm 200Hz", "3 chu kỳ lặp lại, độ lệch chuẩn sigma <= 1 xung (<= 0.15°)"],
-                ["B6", "Cài đặt giới hạn mềm an toàn", "Lưu dải góc an toàn vào Flash NVS", "Azimuth: 0° - 270° (chống xoắn cáp); Elevation: 25° - 90°"],
+                ["B6", "Cài đặt giới hạn mềm an toàn", "Lưu dải góc an toàn vào Flash NVS", "Trục xoay: 0° - 270° (chống xoắn cáp); Trục ngửa: 25° - 90°"],
                 ["B7", "Đo độ rơ cơ khí (Backlash Test)", "Đảo chiều quay 10 bước liên tục", "Độ rơ khớp trục nhỏ hơn 0.5°"],
                 ["B8", "Kiểm tra độ mịn phát xung S-Curve", "Tăng tốc từ 0 đến 500 xung/s qua MCPWM", "Chuyển động êm ái, triệt tiêu hoàn toàn rung giật cơ học"],
                 ["B9", "Định chuẩn hướng Bắc thật & Từ thiên", "Đo góc la bàn và hiệu chỉnh độ từ thiên", "Hiệu chuẩn bù góc từ thiên địa phương -0.5° tại TP.HCM"],
@@ -157,7 +157,12 @@ REFERENCES_DATA = [
     ("[7]", "Passino, K. M., & Yurkovich, S. (1998). Fuzzy Control. Addison-Wesley, Menlo Park, CA."),
     ("[8]", "Kennedy, J., & Eberhart, R. (1995). Particle swarm optimization. Proceedings of ICNN'95 - International Conference on Neural Networks, Perth, WA, Australia, 4, 1942-1948. https://doi.org/10.1109/ICNN.1995.488968"),
     ("[9]", "Espressif Systems (2023). ESP32-S3 Series Datasheet & Technical Reference Manual. Espressif Systems Co., Ltd. https://www.espressif.com/en/products/socs/esp32-s3"),
-    ("[10]", "Texas Instruments (2015). INA226 High-Precision, Low-Side/High-Side Measurement, Bidirectional Current and Power Monitor with I2C Interface. Texas Instruments Inc.")
+    ("[10]", "Texas Instruments (2015). INA226 High-Precision, Low-Side/High-Side Measurement, Bidirectional Current and Power Monitor with I2C Interface. Texas Instruments Inc."),
+    ("[11]", "Changzhou Songyang Machinery & Electronics Co., Ltd. (2021). 57BYGH Two-Phase Hybrid Stepper Motor Technical Specification (NEMA 23 Series). Changzhou Songyang Machinery & Electronics Co., Ltd., Changzhou, China."),
+    ("[12]", "Leadshine Technology Co., Ltd. (2020). DM556 Digital Stepper Driver User's Manual (Microstepping and Idle Current Reduction Technology). Leadshine Technology Co., Ltd., Shenzhen, China. https://www.leadshine.com/product-detail/DM556.html"),
+    ("[13]", "Shanghai Hengxiang Optical Electronics Co., Ltd. (2021). HN3806 Incremental Rotary Optical Encoder Technical Manual. Shanghai Hengxiang Optical Electronics Co., Ltd., Shanghai, China."),
+    ("[14]", "Vishay Semiconductors (2019). TEMT6000 Ambient Light Sensor (Silicon NPN Epitaxial Phototransistor) Datasheet (Document Number: 81579). Vishay Intertechnology, Inc. https://www.vishay.com/docs/81579/temt6000.pdf"),
+    ("[15]", "Maxim Integrated (2015). DS3231 Extremely Accurate I2C-Integrated RTC/TCXO/Crystal Datasheet (19-5170; Rev 10). Analog Devices / Maxim Integrated Products, Inc. https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf")
 ]
 
 print("content_chapter4.py updated successfully.")

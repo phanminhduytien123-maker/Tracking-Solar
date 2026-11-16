@@ -284,7 +284,7 @@ export class FirebaseSolarService {
           localStorage.setItem('solar_custom_history_30d', JSON.stringify(customVal));
         } catch (e) {}
         if (this.latestRawData && this.latestRawData.history) {
-          this.processHistory(this.latestRawData.history, this.latestRawData.tracking);
+          this.processHistory(this.latestRawData.history, this.latestRawData.tracking, true);
         } else if (this.onHistory) {
           const filteredCustom = customVal.filter(item => !item.fullDate || item.fullDate >= '2026-11-01');
           this.onHistory(filteredCustom, null, null);
@@ -395,10 +395,10 @@ export class FirebaseSolarService {
    * - Firmware chưa có PID/Fuzzy/PSO -> không hiển thị số, gán has_algo_data = false.
    */
   
-  processHistory(historyData, trackingData = {}) {
+  processHistory(historyData, trackingData = {}, force = false) {
     if (!historyData || typeof historyData !== 'object') return;
     const historyCount = Object.keys(historyData).length;
-    if (historyCount === this.lastHistoryCount && this.hasProcessedHistory) return;
+    if (!force && historyCount === this.lastHistoryCount && this.hasProcessedHistory) return;
     this.lastHistoryCount = historyCount;
     this.hasProcessedHistory = true;
 

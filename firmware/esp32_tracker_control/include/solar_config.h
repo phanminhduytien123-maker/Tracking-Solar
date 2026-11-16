@@ -92,8 +92,8 @@ extern "C" {
 
 /** [F] Số xung/vòng (PPR) của Encoder Omron/Autonics 3806 gắn 1:1 trục động cơ.
  *  ESP32 PCNT đếm chế độ 4x (4 cạnh A/B), nên số count/vòng motor = 4 * F.
- *  Ví dụ: Encoder 400 PPR -> 1600 count/vòng. CẦN NGƯỜI DÙNG CUNG CẤP PPR THỰC TẾ. */
-#define CFG_F_ENCODER_PPR                   (400.0f)
+ *  Encoder 600 PPR -> 2400 count/vòng (chế độ đếm Quadrature x4, độ phân giải 0.15°/xung). */
+#define CFG_F_ENCODER_PPR                   (600.0f)
 
 /** Cực tính DIR trục Azimuth (+1 hoặc -1).
  *  +1: DIR mức HIGH làm tăng góc phi (Bắc -> Đông -> Nam -> Tây).

@@ -58,7 +58,7 @@ from content_chapter2 import CH2_ESP32_DATA, CH2_ADDITIONAL_SECTIONS
 from content_chapter3 import CH3_DATA
 from content_chapter4 import CH4_DATA, CH5_DATA, REFERENCES_DATA
 
-SRC_TEMPLATE = r"D:\DOANTOTNGHIEP\scratch\ORIGINAL_UNTOUCHED_TEMPLATE_BACKUP.docx"
+SRC_TEMPLATE = r"D:\DOANTOTNGHIEP\scratch\TEMPLATE_FIXED_NUMBERING.docx"
 DST_MAIN = r"D:\DOANTOTNGHIEP\HK1_2627_DATN_Phan Minh Duy Tiến_42200522_Võ Hồng Phát_42200545.docx"
 DST_BACKUP = r"D:\DOANTOTNGHIEP\THUYẾT MINH backup.docx"
 PDF_MAIN = r"D:\DOANTOTNGHIEP\HK1_2627_DATN_Phan Minh Duy Tiến_42200522_Võ Hồng Phát_42200545.pdf"
@@ -86,10 +86,21 @@ TABLE_CAPTIONS = {
 }
 
 def build_docx(target_path):
-    print(f"1. Copying {SRC_TEMPLATE} -> {target_path}...")
-    shutil.copyfile(SRC_TEMPLATE, target_path)
+    if not os.path.exists(target_path):
+        print(f"Target does not exist. Initializing from {SRC_TEMPLATE} -> {target_path}...")
+        shutil.copyfile(SRC_TEMPLATE, target_path)
+    else:
+        print(f"Preserving existing document: modifying {target_path} in-place...")
     doc = docx.Document(target_path)
     body = doc._body._element
+
+    # Strip accidental leading spaces from template headings so w:suff="space" doesn't produce double spaces
+    for p in doc.paragraphs:
+        if p.style.name.startswith('Heading'):
+            for run in p.runs:
+                if run.text.startswith(' '):
+                    run.text = run.text.lstrip()
+                    break
 
     # 2. Add TitleNoTOC style (cloned from Title, without outline level)
     title_style = doc.styles['Title']
@@ -266,20 +277,17 @@ def build_docx(target_path):
         r.font.italic = False
         r.font.bold = True
 
-    p349 = doc.paragraphs[349]
-    p350 = doc.paragraphs[350]
-    if os.path.exists("Ung_ung_thuc_te.jpg"):
-        p349.text = ""
-        p349.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p349.paragraph_format.first_line_indent = Pt(0)
-        p349.paragraph_format.keep_with_next = True
-        p349.add_run().add_picture("Ung_ung_thuc_te.jpg", width=Inches(5.0))
-    p350.text = FIGURE_CAPTIONS["2.3"]
-    for r in p350.runs:
-        r.font.name = "Times New Roman"
-        r.font.size = Pt(11)
-        r.font.italic = False
-        r.font.bold = True
+    # Ensure P0 begins with 'TỔNG'
+    if doc.paragraphs and doc.paragraphs[0].text.startswith("ỔNG"):
+        for r in doc.paragraphs[0].runs:
+            if "ỔNG" in r.text:
+                r.text = r.text.replace("ỔNG", "TỔNG")
+
+    # Ensure no duplicate drawing inside text paragraphs
+    for p in doc.paragraphs:
+        if "Trong lĩnh vực tự động hóa, điều khiển thông minh và thu thập số liệu" in p.text:
+            for d in p._p.xpath('.//w:drawing'):
+                d.getparent().remove(d)
 
     # Fix empty Hình/Bang styles
     for p in doc.paragraphs[330:355]:

@@ -1,0 +1,181 @@
+** Drc report for board2_sensor_relay.kicad_pcb **
+** Created on 2026-11-14T14:06:58 **
+** Report includes: Errors, Warnings **
+
+** Found 41 DRC violations **
+[items_not_allowed]: Items not allowed (keepout area)
+    Rule: keepout area; error
+    @(65.0000 mm, 74.2500 mm): NPTH pad of U_LM2596_ESP2
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.1739 mm)
+    Rule: board setup constraints hole; error
+    @(98.0000 mm, 74.9200 mm): PTH pad 2 [/+PV_STA] of J_PV_STA_IN1
+    @(95.0000 mm, 74.2500 mm): NPTH pad of U_LM2596_ESP2
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.1739 mm)
+    Rule: board setup constraints hole; error
+    @(98.0000 mm, 74.9200 mm): PTH pad 2 [/+PV_STA] of J_PV_STA_IN1
+    @(95.0000 mm, 74.2500 mm): NPTH pad of U_LM2596_ESP2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(88.0000 mm, 50.0000 mm): Footprint R_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(88.0000 mm, 50.0000 mm): PTH pad 1 [/TEMP_TRK] of R_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(88.0000 mm, 42.3800 mm): PTH pad 2 [/+3.3V_ESP2] of R_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(98.0000 mm, 25.0000 mm): Footprint J_PV_TRK_IN1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(95.0000 mm, 15.7500 mm): NPTH pad of U_LM2596_ESP2
+    @(98.0000 mm, 25.0000 mm): Footprint J_PV_TRK_IN1
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 25.0000 mm): PTH pad 1 [/GND] of J_PV_TRK_IN1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 19.9200 mm): PTH pad 2 [/+PV_TRK] of J_PV_TRK_IN1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(98.0000 mm, 50.0000 mm): Footprint J_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 50.0000 mm): PTH pad 1 [/+3.3V_ESP2] of J_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 44.9200 mm): PTH pad 2 [/TEMP_TRK] of J_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 39.8400 mm): PTH pad 3 [/GND] of J_TEMP_TRK1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(98.0000 mm, 80.0000 mm): Footprint J_PV_STA_IN1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(95.0000 mm, 74.2500 mm): NPTH pad of U_LM2596_ESP2
+    @(98.0000 mm, 80.0000 mm): Footprint J_PV_STA_IN1
+[pth_inside_courtyard]: PTH inside courtyard
+    Local override; error
+    @(98.0000 mm, 74.9200 mm): PTH pad 2 [/+PV_STA] of J_PV_STA_IN1
+    @(80.0000 mm, 45.0000 mm): Footprint U_LM2596_ESP2
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.6800 mm, 77.4600 mm): Reference field of J_PV_STA_IN1
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 72.2600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(92.6800 mm, 82.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(95.7000 mm, 82.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(86.6300 mm, 49.4600 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+    @(86.5000 mm, 31.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(86.9600 mm, 49.4600 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+    @(86.5000 mm, 31.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(91.6800 mm, 44.9200 mm): Reference field of J_TEMP_TRK1
+    @(96.0000 mm, 47.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(100.0000 mm, 45.0000 mm): Reference field of U_LM2596_ESP2
+    @(100.6000 mm, 52.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 37.1800 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 52.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(96.0000 mm, 47.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(95.7000 mm, 52.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(96.0000 mm, 47.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(102.7200 mm, 52.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(102.7200 mm, 52.6600 mm): Segment of J_TEMP_TRK1 on F.Silkscreen
+    @(96.0000 mm, 47.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(86.5000 mm, 31.0000 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(86.6300 mm, 42.9200 mm): Segment of R_TEMP_TRK1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(102.7200 mm, 27.6600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(92.6800 mm, 17.2600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(95.7000 mm, 82.6600 mm): Segment of J_PV_STA_IN1 on F.Silkscreen
+    @(95.0000 mm, 74.2500 mm): NPTH pad of U_LM2596_ESP2
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(92.6800 mm, 17.2600 mm): Segment of J_PV_TRK_IN1 on F.Silkscreen
+    @(95.0000 mm, 15.7500 mm): NPTH pad of U_LM2596_ESP2
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 74.9200 mm): PTH pad 2 [/+PV_STA] of J_PV_STA_IN1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 25.0000 mm): PTH pad 1 [/GND] of J_PV_TRK_IN1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 50.0000 mm): PTH pad 1 [/+3.3V_ESP2] of J_TEMP_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 44.9200 mm): PTH pad 2 [/TEMP_TRK] of J_TEMP_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 39.8400 mm): PTH pad 3 [/GND] of J_TEMP_TRK1
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(97.5000 mm, 13.2500 mm): Rectangle of U_LM2596_ESP2 on F.Silkscreen
+    @(98.0000 mm, 19.9200 mm): PTH pad 2 [/+PV_TRK] of J_PV_TRK_IN1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

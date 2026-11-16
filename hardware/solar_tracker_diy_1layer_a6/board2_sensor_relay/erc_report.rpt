@@ -1,0 +1,282 @@
+ERC report (2026-11-14T15:46:36, Encoding UTF8)
+Report includes: Errors, Warnings, Exclusions
+
+***** Sheet /
+[label_dangling]: Label not connected
+    ; error
+    @(34.92 mm, 174.92 mm): Label '+5V_ESP2'
+[label_dangling]: Label not connected
+    ; error
+    @(34.92 mm, 177.46 mm): Label 'GND'
+[label_dangling]: Label not connected
+    ; error
+    @(34.92 mm, 180.00 mm): Label 'ISC_TRK'
+[label_dangling]: Label not connected
+    ; error
+    @(34.92 mm, 215.00 mm): Label 'ISC_STA'
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 204.60 mm): Symbol J_ESP2_R1 Pin 1 [Pin_1, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 207.14 mm): Symbol J_ESP2_R1 Pin 2 [Pin_2, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 209.68 mm): Symbol J_ESP2_R1 Pin 3 [Pin_3, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 212.22 mm): Symbol J_ESP2_R1 Pin 4 [Pin_4, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 214.76 mm): Symbol J_ESP2_R1 Pin 5 [Pin_5, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 217.30 mm): Symbol J_ESP2_R1 Pin 6 [Pin_6, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 219.84 mm): Symbol J_ESP2_R1 Pin 7 [Pin_7, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 222.38 mm): Symbol J_ESP2_R1 Pin 8 [Pin_8, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 224.92 mm): Symbol J_ESP2_R1 Pin 9 [Pin_9, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 227.46 mm): Symbol J_ESP2_R1 Pin 10 [Pin_10, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 230.00 mm): Symbol J_ESP2_R1 Pin 11 [Pin_11, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 232.54 mm): Symbol J_ESP2_R1 Pin 12 [Pin_12, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 235.08 mm): Symbol J_ESP2_R1 Pin 13 [Pin_13, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 237.62 mm): Symbol J_ESP2_R1 Pin 14 [Pin_14, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 240.16 mm): Symbol J_ESP2_R1 Pin 15 [Pin_15, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 242.70 mm): Symbol J_ESP2_R1 Pin 16 [Pin_16, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 245.24 mm): Symbol J_ESP2_R1 Pin 17 [Pin_17, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 247.78 mm): Symbol J_ESP2_R1 Pin 18 [Pin_18, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 250.32 mm): Symbol J_ESP2_R1 Pin 19 [Pin_19, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 252.86 mm): Symbol J_ESP2_R1 Pin 20 [Pin_20, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 255.40 mm): Symbol J_ESP2_R1 Pin 21 [Pin_21, Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(184.92 mm, 257.94 mm): Symbol J_ESP2_R1 Pin 22 [Pin_22, Passive, Line]
+[label_dangling]: Label not connected
+    ; error
+    @(195.08 mm, 217.30 mm): Label 'RL_E_LAMP'
+[label_dangling]: Label not connected
+    ; error
+    @(195.08 mm, 219.84 mm): Label 'RL_B_ISC'
+[label_dangling]: Label not connected
+    ; error
+    @(195.08 mm, 224.92 mm): Label 'RL_D_ISC'
+[label_dangling]: Label not connected
+    ; error
+    @(195.08 mm, 227.46 mm): Label 'RL_CUT_38'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 35.08 mm): Symbol J_BUS_LINK2 Pin 4 [Pin_4, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 67.54 mm): Symbol U_LM2596_ESP2 Pin 3 [Pin_3, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 107.46 mm): Symbol J_RELAY_CTRL1 Pin 3 [Pin_3, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 142.54 mm): Symbol J_RL6_ESP2_PWR Pin 2 [Pin_2, Passive, Line]
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(34.92 mm, 182.54 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(34.92 mm, 185.08 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(34.92 mm, 217.54 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(34.92 mm, 220.08 mm): No Connect
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 251.27 mm): Symbol J_FZ1_TRK1 Pin 2 [Pin_2, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(34.92 mm, 276.27 mm): Symbol J_FZ2_STA1 Pin 2 [Pin_2, Passive, Line]
+[lib_symbol_mismatch]: Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 30.00 mm): Symbol J_BUS_LINK2 [Conn_01x04]
+[footprint_link_issues]: The current configuration does not include the footprint library 'custom_footprints'
+    ; warning
+    @(40.00 mm, 65.00 mm): Symbol U_LM2596_ESP2 [Conn_01x04]
+[lib_symbol_mismatch]: Symbol 'Conn_01x04' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 65.00 mm): Symbol U_LM2596_ESP2 [Conn_01x04]
+[lib_symbol_mismatch]: Symbol 'Conn_01x08' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 110.00 mm): Symbol J_RELAY_CTRL1 [Conn_01x08]
+[lib_symbol_mismatch]: Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 140.00 mm): Symbol J_RL6_ESP2_PWR [Conn_01x02]
+[footprint_link_issues]: The current configuration does not include the footprint library 'custom_footprints'
+    ; warning
+    @(40.00 mm, 180.00 mm): Symbol J_ACS1_TRK1 [Conn_01x05]
+[footprint_link_issues]: The current configuration does not include the footprint library 'custom_footprints'
+    ; warning
+    @(40.00 mm, 215.00 mm): Symbol J_ACS2_STA1 [Conn_01x05]
+[footprint_link_issues]: The current configuration does not include the footprint library 'custom_footprints'
+    ; warning
+    @(40.00 mm, 250.00 mm): Symbol J_FZ1_TRK1 [Conn_01x03]
+[lib_symbol_mismatch]: Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 250.00 mm): Symbol J_FZ1_TRK1 [Conn_01x03]
+[footprint_link_issues]: The current configuration does not include the footprint library 'custom_footprints'
+    ; warning
+    @(40.00 mm, 275.00 mm): Symbol J_FZ2_STA1 [Conn_01x03]
+[lib_symbol_mismatch]: Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(40.00 mm, 275.00 mm): Symbol J_FZ2_STA1 [Conn_01x03]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(90.00 mm, 56.19 mm): Symbol R_TEMP_TRK1 Pin 1 [Passive, Line]
+[lib_symbol_mismatch]: Symbol 'R' doesn't match copy in library 'Device'
+    ; warning
+    @(90.00 mm, 60.00 mm): Symbol R_TEMP_TRK1 [R]
+[lib_symbol_mismatch]: Symbol 'R' doesn't match copy in library 'Device'
+    ; warning
+    @(90.00 mm, 110.00 mm): Symbol R_RL6_PU1 [R]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(90.00 mm, 113.81 mm): Symbol R_RL6_PU1 Pin 2 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(90.00 mm, 121.19 mm): Symbol R_TEMP_STA1 Pin 1 [Passive, Line]
+[lib_symbol_mismatch]: Symbol 'R' doesn't match copy in library 'Device'
+    ; warning
+    @(90.00 mm, 125.00 mm): Symbol R_TEMP_STA1 [R]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 30.00 mm): Symbol J_PV_TRK_IN1 Pin 1 [Pin_1, Passive, Line]
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(134.92 mm, 32.54 mm): Label '+PV_TRK'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 58.73 mm): Symbol J_TEMP_TRK1 Pin 1 [Pin_1, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 97.54 mm): Symbol J_PV_STA_IN1 Pin 2 [Pin_2, Passive, Line]
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(134.92 mm, 97.54 mm): Label '+PV_STA'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 123.73 mm): Symbol J_TEMP_STA1 Pin 1 [Pin_1, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 162.54 mm): Symbol J_LAMP12V_OUT1 Pin 2 [Pin_2, Passive, Line]
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(134.92 mm, 162.54 mm): Label '+12V_LAMP'
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(134.92 mm, 209.68 mm): Label 'RESET_2'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(134.92 mm, 217.30 mm): Symbol J_ESP2_L1 Pin 6 [Pin_6, Passive, Line]
+[lib_symbol_mismatch]: Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 30.00 mm): Symbol J_PV_TRK_IN1 [Conn_01x02]
+[lib_symbol_mismatch]: Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 60.00 mm): Symbol J_TEMP_TRK1 [Conn_01x03]
+[lib_symbol_mismatch]: Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 95.00 mm): Symbol J_PV_STA_IN1 [Conn_01x02]
+[lib_symbol_mismatch]: Symbol 'Conn_01x03' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 125.00 mm): Symbol J_TEMP_STA1 [Conn_01x03]
+[lib_symbol_mismatch]: Symbol 'Conn_01x02' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 160.00 mm): Symbol J_LAMP12V_OUT1 [Conn_01x02]
+[lib_symbol_mismatch]: Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(140.00 mm, 230.00 mm): Symbol J_ESP2_L1 [Conn_01x22]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(184.92 mm, 222.38 mm): Symbol J_ESP2_R1 Pin 8 [Pin_8, Passive, Line]
+[lib_symbol_mismatch]: Symbol 'Conn_01x22' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(190.00 mm, 230.00 mm): Symbol J_ESP2_R1 [Conn_01x22]
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 207.14 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 209.68 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 212.22 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 214.76 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 222.38 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 230.00 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 232.54 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 235.08 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 237.62 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 240.16 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 242.70 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 245.24 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 247.78 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 250.32 mm): No Connect
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(195.08 mm, 252.86 mm): No Connect
+
+ ** ERC messages: 90  Errors 30  Warnings 60
+
+ ** Ignored checks:
+    - Global label only appears once in the schematic
+    - Four connection points are joined together
+    - SPICE model issue
+    - Assigned footprint doesn't match footprint filters

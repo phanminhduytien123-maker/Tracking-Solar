@@ -1,0 +1,11 @@
+(footprint "Mini560"
+  (version 20240108)
+  (generator "custom")
+  (layer "F.Cu")
+  (property "Reference" "REF**" (at 0 -11 0) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.15))))
+  (property "Value" "Mini560" (at 0 11 0) (layer "F.Fab") (effects (font (size 1 1) (thickness 0.15))))
+  (pad "1" thru_hole circle (at -14.5 -4.46) (size 2.2 2.2) (drill 1.2) (layers "*.Cu" "*.Mask"))
+  (pad "2" thru_hole circle (at -14.5 4.46) (size 2.2 2.2) (drill 1.2) (layers "*.Cu" "*.Mask"))
+  (pad "3" thru_hole circle (at 14.5 -4.46) (size 2.2 2.2) (drill 1.2) (layers "*.Cu" "*.Mask"))
+  (pad "4" thru_hole circle (at 14.5 4.46) (size 2.2 2.2) (drill 1.2) (layers "*.Cu" "*.Mask"))
+)

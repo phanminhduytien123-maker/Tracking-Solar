@@ -5,7 +5,7 @@ import hashlib
 import time
 import threading
 
-def flash_voc_isc(esp_ip="192.168.1.13", esp_port=3232, password="solar2026", bin_path=r"C:\tmp_pio_build\root\esp32_voc_isc_node\firmware.bin"):
+def flash_voc_isc(esp_ip="192.168.1.12", esp_port=3232, password="solar2026", bin_path=r"C:\tmp_pio_build\root\esp32_voc_isc_node\firmware.bin"):
     if not os.path.exists(bin_path):
         print(f"Error: {bin_path} not found!")
         return False
@@ -184,5 +184,6 @@ def flash_voc_isc(esp_ip="192.168.1.13", esp_port=3232, password="solar2026", bi
         return True
 
 if __name__ == "__main__":
-    success = flash_voc_isc()
+    target_ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.12"
+    success = flash_voc_isc(esp_ip=target_ip)
     sys.exit(0 if success else 1)

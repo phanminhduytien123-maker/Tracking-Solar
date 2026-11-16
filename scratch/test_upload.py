@@ -1,34 +1,36 @@
 import urllib.request
-import ssl
 import uuid
+import json
+import time
 
-def upload_catbox(file_path):
-    ctx = ssl._create_unverified_context()
-    boundary = uuid.uuid4().hex
-    with open(file_path, 'rb') as f:
-        file_bytes = f.read()
+bin_path = r'scratch\www\firmware.bin'
+with open(bin_path, 'rb') as f:
+    bin_data = f.read()
 
-    data = bytearray()
-    data.extend(f'--{boundary}\r\n'.encode('utf-8'))
-    data.extend(b'Content-Disposition: form-data; name="reqtype"\r\n\r\n')
-    data.extend(b'fileupload\r\n')
+boundary = uuid.uuid4().hex
+part1 = (
+    f'--{boundary}\r\n'
+    f'Content-Disposition: form-data; name="file"; filename="firmware.bin"\r\n'
+    f'Content-Type: application/octet-stream\r\n\r\n'
+).encode('utf-8')
+part2 = f'\r\n--{boundary}--\r\n'.encode('utf-8')
+body = part1 + bin_data + part2
+headers = {'Content-Type': f'multipart/form-data; boundary={boundary}'}
 
-    data.extend(f'--{boundary}\r\n'.encode('utf-8'))
-    data.extend(b'Content-Disposition: form-data; name="fileToUpload"; filename="firmware.bin"\r\n')
-    data.extend(b'Content-Type: application/octet-stream\r\n\r\n')
-    data.extend(file_bytes)
-    data.extend(b'\r\n')
-    data.extend(f'--{boundary}--\r\n'.encode('utf-8'))
+print(f"Uploading {len(bin_data):,} bytes to tmpfiles.org...")
+req = urllib.request.Request('https://tmpfiles.org/api/v1/upload', data=body, headers=headers)
+with urllib.request.urlopen(req, timeout=30) as resp:
+    res = json.loads(resp.read().decode())
+    raw_url = res['data']['url']
+    dl_url = raw_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
+    print('Raw URL:', raw_url)
+    print('Direct Download URL:', dl_url)
 
-    req = urllib.request.Request('https://catbox.moe/user/api.php', data=data)
-    req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
-    req.add_header('User-Agent', 'Mozilla/5.0')
-
-    with urllib.request.urlopen(req, context=ctx, timeout=60) as resp:
-        url = resp.read().decode('utf-8').strip()
-        return url
-
-if __name__ == '__main__':
-    url = upload_catbox(r'C:\tmp_pio_build\root\esp32_devkit_test\firmware.bin')
-    print('Uploaded Catbox URL:', url)
-
+# Benchmark download speed
+print("Testing direct download speed...")
+start = time.time()
+req2 = urllib.request.Request(dl_url, headers={'User-Agent': 'ESP32-http-Update'})
+with urllib.request.urlopen(req2, timeout=20) as resp2:
+    down_data = resp2.read()
+dur = time.time() - start
+print(f"Downloaded {len(down_data):,} bytes in {dur:.2f}s ({len(down_data)/dur/1024:.1f} KB/s)")
