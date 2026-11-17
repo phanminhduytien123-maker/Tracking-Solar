@@ -980,7 +980,7 @@ export class FirebaseSolarService {
       ? Math.max(3, Number(vocIscCfg.relay_interval_sec))
       : ((tracking.relayIntervalSec !== undefined && tracking.relayIntervalSec !== null && !isNaN(tracking.relayIntervalSec))
         ? Math.max(3, Number(tracking.relayIntervalSec))
-        : 10);
+        : 60);
 
     // Cấu hình chu kỳ BẬT / TẮT của Đèn 12V (Relay E) - mặc định 15 phút / 15 phút
     const lampOnMin = Math.max(1, Math.min(360, Number(
@@ -1086,7 +1086,7 @@ export class FirebaseSolarService {
     } else if (vocIscNode.updated_at && Number(vocIscNode.updated_at) > 1700000000000) {
       vocNodeAgeMs = Math.max(0, serverTimeNow - Number(vocIscNode.updated_at));
     }
-    const esp2Online = esp2PowerOn && Boolean(vocIscNode.online && vocNodeAgeMs <= 45000);
+    const esp2Online = esp2PowerOn && Boolean(vocIscNode.online && vocNodeAgeMs <= 50000);
 
     const computedPingMs = isSystemOnline
       ? (this.livePingMs !== null ? this.livePingMs : 22)

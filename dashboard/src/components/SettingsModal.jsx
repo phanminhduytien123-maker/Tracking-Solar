@@ -55,7 +55,7 @@ export default function SettingsModal({
 }) {
   const [activeTab, setActiveTab] = useState(() => initialTab || 'config'); // 'config' | 'location' | 'users' | 'data_history' | 'json'
   const [isExperimentLocked, setIsExperimentLocked] = useState(() => localStorage.getItem('solar_experiment_locked') === 'true');
-  const [relaySecInput, setRelaySecInput] = useState(() => Number(latestTelemetry?.system?.relayIntervalSec || localStorage.getItem('solar_relay_interval_sec') || 10));
+  const [relaySecInput, setRelaySecInput] = useState(() => Number(latestTelemetry?.system?.relayIntervalSec || localStorage.getItem('solar_relay_interval_sec') || 60));
   const [lampOnMinInput, setLampOnMinInput] = useState(() => Number(latestTelemetry?.system?.lampOnMin || localStorage.getItem('solar_lamp_on_min') || 15));
   const [lampOffMinInput, setLampOffMinInput] = useState(() => Number(latestTelemetry?.system?.lampOffMin || localStorage.getItem('solar_lamp_off_min') || 15));
   const [hwConfigFeedback, setHwConfigFeedback] = useState(null);
@@ -438,10 +438,10 @@ export default function SettingsModal({
                           <span className="text-xs font-bold text-zinc-900">
                             2. Chu kỳ Relay đo Voc &amp; Isc
                           </span>
-                          <HelpTip text="Khoảng thời gian giãn cách giữa các lần nhảy relay đo Voc và Isc (mặc định 10s). Trong giờ ngủ đêm, cả 4 relay tự động khóa hoàn toàn để bảo vệ thiết bị." />
+                          <HelpTip text="Khoảng thời gian giãn cách giữa các lần nhảy relay đo Voc và Isc (mặc định 60s). Trong giờ ngủ đêm, cả 4 relay tự động khóa hoàn toàn để bảo vệ thiết bị." />
                         </div>
                         <span className="px-2 py-0.5 rounded-xs text-[11px] font-semibold border bg-zinc-100 text-zinc-700 border-zinc-200">
-                          Hiện tại: {latestTelemetry?.system?.relayIntervalSec || relaySecInput || 10}s
+                          Hiện tại: {latestTelemetry?.system?.relayIntervalSec || relaySecInput || 60}s
                         </span>
                       </div>
 
@@ -465,7 +465,7 @@ export default function SettingsModal({
                                   : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300'
                               }`}
                             >
-                              {sec}s{sec === 10 ? ' (Mặc định)' : ''}
+                              {sec}s{sec === 60 ? ' (Mặc định)' : ''}
                             </button>
                           );
                         })}
