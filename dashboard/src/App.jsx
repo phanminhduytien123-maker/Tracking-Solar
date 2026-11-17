@@ -612,10 +612,17 @@ export default function App() {
   }, []);
 
   // Sync today's accumulated energy to the latest day entry in history30Days
-  // CHỈ CỘNG DỒN KHI DỮ LIỆU LÀ TỪ THIẾT BỊ THẬT (source === 'device'), KHÔNG CỘNG DỮ LIỆU MOCK!
+  // CHỈ CỘNG DỒN KHI DỮ LIỆU LÀ TỪ THIẾT BỊ THẬT (source === 'device'), ĐANG LIVE VÀ THUỘC ĐÚNG NGÀY HÔM NAY!
   useEffect(() => {
     const isRealDevice = telemetry?.system?.source === 'device' && !telemetry?.system?.isMock && dataSource !== 'mock';
-    if (!isRealDevice) return; // Bỏ qua hoàn toàn dữ liệu giả lập
+    const isLive = telemetry?.system?.connStatus === 'LIVE' || telemetry?.INA226?.tracking?.connStatus === 'LIVE';
+    const lastUpd = telemetry?.INA226?.tracking?.lastUpdate;
+    const isTodayUpdate = lastUpd ? (() => {
+      const d = new Date(lastUpd);
+      const now = new Date();
+      return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })() : false;
+    if (!isRealDevice || !isLive || !isTodayUpdate) return; // Bỏ qua dữ liệu giả lập hoặc dữ liệu cũ từ hôm trước
 
     const trkWh = Number(telemetry?.INA226?.tracking?.energyWh || 0);
     const staWh = Number(telemetry?.INA226?.static?.energyWh || 0);
@@ -648,7 +655,7 @@ export default function App() {
         return updated;
       });
     }
-  }, [telemetry?.INA226?.tracking?.energyWh, telemetry?.INA226?.static?.energyWh, telemetry?.system?.source, telemetry?.system?.isMock, dataSource]);
+  }, [telemetry?.INA226?.tracking?.energyWh, telemetry?.INA226?.static?.energyWh, telemetry?.system?.source, telemetry?.system?.isMock, telemetry?.system?.connStatus, telemetry?.INA226?.tracking?.connStatus, telemetry?.INA226?.tracking?.lastUpdate, dataSource]);
 
   // Action: Clear Firebase Data (Được bảo vệ nghiêm ngặt theo BỔ SUNG #4)
   const handleClearFirebase = () => {

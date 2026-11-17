@@ -580,6 +580,15 @@ export default function ChartsSection({
     }
   };
 
+  const calcPaperGainPercent = (row) => {
+    const vt = Number(row?.voc_trk || 0);
+    const vs = Number(row?.voc_sta || 0);
+    const it = Number(row?.isc_trk || 0);
+    const is = Number(row?.isc_sta || 0);
+    if (vt <= 0 || vs <= 0 || it <= 0 || is <= 0) return null;
+    return parseFloat((((vt * it) / (vs * is) - 1) * 100).toFixed(1));
+  };
+
   // =========================================================================
   // 6. XUẤT CSV DỮ LIỆU ĐO 30 NGÀY (UTF-8 BOM CHO EXCEL)
   // =========================================================================
@@ -598,6 +607,7 @@ export default function ChartsSection({
       'Isc_Co_Dinh_A',
       'Nhiet_Do_Tracker_C',
       'Nhiet_Do_Co_Dinh_C',
+      'Phan_Tram_Gain_Bai_Bao_Voc_Isc',
       'Trang_Thai',
       'Thoi_Tiet_Ghi_Chu'
     ];
@@ -605,6 +615,7 @@ export default function ChartsSection({
     const rows = history30Days.map((d, idx) => {
       const trkWh = d.trackingWh !== undefined ? d.trackingWh : (Number(d.trackingKwh || 0) * 1000);
       const staWh = d.staticWh !== undefined ? d.staticWh : (Number(d.staticKwh || 0) * 1000);
+      const paperGain = calcPaperGainPercent(d);
       return [
         idx + 1,
         d.date,
@@ -619,6 +630,7 @@ export default function ChartsSection({
         d.isc_sta || 0,
         d.temp_trk || 0,
         d.temp_sta || 0,
+        paperGain !== null ? paperGain : '',
         d.severe_invalid ? 'LOI_LOAI_TRU' : 'HOP_LE',
         `"${(d.weather_note || (Array.isArray(d.invalid_reasons) ? d.invalid_reasons.join('; ') : d.invalid_reasons) || 'Binh thuong').replace(/"/g, '""')}"`
       ];
@@ -1037,6 +1049,12 @@ export default function ChartsSection({
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">Isc Sta (A)</th>
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Trk (°C)</th>
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Sta (°C)</th>
+                  <th
+                    className="py-3 px-3.5 text-right whitespace-nowrap"
+                    title="Tính theo phương pháp bài báo MDPI (Voc × Isc): ((Voc_trk × Isc_trk) / (Voc_sta × Isc_sta) - 1) × 100%"
+                  >
+                    % Gain (Bài báo)
+                  </th>
                   <th className="py-3 px-3.5 whitespace-nowrap">Ghi chú</th>
                   <th className="py-3 px-3.5 text-center whitespace-nowrap">Trạng thái</th>
                   {isAdmin && onOpenDataSettings && <th className="py-3 px-3.5 text-center whitespace-nowrap">Thao tác</th>}
@@ -1045,7 +1063,7 @@ export default function ChartsSection({
               <tbody className="divide-y divide-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-sm">
                 {filteredTableData.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="py-8 text-center text-zinc-400 dark:text-slate-400">
+                    <td colSpan={15} className="py-8 text-center text-zinc-400 dark:text-slate-400">
                       Không tìm thấy bản ghi nào phù hợp với bộ lọc.
                     </td>
                   </tr>
@@ -1054,6 +1072,7 @@ export default function ChartsSection({
                     const trkWh = row.trackingWh !== undefined ? row.trackingWh : (Number(row.trackingKwh || 0) * 1000);
                     const staWh = row.staticWh !== undefined ? row.staticWh : (Number(row.staticKwh || 0) * 1000);
                     const isGainPos = row.gainPercent >= 0;
+                    const paperGain = calcPaperGainPercent(row);
                     return (
                       <tr key={row.date} className="hover:bg-zinc-50/80 dark:hover:bg-slate-800/60 transition-colors">
                         <td className="py-3 px-3.5 text-zinc-500 dark:text-slate-300 font-medium text-xs sm:text-sm whitespace-nowrap">{idx + 1}</td>
@@ -1084,6 +1103,17 @@ export default function ChartsSection({
                         </td>
                         <td className="py-3 px-3.5 text-right font-medium text-zinc-900 dark:text-white text-sm sm:text-[15px] whitespace-nowrap">
                           {formatDecimal(row.temp_sta, 1)}
+                        </td>
+                        <td
+                          className={`py-3 px-3.5 text-right font-extrabold text-sm sm:text-[15px] whitespace-nowrap ${
+                            paperGain === null
+                              ? 'text-zinc-400 dark:text-slate-500'
+                              : paperGain >= 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-600 dark:text-red-400'
+                          }`}
+                        >
+                          {paperGain !== null ? formatSignedNumber(paperGain, 1, '%') : '--'}
                         </td>
                         <td className="py-3 px-3.5 text-zinc-900 dark:text-white text-xs sm:text-sm max-w-[140px] truncate whitespace-nowrap" title={row.weather_note || 'Bình thường'}>
                           {row.weather_note || 'Bình thường'}
