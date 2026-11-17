@@ -516,7 +516,9 @@ void pushVocIscToFirebase(bool writeHistory) {
   trkPatch.set("lampOnMin", (int)(lampOnSec / 60));
   trkPatch.set("lampOffMin", (int)(lampOffSec / 60));
   trkPatch.set("lampAutoPhase", lampAutoPhase ? "ON" : "OFF");
-  Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trkPatch);
+  if (!Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trkPatch)) {
+    return; // Mạng đang lag/timeout -> bỏ qua phần còn lại trong lượt này tránh nghẽn loop()
+  }
 
   FirebaseJson staPatch;
   staPatch.set("voc_sta", liveVocSta);
@@ -818,6 +820,8 @@ void setup() {
 
   // BƯỚC 4: Kết nối WiFi & đồng bộ giờ NTP (múi giờ Việt Nam UTC+7)
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.printf(">> Dang ket noi WiFi: %s ", WIFI_SSID);
   unsigned long t0 = millis();
@@ -840,6 +844,10 @@ void setup() {
   fbConfig.timeout.serverResponse = 3000;
   Firebase.begin(&fbConfig, &auth);
   Firebase.reconnectWiFi(true);
+  fbdo.setBSSLBufferSize(4096, 2048);
+  fbdo.setResponseSize(2048);
+  fbPoll.setBSSLBufferSize(4096, 1024);
+  fbPoll.setResponseSize(2048);
 
   // BƯỚC 6: Khởi tạo ArduinoOTA cho ESP32-S3 #2
   ArduinoOTA.setHostname("esp32-voc-isc-node");
@@ -870,13 +878,18 @@ void loop() {
     ArduinoOTA.handle();
   }
 
-  // Tự động reconnect WiFi nếu rớt mạng
+  // Tự động phục hồi WiFi chỉ khi mất kết nối liên tục >= 30s (tránh cắt ngang bắt tay WPA2/DHCP)
+  static unsigned long wifiLostSinceMs = 0;
   static unsigned long lastWifiCheckMs = 0;
-  if (millis() - lastWifiCheckMs >= 5000) {
-    lastWifiCheckMs = millis();
-    if (WiFi.status() != WL_CONNECTED) {
-      WiFi.reconnect();
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wifiLostSinceMs == 0) wifiLostSinceMs = millis();
+    if ((millis() - wifiLostSinceMs >= 30000) && (millis() - lastWifiCheckMs >= 30000)) {
+      lastWifiCheckMs = millis();
+      WiFi.disconnect(false);
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
+  } else {
+    wifiLostSinceMs = 0;
   }
 
   // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 15 giây (khi đang ở MEAS_IDLE)

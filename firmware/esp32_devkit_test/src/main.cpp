@@ -143,6 +143,20 @@ FirebaseData fbdo;
 FirebaseData cmdFbdo;
 FirebaseAuth auth;
 FirebaseConfig fbConfig;
+SemaphoreHandle_t fbdoMutex = NULL;
+
+bool safeUpdateNodeFbdo(const char *path, FirebaseJson *json,
+                        uint32_t timeoutMs = 1500) {
+  if (!fbdoMutex) {
+    return Firebase.RTDB.updateNode(&fbdo, path, json);
+  }
+  if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
+    return false;
+  }
+  bool ok = Firebase.RTDB.updateNode(&fbdo, path, json);
+  xSemaphoreGive(fbdoMutex);
+  return ok;
+}
 
 // Cảm biến đo công suất INA226 cho cả 2 tấm pin (Chung bus I2C SDA: GPIO 8, SCL: GPIO 9)
 // Tấm xoay Tracker: 0x41 (A0 hàn VCC) | Tấm cố định: 0x40 (Mặc định A0/A1 để hở)
@@ -1036,7 +1050,7 @@ void enterNightLightSleep(uint32_t sleepMinutes = 2) {
     sleepJson.set("status", "SLEEPING");
     sleepJson.set("online", true);
     sleepJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &sleepJson);
+    safeUpdateNodeFbdo("/solar/tracking", &sleepJson);
   }
 
   // 4. Tắt WiFi để giảm thiểu dòng điện
@@ -1157,7 +1171,7 @@ void enterNightSleepUntil4AM() {
     sleepJson.set("isSleeping", true);
     sleepJson.set("displayState", "Nghi dem an toan (Cho binh minh 04:00)");
     sleepJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &sleepJson);
+    safeUpdateNodeFbdo("/solar/tracking", &sleepJson);
     Serial.println(
         "   [3/4] Da cap nhat trang thai SLEEP (wake_at: 04:00) len Firebase.");
   }
@@ -1293,7 +1307,7 @@ void executeTestSleepNow() {
     sleepJson.set("isTestSleep", true);
     sleepJson.set("displayState", "🌙 TEST NGỦ ĐÔNG (CHỜ WAKE/RESET)");
     sleepJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &sleepJson);
+    safeUpdateNodeFbdo("/solar/tracking", &sleepJson);
   }
   Serial.println(">> [BUOC 3/3] Gian pin da vao the ngu an toan! Giu nguyen khong bi anh huong boi gio RTC.\n");
 }
@@ -1350,7 +1364,7 @@ void executeTestWakeNow() {
     wakeJson.set("isTestSleep", false);
     wakeJson.set("displayState", "☀️ TEST THỨC DẬY (THẾ ĐÓN BÌNH MINH)");
     wakeJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &wakeJson);
+    safeUpdateNodeFbdo("/solar/tracking", &wakeJson);
   }
   Serial.println(">> [BUOC 3/3] Gian pin da o the don binh minh san sang!\n");
 }
@@ -1411,7 +1425,7 @@ void executeResumeRealState() {
       realJson.set("isTestSleep", false);
       realJson.set("mode", "AUTO");
       realJson.set("source", "device");
-      Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &realJson);
+      safeUpdateNodeFbdo("/solar/tracking", &realJson);
     }
   } else {
     // Ban đêm: Nếu đã vô hiệu hóa ngủ đêm thì về giữ bước vị trí cuối buổi chiều
@@ -1485,7 +1499,7 @@ void moveToAfternoonHoldPosition() {
     holdJson.set("sleepDisabled", true);
     holdJson.set("displayState", "GIỮ BƯỚC CHIỀU (TẮT NGỦ ĐÊM)");
     holdJson.set("source", "device");
-    Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &holdJson);
+    safeUpdateNodeFbdo("/solar/tracking", &holdJson);
   }
 }
 
@@ -1728,7 +1742,7 @@ void updateEnergyAndPower() {
       hJson.set("sys_mode", (int)rec.sys_mode);
       hJson.set("flags", (int)rec.flags);
       hJson.set("source", "device");
-      Firebase.RTDB.updateNode(&fbdo, histPath, &hJson);
+      safeUpdateNodeFbdo(histPath, &hJson, 3000);
     } else {
       // MẤT MẠNG: Đẩy bản ghi vào hàng đợi Offline LittleFS (Mục 2 & Mục 9)
       OfflineQueue.pushRecord(rec);
@@ -2732,7 +2746,7 @@ void pushTelemetryToFirebase() {
     vocOffline.set("online", false);
     root.set("voc_isc_node", vocOffline);
   }
-  if (!Firebase.RTDB.updateNode(&fbdo, "/solar", &root)) {
+  if (!safeUpdateNodeFbdo("/solar", &root, 3000)) {
     static unsigned long lastPushErrPrint = 0;
     if (millis() - lastPushErrPrint >= 5000) {
       lastPushErrPrint = millis();
@@ -3373,7 +3387,7 @@ void telemetryTask(void *pvParameters) {
           hJson.set("flags", (int)pendingRec.flags);
           hJson.set("source", "device");
           hJson.set("backfill", true);
-          if (Firebase.RTDB.updateNode(&fbdo, histPath, &hJson)) {
+          if (safeUpdateNodeFbdo(histPath, &hJson, 3000)) {
             OfflineQueue.popRecord();
             Serial.printf(">> [OFFLINE QUEUE] Day bu thanh cong ban ghi %lu "
                           "len Firebase | Con lai trong Queue: %u\n",
@@ -4460,6 +4474,8 @@ void setup() {
   // 8. Khoi tao Background Task tren Core 0
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
+  if (!fbdoMutex)
+    fbdoMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
                           16384, // 16 KB stack phong phu chong tran Stack khi BearSSL & JSON xu ly
                           NULL,
