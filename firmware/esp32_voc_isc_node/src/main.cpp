@@ -192,6 +192,8 @@ float readAdcMilliVoltsFiltered(uint8_t pin) {
 // 6. KIỂM TRA TRẠNG THÁI NGỦ CỦA HỆ THỐNG & ĐIỀU KHIỂN ĐÈN 12V (RELAY E)
 // -------------------------------------------------------------------------
 void pushVocIscToFirebase(bool writeHistory = false);
+void pushHeartbeatToFirebase();
+unsigned long lastHeartbeatMs = 0;
 
 // Hàm trả về true khi hệ thống đang trong trạng thái ngủ đêm
 bool isSystemCurrentlySleeping() {
@@ -570,6 +572,33 @@ void pushVocIscToFirebase(bool writeHistory) {
       Firebase.RTDB.updateNode(&fbdo, histPath, &hVocJson);
     }
   }
+  lastHeartbeatMs = millis();
+}
+
+void pushHeartbeatToFirebase() {
+  if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
+  unsigned long lampRemainSec = 0;
+  if (!lampAutoDisabled && wasSleepingForLamp) {
+    unsigned long currentTargetMs = (lampAutoPhase ? lampOnSec : lampOffSec) * 1000UL;
+    unsigned long elapsed = millis() - lampPhaseStartMs;
+    if (elapsed < currentTargetMs) {
+      lampRemainSec = (currentTargetMs - elapsed) / 1000UL;
+    }
+  }
+
+  FirebaseJson hbJson;
+  hbJson.set("online", true);
+  hbJson.set("is_sleeping", isSystemCurrentlySleeping());
+  hbJson.set("lamp_12v_on", lamp12vState);
+  hbJson.set("lamp_auto_phase", lampAutoPhase ? "ON" : "OFF");
+  hbJson.set("lamp_remain_sec", (int)lampRemainSec);
+  hbJson.set("relay_interval_sec", (int)relayIntervalSec);
+  hbJson.set("temp_chip_c", temperatureRead());
+  hbJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
+  hbJson.set("ip", WiFi.localIP().toString());
+  hbJson.set("updated_at/.sv", "timestamp");
+  Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &hbJson);
 }
 
 // -------------------------------------------------------------------------
@@ -861,11 +890,10 @@ void loop() {
   // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
   updateNightLamp12vCycle();
 
-  // Định kỳ mỗi 60 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
-  static unsigned long lastSleepHeartbeatMs = 0;
-  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 60000)) {
-    lastSleepHeartbeatMs = millis();
-    pushVocIscToFirebase(false);
+  // Heartbeat mỗi 20 giây (cả ngày lẫn đêm khi MEAS_IDLE) để Web luôn báo ESP2 Online (< 45s)
+  if (measState == MEAS_IDLE && (millis() - lastHeartbeatMs >= 20000)) {
+    lastHeartbeatMs = millis();
+    pushHeartbeatToFirebase();
   }
 
   // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc (Chỉ chạy khi thức)
