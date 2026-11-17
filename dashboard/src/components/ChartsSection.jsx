@@ -1051,9 +1051,9 @@ export default function ChartsSection({
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Sta (°C)</th>
                   <th
                     className="py-3 px-3.5 text-right whitespace-nowrap"
-                    title="Tính theo phương pháp bài báo MDPI (Voc × Isc): ((Voc_trk × Isc_trk) / (Voc_sta × Isc_sta) - 1) × 100%"
+                    title="Tính theo thông số không tải (Voc × Isc): ((Voc_trk × Isc_trk) / (Voc_sta × Isc_sta) - 1) × 100%"
                   >
-                    % Gain (Bài báo)
+                    % Gain (Không tải)
                   </th>
                   <th className="py-3 px-3.5 whitespace-nowrap">Ghi chú</th>
                   <th className="py-3 px-3.5 text-center whitespace-nowrap">Trạng thái</th>
