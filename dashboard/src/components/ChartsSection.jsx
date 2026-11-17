@@ -584,12 +584,7 @@ export default function ChartsSection({
     if (row?.paperGainPercent !== undefined && row?.paperGainPercent !== null) {
       return Number(row.paperGainPercent);
     }
-    const vt = Number(row?.voc_trk || 0);
-    const vs = Number(row?.voc_sta || 0);
-    const it = Number(row?.isc_trk || 0);
-    const is = Number(row?.isc_sta || 0);
-    if (vt <= 0 || vs <= 0 || it <= 0 || is <= 0) return null;
-    return parseFloat((((vt * it) / (vs * is) - 1) * 100).toFixed(1));
+    return null;
   };
 
   // =========================================================================
