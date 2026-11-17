@@ -581,6 +581,9 @@ export default function ChartsSection({
   };
 
   const calcPaperGainPercent = (row) => {
+    if (row?.paperGainPercent !== undefined && row?.paperGainPercent !== null) {
+      return Number(row.paperGainPercent);
+    }
     const vt = Number(row?.voc_trk || 0);
     const vs = Number(row?.voc_sta || 0);
     const it = Number(row?.isc_trk || 0);

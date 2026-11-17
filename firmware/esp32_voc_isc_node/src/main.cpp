@@ -79,7 +79,7 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 
 // Cấu hình chu kỳ nhảy Relay & trạng thái ngủ đồng bộ từ hệ thống chính
-uint32_t relayIntervalSec = 10;      // Mặc định 10 giây / 1 chu kỳ nhảy relay A-B-C-D
+uint32_t relayIntervalSec = 60;      // Mặc định 60 giây / 1 chu kỳ nhảy relay A-B-C-D (đồng bộ lịch sử 1 phút)
 bool remoteIsSleeping     = false;   // Trạng thái ngủ thực tế từ ESP32 #1
 bool remoteSleepDisabled  = false;   // Cờ vô hiệu hóa ngủ đêm
 bool remoteMotorsMoving   = false;   // Tránh đóng relay đúng lúc motor đang quay mạnh
@@ -191,7 +191,7 @@ float readAdcMilliVoltsFiltered(uint8_t pin) {
 // -------------------------------------------------------------------------
 // 6. KIỂM TRA TRẠNG THÁI NGỦ CỦA HỆ THỐNG & ĐIỀU KHIỂN ĐÈN 12V (RELAY E)
 // -------------------------------------------------------------------------
-void pushVocIscToFirebase();
+void pushVocIscToFirebase(bool writeHistory = false);
 
 // Hàm trả về true khi hệ thống đang trong trạng thái ngủ đêm
 bool isSystemCurrentlySleeping() {
@@ -490,7 +490,7 @@ void pollSystemStateAndConfig() {
   }
 }
 
-void pushVocIscToFirebase() {
+void pushVocIscToFirebase(bool writeHistory) {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
 
   unsigned long lampRemainSec = 0;
@@ -549,8 +549,27 @@ void pushVocIscToFirebase() {
   nodeJson.set("ip", WiFi.localIP().toString());
   nodeJson.set("ota_hostname", "esp32-voc-isc-node");
   nodeJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
+  nodeJson.set("temp_chip_c", temperatureRead());
   nodeJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &nodeJson);
+
+  // Ghi lịch sử Voc/Isc mỗi chu kỳ đo (60s/lần) vào /solar/history để tích phân theo từng thời điểm
+  if (writeHistory) {
+    time_t nowEpoch = time(nullptr);
+    if (nowEpoch > 1700000000) {
+      uint32_t slotEpoch = ((uint32_t)nowEpoch / 60UL) * 60UL;
+      char histPath[64];
+      snprintf(histPath, sizeof(histPath), "/solar/history/%lu", (unsigned long)slotEpoch);
+      FirebaseJson hVocJson;
+      hVocJson.set("epoch_ts", (double)slotEpoch);
+      hVocJson.set("voc_trk", liveVocTrk);
+      hVocJson.set("isc_trk", liveIscTrk);
+      hVocJson.set("voc_sta", liveVocSta);
+      hVocJson.set("isc_sta", liveIscSta);
+      hVocJson.set("source", "device");
+      Firebase.RTDB.updateNode(&fbdo, histPath, &hVocJson);
+    }
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -664,8 +683,8 @@ void runMeasurementStateMachine() {
                       (unsigned long)relayIntervalSec,
                       lamp12vState ? "ON" : "OFF");
 
-        // Đẩy kết quả đo mới nhất lên Firebase ngay sau khi hoàn tất chu kỳ
-        pushVocIscToFirebase();
+        // Đẩy kết quả đo mới nhất lên Firebase ngay sau khi hoàn tất chu kỳ (kèm ghi lịch sử 1 phút)
+        pushVocIscToFirebase(true);
       }
       break;
     }
@@ -751,8 +770,8 @@ void setup() {
 
   // BƯỚC 3: Khôi phục cấu hình từ NVS Flash
   prefs.begin("voc_isc_cfg", false);
-  relayIntervalSec = prefs.getUInt("rly_sec", 10);
-  if (relayIntervalSec < 3 || relayIntervalSec > 3600) relayIntervalSec = 10;
+  relayIntervalSec = prefs.getUInt("rly_sec", 60);
+  if (relayIntervalSec < 3 || relayIntervalSec > 3600) relayIntervalSec = 60;
   lampAutoDisabled = prefs.getBool("lamp_dis", false);
   lampManualState = prefs.getBool("lamp_man", false);
   lampOnSec = prefs.getUInt("lamp_on_s", 15 * 60);
@@ -842,11 +861,11 @@ void loop() {
   // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
   updateNightLamp12vCycle();
 
-  // Định kỳ mỗi 4 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
+  // Định kỳ mỗi 60 giây khi đang ngủ (Relay A-D không nhảy), vẫn cập nhật trạng thái Đèn 12V lên Firebase
   static unsigned long lastSleepHeartbeatMs = 0;
-  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 4000)) {
+  if (isSystemCurrentlySleeping() && (millis() - lastSleepHeartbeatMs >= 60000)) {
     lastSleepHeartbeatMs = millis();
-    pushVocIscToFirebase();
+    pushVocIscToFirebase(false);
   }
 
   // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc (Chỉ chạy khi thức)

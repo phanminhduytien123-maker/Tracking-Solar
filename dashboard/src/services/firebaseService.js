@@ -432,6 +432,9 @@ export class FirebaseSolarService {
           maxVocSta: 0,
           maxIscTrk: 0,
           maxIscSta: 0,
+          sumPappTrk: 0,
+          sumPappSta: 0,
+          vocIscCount: 0,
           sumTempTrk: 0,
           sumTempSta: 0,
           tempCount: 0,
@@ -452,6 +455,11 @@ export class FirebaseSolarService {
       if (rec.voc_sta) byDay[dayKey].maxVocSta = Math.max(byDay[dayKey].maxVocSta, Number(rec.voc_sta));
       if (rec.isc_trk) byDay[dayKey].maxIscTrk = Math.max(byDay[dayKey].maxIscTrk, Number(rec.isc_trk));
       if (rec.isc_sta) byDay[dayKey].maxIscSta = Math.max(byDay[dayKey].maxIscSta, Number(rec.isc_sta));
+      if (rec.voc_trk > 0 && rec.isc_trk > 0 && rec.voc_sta > 0 && rec.isc_sta > 0) {
+        byDay[dayKey].sumPappTrk += Number(rec.voc_trk) * Number(rec.isc_trk);
+        byDay[dayKey].sumPappSta += Number(rec.voc_sta) * Number(rec.isc_sta);
+        byDay[dayKey].vocIscCount++;
+      }
       if (rec.temp_trk || rec.temp_sta) {
         byDay[dayKey].sumTempTrk += Number(rec.temp_trk || 0);
         byDay[dayKey].sumTempSta += Number(rec.temp_sta || 0);
@@ -498,6 +506,10 @@ export class FirebaseSolarService {
         const avgTempTrk = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_trk || 0);
         const avgTempSta = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempSta / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_sta || 0);
 
+        const paperGainPercent = (dayInfo.vocIscCount > 0 && dayInfo.sumPappSta > 0)
+          ? parseFloat((((dayInfo.sumPappTrk / dayInfo.sumPappSta) - 1) * 100).toFixed(1))
+          : null;
+
         historyList[idx] = {
           ...historyList[idx],
           trackingWh: trkWh,
@@ -507,6 +519,7 @@ export class FirebaseSolarService {
           diffWh,
           diffKwh,
           gainPercent: gain,
+          paperGainPercent,
           severe_invalid: false, // Dữ liệu thật từ cảm biến đo đạc -> gỡ bỏ cờ lỗi
           invalid_reasons: [],
           voc_trk: dayInfo.maxVocTrk > 0 ? parseFloat(dayInfo.maxVocTrk.toFixed(2)) : (historyList[idx]?.voc_trk || 0),
