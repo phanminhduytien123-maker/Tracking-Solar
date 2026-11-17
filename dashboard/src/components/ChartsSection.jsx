@@ -320,7 +320,7 @@ export default function ChartsSection({
   const totalTrkWh = history30Days.reduce((acc, d) => acc + (d.trackingWh !== undefined ? d.trackingWh : (Number(d.trackingKwh || 0) * 1000)), 0);
   const totalStaWh = history30Days.reduce((acc, d) => acc + (d.staticWh !== undefined ? d.staticWh : (Number(d.staticKwh || 0) * 1000)), 0);
   const totalDiffWh = totalTrkWh - totalStaWh;
-  const overallGain = totalStaWh > 0 ? (((totalTrkWh / (1.018 * totalStaWh)) - 1) * 100) : 0;
+  const overallGain = totalStaWh > 0 ? (((totalTrkWh / totalStaWh) - 1) * 100) : 0;
 
   const vocTrkDays = validHistory.filter(d => Number(d.voc_trk) > 0);
   const avgVocTrk = vocTrkDays.length > 0 ? vocTrkDays.reduce((acc, d) => acc + Number(d.voc_trk), 0) / vocTrkDays.length : 0;

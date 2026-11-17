@@ -167,12 +167,12 @@ export default function KpiCards({ INA226 }) {
                   Hiệu Suất Cải Thiện
                 </h2>
                 <span className="text-[11px] font-mono text-zinc-400">
-                  % Gain = (ΣE_trk / (k · ΣE_sta) − 1) × 100%
+                  % Gain = (ΣE_trk / ΣE_sta − 1) × 100%
                 </span>
               </div>
             </div>
             <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-[#181a22] text-zinc-200 border border-[#2c3140]">
-              HIỆU CHUẨN k=1.018
+              SO SÁNH TRỰC TIẾP
             </span>
           </div>
 

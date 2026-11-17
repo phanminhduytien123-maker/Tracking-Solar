@@ -90,7 +90,7 @@ export default function HistoryDataManagementTab({
       if ((field === 'trackingWh' || field === 'staticWh') && !isManualGain) {
         const trk = Number(field === 'trackingWh' ? value : prev.trackingWh);
         const sta = Number(field === 'staticWh' ? value : prev.staticWh);
-        const expectedSta = 1.018 * sta;
+        const expectedSta = sta;
         if (expectedSta > 0) {
           next.gainPercent = parseFloat((((trk / expectedSta) - 1) * 100).toFixed(1));
         } else {

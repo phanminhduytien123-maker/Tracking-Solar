@@ -639,7 +639,7 @@ export default function App() {
         if (today.trackingWh && trkWh <= today.trackingWh) return prev;
         const diffWh = parseFloat((trkWh - staWh).toFixed(1));
         const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
-        const expectedStaWh = 1.018 * staWh;
+        const expectedStaWh = staWh;
         const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
         const updated = [...prev];
         updated[lastIdx] = {

@@ -87,7 +87,7 @@ export function getCleanZeroTelemetry() {
         hasValidGain: false,
         powerDelta: null,
         energyDeltaWh: null,
-        calibrationK: 1.018
+        calibrationK: 1.0
       }
     },
     motors: {
@@ -492,7 +492,7 @@ export class FirebaseSolarService {
         staWh = parseFloat(staWh.toFixed(1));
         const diffWh = parseFloat((trkWh - staWh).toFixed(1));
         const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
-        const expectedStaWh = 1.018 * staWh;
+        const expectedStaWh = staWh;
         const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
 
         const avgTempTrk = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_trk || 0);
@@ -538,7 +538,7 @@ export class FirebaseSolarService {
             const slotData = daySlots.get(pt.time);
             pt.pTracking = slotData.pTracking;
             pt.pStatic = slotData.pStatic;
-            const exp = 1.018 * slotData.pStatic;
+            const exp = slotData.pStatic;
             pt.gain = exp > 0 ? parseFloat((((slotData.pTracking / exp) - 1) * 100).toFixed(1)) : 0;
           }
         });
@@ -571,7 +571,7 @@ export class FirebaseSolarService {
           const staWh = (c.staticWh !== undefined && c.staticWh !== null) ? c.staticWh : (item.staticWh || 0);
           const diffWh = parseFloat((trkWh - staWh).toFixed(1));
           const diffKwh = parseFloat(((trkWh - staWh) / 1000).toFixed(3));
-          const expectedStaWh = 1.018 * staWh;
+          const expectedStaWh = staWh;
           const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : (c.gainPercent || 0);
 
           return {
@@ -803,7 +803,7 @@ export class FirebaseSolarService {
     const fixedEps = Number((90.0 - fixedBeta).toFixed(1)); // 75.0°
 
     // Tích phân % Gain: Chỉ tính khi CẢ 2 ĐANG LIVE, CÙNG NGUỒN DEVICE THẬT, VÀ ΣE_sta >= 5 Wh
-    const K_CROSS = Number(algo.crossCalibrationK || 1.018);
+    const K_CROSS = 1.0;
     let percentGain = null;
     let hasValidGain = false;
     if (isTrackingLive && isStaticLive && sourceStatus === 'device' && staEnergyWh !== null && staEnergyWh >= 5.0 && trkEnergyWh !== null) {
