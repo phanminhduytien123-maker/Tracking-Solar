@@ -6428,22 +6428,22 @@ void loop() {
                 }
               } else {
                 // Buổi sáng sớm trước bình minh (04:00 - 05:45):
-                // Luôn tự đưa về tư thế đón bình minh NOAA (targetAz, Zenith 0° tilt / Epsilon 90°) và ready!
+                // Tự đưa Trục 1 về góc phương vị Đông và gập Trục 2 về góc đón bình minh tối đa theo NOAA (targetEl)
                 isMaxAzimuthReached = false;
                 systemFsmState = FSM_STATE_DAWN_POLL;
                 if (fabs(targetAz - getAngleDeg1()) > 0.5f) {
                   stepPositionControl(1, targetAz, autoSpeedHz);
                 }
-                if (fabs(getAxis2TiltSignedDeg()) > 0.5f) {
-                  stepPositionControl(2, 0.0f, 5000);
+                if (fabs(targetEl - getAxis2TiltSignedDeg()) > 0.5f) {
+                  stepPositionControl(2, targetEl, 5000);
                 }
                 static unsigned long lastDawnLogMs = 0;
                 if (millis() - lastDawnLogMs >= 30000) {
                   lastDawnLogMs = millis();
                   Serial.printf("\n>> [DAWN WAIT] Sang som truoc binh minh "
                                 "(Gio: %02d:%02d, El=%+.1f°). Gian pin san sang "
-                                "tai goc don nang NOAA (Az=%+.1f°, El=90.0°)!\n",
-                                curH, curMin, elSun, targetAz);
+                                "tai goc don nang NOAA (Az=%+.1f°, Eps=%.1f°)!\n",
+                                curH, curMin, elSun, targetAz, 90.0f - fabs(targetEl));
                 }
               }
             } else {
