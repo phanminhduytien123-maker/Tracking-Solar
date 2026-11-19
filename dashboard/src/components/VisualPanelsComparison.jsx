@@ -1,5 +1,11 @@
 import React from 'react';
-import { formatSignedNumber, formatValueOrDash, getConnectionStatusBadge, getCompassDirectionName } from '../utils/formatters';
+import {
+  formatSignedNumber,
+  formatValueOrDash,
+  getConnectionStatusBadge,
+  getCompassDirectionName,
+  computeSignedTiltFromTelemetry
+} from '../utils/formatters';
 
 /**
  * BẢNG SO SÁNH ĐO ĐẠC PHÒNG THÍ NGHIỆM
@@ -27,14 +33,18 @@ export default function VisualPanelsComparison({
   const phiAngle = az.phi !== undefined && az.phi !== null ? az.phi : az.currentAngle;
   const epsAngle = el.epsilon !== undefined ? el.epsilon : (el.currentAngle !== null ? el.currentAngle : null);
 
-  // Tính phương vị địa lý thực tế (Compass Azimuth) của giàn pin tracker từ cơ cấu (φ, ε):
+  // Góc nghiêng có dấu thật từ phần cứng (0° = nằm ngang Zenith khi ε = 90°, +60° = CTHT 2, -30° = đáy vít me)
+  const signedTiltDeg = computeSignedTiltFromTelemetry(el.encoderPulses, epsAngle);
+  const clampedTiltSvg = Math.max(-35, Math.min(60, signedTiltDeg));
+
+  // Tính phương vị địa lý thực tế (Compass Azimuth) của giàn pin tracker từ cơ cấu (φ, signedTilt):
   // - Switch Home 1 đặt tại Nam (180.0°). Quay ra xa Home ngược KĐH về phía Đông (90.0°).
-  // - Sáng (Trước 12h): Heading = 180.0° - φ (Đón nắng Đông -> Nam).
-  // - Chiều (Sau 12h): Heading = 360.0° - φ (Trục 1 quay Đông Bắc ~100°, Trục 2 ngửa sau đón nắng Tây).
+  // - Sáng (tilt >= 0): Heading = 180.0° - φ (Đón nắng Đông -> Nam).
+  // - Chiều (tilt < 0): Heading = 360.0° - φ (Trục 1 quay Đông Bắc ~100°, Trục 2 ngửa sau đón nắng Tây).
   const compassAzimuth = (() => {
     if (phiAngle !== null && phiAngle !== undefined && !isNaN(phiAngle)) {
       const hour = new Date().getHours();
-      const isAfternoon = hour >= 12;
+      const isAfternoon = signedTiltDeg < -0.5 || (Math.abs(signedTiltDeg) <= 0.5 && hour >= 12);
       let azVal = isAfternoon ? (360.0 - Number(phiAngle)) : (180.0 - Number(phiAngle));
       while (azVal < 0) azVal += 360.0;
       while (azVal >= 360.0) azVal -= 360.0;
@@ -51,17 +61,6 @@ export default function VisualPanelsComparison({
   const staBadge = getConnectionStatusBadge(stat.connStatus, stat.staleDurationMs);
 
   const hasValidGain = comparison.hasValidGain && comparison.percentGain !== null;
-
-  // Góc nghiêng mặt pin so với phương ngang (Zenith nằm ngang = 50°) để vẽ sơ đồ mặt cắt nghiêng vuông góc 90° với tia nắng
-  const tiltDegFromHorizontal = (() => {
-    if (epsAngle === null || isNaN(epsAngle)) return 25;
-    const rawDelta = Math.abs(Number(epsAngle) - 50);
-    if (system?.isSleeping || Number(epsAngle) <= 12) return 30;
-    // Nếu firmware cũ đang nén tỷ lệ 40/90 (rawDelta ~ 13.5° lúc 10h40), khôi phục góc nghiêng thực tế
-    const effectiveTilt = rawDelta > 0 && rawDelta < 20 ? rawDelta * (90 / 40) : rawDelta;
-    return Math.max(8, Math.min(42, effectiveTilt));
-  })();
-  const clampedTiltSvg = Math.max(-45, Math.min(45, tiltDegFromHorizontal));
 
   return (
     <div className="lab-card p-4 sm:p-5 space-y-4">

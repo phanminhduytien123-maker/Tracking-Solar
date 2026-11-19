@@ -7,7 +7,8 @@ import {
   formatSignedNumber,
   formatValueOrDash,
   getConnectionStatusBadge,
-  getCompassDirectionName
+  getCompassDirectionName,
+  computeSignedTiltFromTelemetry
 } from '../utils/formatters';
 
 /**
@@ -360,36 +361,93 @@ function createHoneycombPsuTexture() {
 }
 
 /**
- * Tạo hình học gá chữ T in 3D màu trắng
+ * Tạo texture ren trục vít me T8 bước 8 bằng thép không gỉ
  */
-function createSculptedTBracketGeometry() {
-  const shape = new THREE.Shape();
-  shape.moveTo(-0.44, 0.12);
-  shape.lineTo(0.44, 0.12);
-  shape.quadraticCurveTo(0.48, 0.12, 0.48, 0.08);
-  shape.lineTo(0.48, -0.02);
-  shape.quadraticCurveTo(0.48, -0.06, 0.43, -0.06);
-  shape.lineTo(0.22, -0.06);
-  shape.quadraticCurveTo(0.18, -0.06, 0.18, -0.10);
-  shape.lineTo(0.18, -0.22);
-  shape.quadraticCurveTo(0.18, -0.27, 0.12, -0.27);
-  shape.lineTo(-0.12, -0.27);
-  shape.quadraticCurveTo(-0.18, -0.27, -0.18, -0.22);
-  shape.lineTo(-0.18, -0.10);
-  shape.quadraticCurveTo(-0.18, -0.06, -0.22, -0.06);
-  shape.lineTo(-0.43, -0.06);
-  shape.quadraticCurveTo(-0.48, -0.06, -0.48, -0.02);
-  shape.lineTo(-0.48, 0.08);
-  shape.quadraticCurveTo(-0.48, 0.12, -0.44, 0.12);
+function createLeadScrewTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
 
-  return new THREE.ExtrudeGeometry(shape, {
-    depth: 0.055,
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillRect(0, 0, 128, 256);
+
+  for (let y = 0; y < 256; y += 16) {
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(0, y, 128, 5);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, y + 5, 128, 5);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(0, y + 10, 128, 6);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 28);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/**
+ * Tạo vòm cầu in 3D màu trắng nối đỉnh 2 thanh nhôm đứng Trục 2 (đúng thực tế Ảnh 2 & Ảnh 4)
+ */
+function createTopArchBridgeGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.32, 0.10);
+  shape.lineTo(0.32, 0.10);
+  shape.quadraticCurveTo(0.35, 0.10, 0.35, 0.06);
+  shape.lineTo(0.35, -0.09);
+  shape.quadraticCurveTo(0.35, -0.12, 0.31, -0.12);
+  shape.lineTo(0.18, -0.12);
+  shape.quadraticCurveTo(0.15, -0.12, 0.14, -0.06);
+  shape.quadraticCurveTo(0.09, 0.015, 0, 0.015);
+  shape.quadraticCurveTo(-0.09, 0.015, -0.14, -0.06);
+  shape.quadraticCurveTo(-0.15, -0.12, -0.18, -0.12);
+  shape.lineTo(-0.31, -0.12);
+  shape.quadraticCurveTo(-0.35, -0.12, -0.35, -0.09);
+  shape.lineTo(-0.35, 0.06);
+  shape.quadraticCurveTo(-0.35, 0.10, -0.32, 0.10);
+
+  const geom = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.14,
     bevelEnabled: true,
-    bevelSegments: 3,
+    bevelSegments: 2,
     steps: 1,
     bevelSize: 0.008,
     bevelThickness: 0.008
   });
+  geom.translate(0, 0, -0.07);
+  geom.rotateY(Math.PI / 2);
+  return geom;
+}
+
+/**
+ * Tạo tai gá ổ bi chữ U in 3D màu trắng gắn mặt dưới tấm pin quanh trục quay Trục 2 (Ảnh 5)
+ */
+function createBearingEarGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.17, 0.116);
+  shape.lineTo(0.17, 0.116);
+  shape.lineTo(0.17, 0.076);
+  shape.lineTo(0.115, 0.076);
+  shape.quadraticCurveTo(0.098, 0.076, 0.098, 0.02);
+  shape.absarc(0, 0, 0.098, 0, Math.PI, true);
+  shape.quadraticCurveTo(-0.098, 0.076, -0.115, 0.076);
+  shape.lineTo(-0.17, 0.076);
+  shape.closePath();
+
+  const geom = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.052,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.006,
+    bevelThickness: 0.006
+  });
+  geom.translate(0, 0, -0.026);
+  return geom;
 }
 
 // Góc nhìn tổng quan mặc định & góc xuất phát khi chuyển cảnh (Cinematic Camera Fly-in)
@@ -420,8 +478,10 @@ export default function CompactInteractiveTwin({
   const az = motors?.azimuth || {};
   const el = motors?.elevation || {};
 
-  const livePhi = az.phi !== undefined && az.phi !== null ? Number(az.phi) : (az.currentAngle !== null ? Number(az.currentAngle) : 2.3);
-  const liveEps = el.epsilon !== undefined && el.epsilon !== null ? Number(el.epsilon) : (el.currentAngle !== null ? Number(el.currentAngle) : 9.3);
+  const livePhi = az.phi !== undefined && az.phi !== null ? Number(az.phi) : (az.currentAngle !== null ? Number(az.currentAngle) : 0);
+  const liveEps = el.epsilon !== undefined && el.epsilon !== null ? Number(el.epsilon) : (el.currentAngle !== null ? Number(el.currentAngle) : 90.0);
+  const liveElEnc = el.encoderPulses;
+  const signedTiltDeg = computeSignedTiltFromTelemetry(liveElEnc, liveEps);
 
   const siteLat = Number(location?.lat) || 10.78816;
   const siteLon = Number(location?.lon) || 106.66617;
@@ -441,12 +501,12 @@ export default function CompactInteractiveTwin({
   }, [siteLat, siteLon, clockTick]);
 
   // Phương vị địa lý thực tế (Compass Azimuth):
-  // - Switch Home 1 đặt tại Nam (180°). Sáng (trước 12h): 180° - φ (Đông -> Đông Nam -> Nam).
-  // - Chiều (sau 12h): 360° - φ (kết hợp Trục 2 ngửa sau đón nắng Tây Nam -> Tây).
+  // - Switch Home 1 đặt tại Nam (180°). Sáng (tilt > 0): 180° - φ (Đông -> Đông Nam -> Nam).
+  // - Chiều (tilt < 0): 360° - φ (kết hợp Trục 2 ngửa sau đón nắng Tây Nam -> Tây).
   const compassAzimuth = (() => {
     if (livePhi !== null && livePhi !== undefined && !isNaN(livePhi)) {
       const hour = new Date().getHours();
-      const isAfternoon = hour >= 12;
+      const isAfternoon = signedTiltDeg < -0.5 || (Math.abs(signedTiltDeg) <= 0.5 && hour >= 12);
       let azVal = isAfternoon ? (360.0 - livePhi) : (180.0 - livePhi);
       while (azVal < 0) azVal += 360.0;
       while (azVal >= 360.0) azVal -= 360.0;
@@ -479,7 +539,7 @@ export default function CompactInteractiveTwin({
   });
   const targetAnglesRef = useRef({
     phiRad: 0,
-    tiltRad: THREE.MathUtils.degToRad(30),
+    tiltRad: 0,
     lidRad: 0,
     camTargetPos: null,
     camLookAt: null,
@@ -499,46 +559,15 @@ export default function CompactInteractiveTwin({
     targetAnglesRef.current.staPower = Math.max(0, Number(stat.power) || 0);
   }, [tracking.power, stat.power]);
 
-  // Đồng bộ góc quay 2 trục của tấm Tracker theo đúng hệ tọa độ La bàn 3D:
-  // - Trên (-Z) = Đông (90°), Phải (+X) = Nam (180°), Dưới (+Z) = Tây (270°), Trái (-X) = Bắc (0° / 360°)
-  // - Khi buổi sáng / ngủ đêm (ε < 50°): Mặt pin nghiêng về phía -X lokal (elevationGroup.rotation.z > 0),
-  //   do đó để hướng mặt tấm pin nhìn về góc phương vị Az (ví dụ Đông Nam ~130°), trục đứng cần xoay:
-  //   azimuthGroup.rotation.y = (90° - Az) hoặc khi tính trực tiếp từ cơ cấu (φ, ε):
-  //   Khi φ = 0° (Home Nam 180°) -> trục +X hướng về Bắc (-X thế giới), mặt nghiêng -X hướng về Nam (+X thế giới) -> phiRad = π - φ (hoặc +φ từ gốc Bắc).
+  // Đồng bộ góc quay 2 trục của tấm Tracker 100% theo cơ cấu thật (vít me 5 điểm + Home Nam 180°):
+  // - φ = 0° -> Trục 1 giữ nguyên vị trí Home (vít me ở -X bên trái, khi +60° tấm pin nghiêng về +X = Nam 180°)
+  // - φ tăng từ 0° -> +90° -> rotation.y dương xoay cụm từ Nam (+X) ngược KĐH sang Đông (-Z)
+  // - signedTiltDeg = +60° (CTHT 2 trên đỉnh) -> rotation.z = -60° | 0° (Zenith nằm phẳng) -> rotation.z = 0° | -30° (đáy) -> rotation.z = +30°
   useEffect(() => {
-    const epsDeg = Number(liveEps);
-    const validEps = !isNaN(epsDeg) ? epsDeg : 9.3;
-
-    // Góc nghiêng mặt pin quanh trục Z cục bộ (Zenith nằm ngang = 50°):
-    // - Khi ngủ đêm hoặc về sát giới hạn mềm (validEps <= 12°): giữ nguyên góc nghiêng chuẩn (~30° về hướng Bắc)
-    // - Khi bám mặt trời ban ngày: tính góc nghiêng vuông góc (90°) với tia bức xạ Mặt trời NOAA
-    let tiltLeftDeg = 0;
-    const rawDelta = 50 - validEps;
-    if (system?.isSleeping || validEps <= 12) {
-      tiltLeftDeg = Math.max(-42, Math.min(42, rawDelta * 0.75));
-    } else if (Math.abs(rawDelta) > 0.8) {
-      const tiltSign = rawDelta >= 0 ? 1 : -1;
-      if (noaaSun?.isDaylight && !system?.isManualMode) {
-        const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
-        const rayHorizDist = Math.hypot(sunPos.x - (-2.05), sunPos.z);
-        const rayVertDist = Math.max(0.5, sunPos.y - 2.35);
-        const rayZenithDeg = THREE.MathUtils.radToDeg(Math.atan2(rayHorizDist, rayVertDist));
-        tiltLeftDeg = tiltSign * Math.min(41, Math.max(90 - noaaSun.elevationDeg, rayZenithDeg));
-      } else {
-        tiltLeftDeg = Math.max(-41, Math.min(41, rawDelta));
-      }
-    }
-    targetAnglesRef.current.tiltRad = THREE.MathUtils.degToRad(tiltLeftDeg);
-
-    // Xác định hướng xoay Trục 1 (azimuthGroup.rotation.y) sao cho Pháp tuyến mặt pin hướng đúng về Phương vị địa lý (Đông Nam buổi sáng / Tây Nam buổi chiều):
-    const azDeg = compassAzimuth !== null ? Number(compassAzimuth) : (180 - (Number(livePhi) || 0));
-    const azRad = THREE.MathUtils.degToRad(azDeg);
-    if (tiltLeftDeg >= 0) {
-      targetAnglesRef.current.phiRad = -azRad;
-    } else {
-      targetAnglesRef.current.phiRad = Math.PI - azRad;
-    }
-  }, [livePhi, liveEps, compassAzimuth, noaaSun, system?.isSleeping, system?.isManualMode]);
+    const phiDeg = !isNaN(Number(livePhi)) ? Number(livePhi) : 0;
+    targetAnglesRef.current.phiRad = THREE.MathUtils.degToRad(phiDeg);
+    targetAnglesRef.current.tiltRad = -THREE.MathUtils.degToRad(signedTiltDeg);
+  }, [livePhi, signedTiltDeg]);
 
   // Đồng bộ vị trí Mặt trời NOAA trong không gian 3D
   useEffect(() => {
@@ -550,7 +579,7 @@ export default function CompactInteractiveTwin({
 
     const posAttr = sunRayLine.geometry.attributes.position;
     posAttr.setXYZ(0, sunPos.x, sunPos.y, sunPos.z);
-    posAttr.setXYZ(1, -2.05, 2.35, 0);
+    posAttr.setXYZ(1, -2.05, 2.68, 0);
     posAttr.needsUpdate = true;
     sunRayLine.computeLineDistances();
 
@@ -755,7 +784,7 @@ export default function CompactInteractiveTwin({
 
     const rayGeom = new THREE.BufferGeometry().setFromPoints([
       initSunPos,
-      new THREE.Vector3(-2.05, 2.35, 0)
+      new THREE.Vector3(-2.05, 2.68, 0)
     ]);
     const sunRayLine = new THREE.Line(
       rayGeom,
@@ -1075,110 +1104,282 @@ export default function CompactInteractiveTwin({
       azimuthGroup.add(bolt);
     }
 
-    const colHeight = 1.68;
-    addVSlotBar(azimuthGroup, 0.115, colHeight, 0.115, -0.058, 0.15 + colHeight / 2, 0);
-    addVSlotBar(azimuthGroup, 0.115, colHeight, 0.115, 0.058, 0.15 + colHeight / 2, 0);
+    // -------------------------------------------------------------------------
+    // CỤM TRỤC 2 MỚI: VÍT ME T8 BƯỚC 8 + THANH ĐẨY BẢN LỀ (KHỚP 5 ẢNH THỰC TẾ)
+    // - 2 trụ nhôm 20x20 đặt dọc theo trục Z (z = ±0.25)
+    // - Vít me T8 đặt đứng bên trái (-X = -0.26) nối hộp số + motor + encoder ở dưới
+    // - CTHT 2 đặt trên tay đỡ đen ở đỉnh trụ vít me
+    // - Đai ốc đồng chạy dọc trục vít me kéo/đẩy thanh thép tròn tới khớp U dưới mặt pin
+    // -------------------------------------------------------------------------
+    const COL_HEIGHT = 1.66;
+    const PIVOT_Y = 1.85;
+    const X_SCREW = -0.26;
+    const X_LOWER_CLEVIS = -0.38;
+    const CLEVIS_X = -0.82;
+    const CLEVIS_Y = 0.02;
+    const L_ROD = 1.04;
 
-    const midY = 1.12;
-    const m2Plate = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.34, 0.06, 2, 0.01), whitePrintMat);
-    m2Plate.position.set(-0.22, midY, 0.09);
-    m2Plate.castShadow = true;
-    azimuthGroup.add(m2Plate);
+    // 2 trụ nhôm đứng song song 20x20
+    addVSlotBar(azimuthGroup, 0.10, COL_HEIGHT, 0.10, 0, 0.15 + COL_HEIGHT / 2, 0.25);
+    addVSlotBar(azimuthGroup, 0.10, COL_HEIGHT, 0.10, 0, 0.15 + COL_HEIGHT / 2, -0.25);
 
-    [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]].forEach(([sx, sy]) => {
-      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.02, 10), chromeSteelMat);
-      s.rotation.x = Math.PI / 2;
-      s.position.set(-0.22 + sx, midY + sy, 0.122);
-      azimuthGroup.add(s);
-    });
+    // Cụm hộp bảo vệ động cơ & hộp giảm tốc in 3D màu đen ở chân cột (như Ảnh 2, 3)
+    const colClampFront = new THREE.Mesh(
+      new RoundedBoxGeometry(0.148, 0.36, 0.148, 2, 0.012),
+      matteBlackPrintMat
+    );
+    colClampFront.position.set(0, 0.33, 0.25);
+    colClampFront.castShadow = true;
+    azimuthGroup.add(colClampFront);
 
-    const m2PulleyPocket = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.07, 28), matteBlackPrintMat);
-    m2PulleyPocket.rotation.x = Math.PI / 2;
-    m2PulleyPocket.position.set(-0.22, midY, 0.10);
-    azimuthGroup.add(m2PulleyPocket);
+    const colClampBack = new THREE.Mesh(
+      new RoundedBoxGeometry(0.148, 0.36, 0.148, 2, 0.012),
+      matteBlackPrintMat
+    );
+    colClampBack.position.set(0, 0.33, -0.25);
+    colClampBack.castShadow = true;
+    azimuthGroup.add(colClampBack);
 
-    const m2AluHub = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.09, 20), chromeSteelMat);
-    m2AluHub.rotation.x = Math.PI / 2;
-    m2AluHub.position.set(-0.22, midY, 0.11);
-    azimuthGroup.add(m2AluHub);
+    const motorShroudTower = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.20, 0.21, 0.72, 8),
+      matteBlackPrintMat
+    );
+    motorShroudTower.rotation.y = Math.PI / 8;
+    motorShroudTower.position.set(-0.02, 0.51, 0);
+    motorShroudTower.castShadow = true;
+    azimuthGroup.add(motorShroudTower);
 
-    const nema2 = createDetailedNema17();
-    nema2.rotation.x = Math.PI / 2;
-    nema2.position.set(-0.22, midY, -0.12);
-    azimuthGroup.add(nema2);
+    const gearboxNeck = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.27, 0.28, 2, 0.015),
+      matteBlackPrintMat
+    );
+    gearboxNeck.position.set(-0.15, 0.285, 0);
+    gearboxNeck.castShadow = true;
+    azimuthGroup.add(gearboxNeck);
 
-    const enc2Mount = new THREE.Mesh(new RoundedBoxGeometry(0.38, 0.22, 0.18, 2, 0.01), whitePrintMat);
-    enc2Mount.position.set(0.14, midY - 0.03, 0.08);
-    azimuthGroup.add(enc2Mount);
+    const gearboxBoss = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.175, 0.175, 0.27, 36),
+      matteBlackPrintMat
+    );
+    gearboxBoss.position.set(X_SCREW, 0.285, 0);
+    gearboxBoss.castShadow = true;
+    azimuthGroup.add(gearboxBoss);
 
-    const tensionArm = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.045, 0.04, 2, 0.008), whitePrintMat);
-    tensionArm.position.set(0.18, midY + 0.02, 0.185);
-    tensionArm.rotation.z = 0.45;
-    azimuthGroup.add(tensionArm);
+    const enc2CoaxialBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.15, 24),
+      matteBlackPrintMat
+    );
+    enc2CoaxialBody.position.set(X_SCREW, 0.075, 0);
+    azimuthGroup.add(enc2CoaxialBody);
 
-    const sw2Body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.045, 0.035), matteBlackPrintMat);
-    sw2Body.position.set(0.30, midY - 0.11, 0.14);
+    const enc2Collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.055, 0.04, 20),
+      chromeSteelMat
+    );
+    enc2Collar.position.set(X_SCREW, 0.0, 0);
+    azimuthGroup.add(enc2Collar);
+
+    // Vòm cầu trắng nối đỉnh 2 trụ nhôm & trục xoay ngang bằng thép mạ crom (Ảnh 4, 5)
+    const topArchGeom = createTopArchBridgeGeometry();
+    const topArchBridge = new THREE.Mesh(topArchGeom, whitePrintMat);
+    topArchBridge.position.set(0, 1.81, 0);
+    topArchBridge.castShadow = true;
+    azimuthGroup.add(topArchBridge);
+
+    // Tay đỡ đen vươn sang -X giữ đầu trên vít me + Công tắc hành trình CTHT 2
+    const topScrewArm = new THREE.Mesh(
+      new RoundedBoxGeometry(0.36, 0.064, 0.14, 2, 0.012),
+      matteBlackPrintMat
+    );
+    topScrewArm.position.set(-0.16, 1.68, 0);
+    topScrewArm.castShadow = true;
+    azimuthGroup.add(topScrewArm);
+
+    const topBearingCollar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.042, 0.042, 0.036, 20),
+      chromeSteelMat
+    );
+    topBearingCollar.position.set(X_SCREW, 1.662, 0);
+    azimuthGroup.add(topBearingCollar);
+
+    const sw2Body = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.04, 0.032), matteBlackPrintMat);
+    sw2Body.position.set(X_SCREW, 1.635, 0.072);
     azimuthGroup.add(sw2Body);
+    const sw2Lever = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.007, 0.02), chromeSteelMat);
+    sw2Lever.position.set(X_SCREW - 0.015, 1.615, 0.072);
+    sw2Lever.rotation.z = 0.24;
+    azimuthGroup.add(sw2Lever);
     const sw2LedMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
     const sw2Led = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 12), sw2LedMat);
-    sw2Led.position.set(0.32, midY - 0.11, 0.16);
+    sw2Led.position.set(X_SCREW + 0.025, 1.638, 0.088);
     azimuthGroup.add(sw2Led);
 
-    const topPivotY = 0.15 + colHeight;
-    const topSaddleBlack = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.24, 0.32, 2, 0.015), matteBlackPrintMat);
-    topSaddleBlack.position.set(0, topPivotY - 0.04, 0);
-    azimuthGroup.add(topSaddleBlack);
+    // Trục vít me T8 ren thép đứng từ hộp giảm tốc (y=0.42) lên tay đỡ đỉnh (y=1.66)
+    const leadScrewTex = createLeadScrewTexture();
+    const leadScrewMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      map: leadScrewTex,
+      metalness: 0.88,
+      roughness: 0.22
+    });
+    const leadScrewMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 1.24, 20),
+      leadScrewMat
+    );
+    leadScrewMesh.position.set(X_SCREW, 1.04, 0);
+    leadScrewMesh.castShadow = true;
+    azimuthGroup.add(leadScrewMesh);
 
-    const upperDrivenPulley = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 32), whitePrintMat);
-    upperDrivenPulley.rotation.x = Math.PI / 2;
-    upperDrivenPulley.position.set(0, topPivotY + 0.02, 0.16);
-    azimuthGroup.add(upperDrivenPulley);
+    // Cụm Đai ốc đồng T8 + Gá L trắng trượt theo trục vít me (Ảnh 1, 2, 3)
+    const nutCarriageGroup = new THREE.Group();
+    nutCarriageGroup.position.set(0, 0.928, 0);
+    azimuthGroup.add(nutCarriageGroup);
 
-    const belt2Left = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.74, 0.042), rubberBeltMat);
-    belt2Left.position.set(-0.15, (midY + topPivotY) / 2 + 0.02, 0.14);
-    belt2Left.rotation.z = -0.28;
-    azimuthGroup.add(belt2Left);
+    const nutPlate = new THREE.Mesh(
+      new RoundedBoxGeometry(0.24, 0.032, 0.125, 2, 0.006),
+      whitePrintMat
+    );
+    nutPlate.position.set(-0.32, -0.04, 0);
+    nutPlate.castShadow = true;
+    nutCarriageGroup.add(nutPlate);
 
-    const belt2Right = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.74, 0.042), rubberBeltMat);
-    belt2Right.position.set(-0.05, (midY + topPivotY) / 2 + 0.02, 0.14);
-    belt2Right.rotation.z = -0.26;
-    azimuthGroup.add(belt2Right);
+    const brassFlange = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.022, 24), brassMat);
+    brassFlange.position.set(X_SCREW, -0.014, 0);
+    nutCarriageGroup.add(brassFlange);
 
-    // Nhóm nghiêng Độ ngửa Trục 2
+    const brassBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.055, 20), brassMat);
+    brassBarrel.position.set(X_SCREW, 0.005, 0);
+    nutCarriageGroup.add(brassBarrel);
+
+    [[-0.038, -0.038], [0.038, -0.038], [-0.038, 0.038], [0.038, 0.038]].forEach(([bx, bz]) => {
+      const nutScrew = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.018, 10), chromeSteelMat);
+      nutScrew.position.set(X_SCREW + bx, -0.001, bz);
+      nutCarriageGroup.add(nutScrew);
+    });
+
+    [-0.048, 0.048].forEach((ez) => {
+      const lowerEar = new THREE.Mesh(
+        new RoundedBoxGeometry(0.088, 0.095, 0.024, 2, 0.008),
+        whitePrintMat
+      );
+      lowerEar.position.set(X_LOWER_CLEVIS, -0.002, ez);
+      lowerEar.castShadow = true;
+      nutCarriageGroup.add(lowerEar);
+    });
+
+    const lowerClevisBolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.165, 14),
+      chromeSteelMat
+    );
+    lowerClevisBolt.rotation.x = Math.PI / 2;
+    lowerClevisBolt.position.set(X_LOWER_CLEVIS, 0, 0);
+    nutCarriageGroup.add(lowerClevisBolt);
+
+    // Thanh đẩy thép tròn + Gá đầu dưới màu trắng xoay động theo khớp clevis
+    const pushRodPivotGroup = new THREE.Group();
+    pushRodPivotGroup.position.set(X_LOWER_CLEVIS, 0.928, 0);
+    azimuthGroup.add(pushRodPivotGroup);
+
+    const lowerRodBlock = new THREE.Mesh(
+      new RoundedBoxGeometry(0.082, 0.155, 0.066, 2, 0.01),
+      whitePrintMat
+    );
+    lowerRodBlock.position.set(0, 0.055, 0);
+    lowerRodBlock.castShadow = true;
+    pushRodPivotGroup.add(lowerRodBlock);
+
+    const pushRodLen = L_ROD - 0.10;
+    const pushRodMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.019, 0.019, pushRodLen, 18),
+      chromeSteelMat
+    );
+    pushRodMesh.position.set(0, 0.05 + pushRodLen / 2, 0);
+    pushRodMesh.castShadow = true;
+    pushRodPivotGroup.add(pushRodMesh);
+
+    // Nhóm nghiêng Độ ngửa Trục 2 (xoay quanh trục ngang PIVOT_Y = 1.85)
     const elevationGroup = new THREE.Group();
-    elevationGroup.position.set(0, topPivotY + 0.06, 0);
-    elevationGroup.rotation.z = THREE.MathUtils.degToRad(30);
+    elevationGroup.position.set(0, PIVOT_Y, 0);
+    elevationGroup.rotation.z = 0;
     azimuthGroup.add(elevationGroup);
 
-    const pivotShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.48, 20), chromeSteelMat);
+    const pivotShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, 1.06, 20),
+      chromeSteelMat
+    );
     pivotShaft.rotation.x = Math.PI / 2;
-    pivotShaft.position.set(0, -0.04, 0);
     elevationGroup.add(pivotShaft);
 
-    const tBracketGeom = createSculptedTBracketGeometry();
-    const tBracketFront = new THREE.Mesh(tBracketGeom, whitePrintMat);
-    tBracketFront.position.set(0, 0.04, 0.18);
-    tBracketFront.castShadow = true;
-    elevationGroup.add(tBracketFront);
+    const bearingEarGeom = createBearingEarGeometry();
+    const earFront = new THREE.Mesh(bearingEarGeom, whitePrintMat);
+    earFront.position.set(0, 0, 0.41);
+    earFront.castShadow = true;
+    elevationGroup.add(earFront);
 
-    const tBracketBack = new THREE.Mesh(tBracketGeom, whitePrintMat);
-    tBracketBack.position.set(0, 0.04, -0.235);
-    tBracketBack.castShadow = true;
-    elevationGroup.add(tBracketBack);
+    const earBack = new THREE.Mesh(bearingEarGeom, whitePrintMat);
+    earBack.position.set(0, 0, -0.41);
+    earBack.castShadow = true;
+    elevationGroup.add(earBack);
 
-    const brgRight = createBallBearing(0.065, 0.035);
-    brgRight.position.set(0.32, 0.03, 0.21);
-    elevationGroup.add(brgRight);
+    const brgFront = createBallBearing(0.068, 0.036);
+    brgFront.position.set(0, 0, 0.44);
+    elevationGroup.add(brgFront);
 
-    const brgCenter = createBallBearing(0.072, 0.04);
-    brgCenter.position.set(0, -0.08, 0.21);
-    elevationGroup.add(brgCenter);
+    const brgBack = createBallBearing(0.068, 0.036);
+    brgBack.position.set(0, 0, -0.44);
+    elevationGroup.add(brgBack);
 
-    addVSlotBar(elevationGroup, 1.75, 0.075, 0.08, 0, 0.18, 0);
+    // Khớp U phía trên gắn phẳng dưới gầm tấm pin ở -X (CLEVIS_X, CLEVIS_Y)
+    const upperClevisFlange = new THREE.Mesh(
+      new RoundedBoxGeometry(0.22, 0.026, 0.19, 2, 0.006),
+      whitePrintMat
+    );
+    upperClevisFlange.position.set(CLEVIS_X, 0.104, 0);
+    upperClevisFlange.castShadow = true;
+    elevationGroup.add(upperClevisFlange);
+
+    [-0.052, 0.052].forEach((cz) => {
+      const upperCheek = new THREE.Mesh(
+        new RoundedBoxGeometry(0.13, 0.12, 0.028, 2, 0.015),
+        whitePrintMat
+      );
+      upperCheek.position.set(CLEVIS_X, 0.045, cz);
+      upperCheek.castShadow = true;
+      elevationGroup.add(upperCheek);
+    });
+
+    const upperRodHub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.038, 0.064, 18),
+      whitePrintMat
+    );
+    upperRodHub.rotation.x = Math.PI / 2;
+    upperRodHub.position.set(CLEVIS_X, CLEVIS_Y, 0);
+    elevationGroup.add(upperRodHub);
+
+    const upperClevisBolt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.15, 14),
+      chromeSteelMat
+    );
+    upperClevisBolt.rotation.x = Math.PI / 2;
+    upperClevisBolt.position.set(CLEVIS_X, CLEVIS_Y, 0);
+    elevationGroup.add(upperClevisBolt);
 
     const trackerPanel = createIndustrialSolarPanel(2.04, 1.56, true);
-    trackerPanel.position.set(0, 0.245, 0);
+    trackerPanel.position.set(0, 0.145, 0);
     elevationGroup.add(trackerPanel);
+
+    const updateLeadScrewLinkage = (th) => {
+      const ux = CLEVIS_X * Math.cos(th) - CLEVIS_Y * Math.sin(th);
+      const uy = PIVOT_Y + CLEVIS_X * Math.sin(th) + CLEVIS_Y * Math.cos(th);
+      const dx = ux - X_LOWER_CLEVIS;
+      const dy = Math.sqrt(Math.max(0.04, L_ROD * L_ROD - dx * dx));
+      const yNut = uy - dy;
+      nutCarriageGroup.position.y = yNut;
+      pushRodPivotGroup.position.set(X_LOWER_CLEVIS, yNut, 0);
+      pushRodPivotGroup.rotation.z = Math.atan2(-dx, dy);
+      leadScrewMesh.rotation.y = (yNut - 0.928) * 35.0;
+    };
+    updateLeadScrewLinkage(elevationGroup.rotation.z);
 
     // =========================================================================
     // 3. CHÍNH GIỮA: HỘP ĐIỆN TRẮNG
@@ -1863,8 +2064,8 @@ export default function CompactInteractiveTwin({
       scene,
       [
         new THREE.Vector3(-1.45, frameY + 0.10, 0.35),
-        new THREE.Vector3(-1.95, frameY + 0.55, 0.12),
-        new THREE.Vector3(-2.22, frameY + 1.42, -0.05) // Lên Motor NEMA 17 Trục 2 trên trụ đứng
+        new THREE.Vector3(-1.90, frameY + 0.42, 0.16),
+        new THREE.Vector3(-2.12, frameY + 0.72, 0.02) // Lên cụm động cơ/hộp số Trục 2 trong vỏ đen
       ],
       0x1e293b,
       0xf97316,
@@ -1894,8 +2095,8 @@ export default function CompactInteractiveTwin({
     createAnimatedFlowPath(
       scene,
       [
-        new THREE.Vector3(-1.90, frameY + 1.42, 0.12), // Từ cụm Encoder 2 trên trụ
-        new THREE.Vector3(-1.75, frameY + 0.52, -0.08),
+        new THREE.Vector3(-2.31, frameY + 0.44, 0.02), // Từ cụm Encoder 2 đồng trục dưới hộp giảm tốc
+        new THREE.Vector3(-1.75, frameY + 0.32, -0.12),
         new THREE.Vector3(-0.85, frameY + 0.15, -0.12),
         new THREE.Vector3(-0.14, frameY + 0.24, 0.28) // Về chân ngắt ESP32-S3
       ],
@@ -1912,8 +2113,8 @@ export default function CompactInteractiveTwin({
       scene,
       [
         new THREE.Vector3(-1.89, frameY + 0.16, -0.42), // Từ Công tắc hành trình SW1
-        new THREE.Vector3(-1.75, frameY + 1.35, 0.16),  // Qua Công tắc hành trình SW2
-        new THREE.Vector3(-1.15, frameY + 0.22, 0.22),
+        new THREE.Vector3(-2.31, frameY + 1.98, 0.08),  // Qua Công tắc hành trình SW2 trên đỉnh vít me
+        new THREE.Vector3(-1.35, frameY + 0.35, 0.22),
         new THREE.Vector3(-0.14, frameY + 0.23, 0.31)   // Về ESP32-S3
       ],
       0x064e3b,
@@ -2051,6 +2252,7 @@ export default function CompactInteractiveTwin({
 
       azimuthGroup.rotation.y += (phiRad - azimuthGroup.rotation.y) * 0.1;
       elevationGroup.rotation.z += (tiltRad - elevationGroup.rotation.z) * 0.1;
+      updateLeadScrewLinkage(elevationGroup.rotation.z);
       lidGroup.rotation.z += (-lidRad - lidGroup.rotation.z) * 0.12;
       fanBladesGroup.rotation.y += 0.14;
       anemometerRotorGroup.rotation.y += 0.035;
@@ -2241,11 +2443,16 @@ export default function CompactInteractiveTwin({
                       <span className="font-bold text-zinc-900 dark:text-white">
                         {formatValueOrDash(liveEps, 1, '°')}
                       </span>
+                      <span className="mx-1.5 text-zinc-400">|</span>
+                      <span>Nghiêng: </span>
+                      <span className="font-bold text-blue-700 dark:text-sky-300">
+                        {formatSignedNumber(signedTiltDeg, 1, '°')}
+                      </span>
                     </div>
                     <span className="text-[11px] text-zinc-500 dark:text-slate-400 block mt-0.5">
                       {compassAzimuth !== null
                         ? `Phương vị: ${formatSignedNumber(compassAzimuth, 1, '°')} (${getCompassDirectionName(compassAzimuth)})`
-                        : '(Zenith nằm ngang = 50°, CTHT = 90°)'}
+                        : '(Nằm ngang = 90°, CTHT 2 = +60°)'}
                     </span>
                   </td>
                 </tr>

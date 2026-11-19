@@ -100,3 +100,48 @@ export function getCompassDirectionName(deg) {
   if (norm >= 247.5 && norm < 292.5) return 'Tây';
   return 'Tây Bắc';
 }
+
+const EL_SCREW_COUNTS = [0, 20275, 44349, 54001, 66174];
+const EL_SCREW_TILTS = [60.0, 30.0, 0.0, -12.0, -30.0];
+
+/**
+ * Quy đổi encoder Trục 2 (vít me bước 8) và góc nâng epsilon sang góc nghiêng có dấu (°):
+ * - +60.0° = nghiêng hết mức về phía sáng (+X / Nam khi φ = 0°), chạm CTHT 2 (Cnt = 0)
+ * -   0.0° = nằm ngang phẳng Zenith (Cnt = 44349, ε = 90.0°)
+ * - -30.0° = nghiêng về phía chiều (-X), chạm giới hạn mềm dưới (Cnt = 66174)
+ */
+export function computeSignedTiltFromTelemetry(elEncoder, epsAngle) {
+  const hasEps = epsAngle !== null && epsAngle !== undefined && !isNaN(Number(epsAngle));
+  const epsNum = hasEps ? Number(epsAngle) : null;
+
+  const hasEnc = elEncoder !== null && elEncoder !== undefined && !isNaN(Number(elEncoder));
+  if (hasEnc) {
+    const c = Math.abs(Number(elEncoder));
+    let tiltFromEnc = EL_SCREW_TILTS[0];
+    if (c <= EL_SCREW_COUNTS[0]) {
+      tiltFromEnc = EL_SCREW_TILTS[0];
+    } else if (c >= EL_SCREW_COUNTS[4]) {
+      tiltFromEnc = EL_SCREW_TILTS[4];
+    } else {
+      for (let i = 0; i < 4; i++) {
+        const c0 = EL_SCREW_COUNTS[i];
+        const c1 = EL_SCREW_COUNTS[i + 1];
+        if (c >= c0 && c <= c1) {
+          const t = (c - c0) / (c1 - c0);
+          tiltFromEnc = EL_SCREW_TILTS[i] + t * (EL_SCREW_TILTS[i + 1] - EL_SCREW_TILTS[i]);
+          break;
+        }
+      }
+    }
+
+    if (!hasEps || Math.abs((90.0 - Math.abs(tiltFromEnc)) - epsNum) <= 5.0) {
+      return tiltFromEnc;
+    }
+  }
+
+  if (hasEps) {
+    return Math.max(-30.0, Math.min(60.0, 90.0 - epsNum));
+  }
+
+  return 0.0;
+}
