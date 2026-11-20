@@ -60,15 +60,15 @@ void ParamRegistryClass::init() {
 
   // 4. Giới hạn Tốc độ & Gia tốc (FastAccelStepper Profile S-Curve)
   registerParam("T_MAX_SPEED_AZ",      3500.0f,  "Hz",      100.0f,  25000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
-  registerParam("T_MAX_SPEED_EL",      2500.0f,  "Hz",      100.0f,  25000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
+  registerParam("T_MAX_SPEED_EL",      3000.0f,  "Hz",      100.0f,  25000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
   registerParam("U_MAX_ACCEL_AZ",      7000.0f,  "Hz/s",    100.0f,  50000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
-  registerParam("U_MAX_ACCEL_EL",      5000.0f,  "Hz/s",    100.0f,  50000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
+  registerParam("U_MAX_ACCEL_EL",      4500.0f,  "Hz/s",    100.0f,  50000.0f, POLICY_AUTO_ON_CONFIRM, "B4");
   registerParam("MANUAL_SPEED_AZ",     1200.0f,  "Hz",      100.0f,  10000.0f, POLICY_MANUAL_ONLY,     "INIT");
   registerParam("MANUAL_SPEED_EL",     1200.0f,  "Hz",      100.0f,  10000.0f, POLICY_MANUAL_ONLY,     "INIT");
 
   // 5. Chu trình tìm gốc Homing 2 cấp tốc độ
   registerParam("HOMING_FAST_AZ",      1200.0f,  "Hz",      100.0f,  10000.0f, POLICY_AUTO_ON_CONFIRM, "B5");
-  registerParam("HOMING_FAST_EL",      1200.0f,  "Hz",      100.0f,  10000.0f, POLICY_AUTO_ON_CONFIRM, "B5");
+  registerParam("HOMING_FAST_EL",      3000.0f,  "Hz",      100.0f,  10000.0f, POLICY_AUTO_ON_CONFIRM, "B5");
   registerParam("HOMING_SLOW_AZ",      200.0f,   "Hz",      10.0f,   1000.0f,  POLICY_AUTO_ON_CONFIRM, "B5");
   registerParam("HOMING_SLOW_EL",      200.0f,   "Hz",      10.0f,   1000.0f,  POLICY_AUTO_ON_CONFIRM, "B5");
   registerParam("HOMING_RETRACT_AZ",   1000.0f,  "pulses",  50.0f,   10000.0f, POLICY_MANUAL_ONLY,     "B5");
@@ -77,7 +77,7 @@ void ParamRegistryClass::init() {
 
   // 6. Giới hạn mềm phần mềm & Hình học công tắc Home
   registerParam("SOFT_MIN_AZ",         0.0f,     "deg",   -360.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
-  registerParam("SOFT_MAX_AZ",         270.0f,   "deg",   -360.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
+  registerParam("SOFT_MAX_AZ",         200.0f,   "deg",   -360.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("G_AZ_HOME",           180.0f,    "deg",   -360.0f,   360.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("H_AZ_OFFSET",         0.0f,     "deg",   -180.0f,   180.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("J_EL_HOME",           90.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
