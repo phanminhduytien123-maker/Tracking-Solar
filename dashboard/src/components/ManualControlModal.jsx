@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RotateCcw, Moon, Sun, RefreshCw, HelpCircle } from 'lucide-react';
-import { formatSignedNumber, formatValueOrDash, formatDecimal } from '../utils/formatters';
+import { formatSignedNumber, formatValueOrDash, formatDecimal, computeSignedTiltFromTelemetry } from '../utils/formatters';
 
 function HelpTip({ text }) {
   return (
@@ -41,6 +41,17 @@ export default function ManualControlModal({
   isExperimentLocked = false
 }) {
   const [stepSize, setStepSize] = useState(5.0); // 1.0, 5.0, 10.0 deg
+  const [jogBusy, setJogBusy] = useState(false);
+  const [jogFeedback, setJogFeedback] = useState(null);
+  const jogTimerRef = useRef(null);
+  const cooldownTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (jogTimerRef.current) clearTimeout(jogTimerRef.current);
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -51,6 +62,7 @@ export default function ManualControlModal({
 
   const phiVal = az.phi !== undefined && az.phi !== null ? az.phi : az.currentAngle;
   const epsVal = el.epsilon !== undefined && el.epsilon !== null ? el.epsilon : el.currentAngle;
+  const signedTilt2 = computeSignedTiltFromTelemetry(el.encoderPulses, epsVal);
 
   const azSoftLimitStr = (az.soft_min !== null && az.soft_max !== null) 
     ? `[${formatDecimal(az.soft_min, 1)}°, ${formatDecimal(az.soft_max, 1)}°]` 
@@ -60,7 +72,31 @@ export default function ManualControlModal({
     : 'Chưa đo';
 
   const isManual = mode === 'MANUAL';
+  const canJog = isManual && !system?.emergencyActive;
   const isSleeping = Boolean(system?.isSleeping || system?.isTestSleep || mode === 'SLEEP' || system?.state === 'DEEP_SLEEP');
+
+  const handleJogClick = async (axis, delta) => {
+    if (!canJog || !onJog || jogBusy) return;
+    setJogBusy(true);
+    const label = axis === 'azimuth'
+      ? `Trục 1 (φ ${delta > 0 ? '+' : '−'}${formatDecimal(Math.abs(delta), 0)}°)`
+      : `Trục 2 (${delta > 0 ? 'nghiêng sáng +' : 'nghiêng chiều −'}${formatDecimal(Math.abs(delta), 0)}°)`;
+    setJogFeedback({ type: 'info', text: `Đang gửi lệnh ${label}...` });
+    try {
+      const ok = await onJog(axis, delta);
+      if (ok === false) {
+        setJogFeedback({ type: 'error', text: `Không gửi được lệnh ${label} — kiểm tra kết nối Firebase!` });
+      } else {
+        setJogFeedback({ type: 'ok', text: `Đã gửi lệnh ${label}. Mạch sẽ phản hồi trong ~1–2 giây.` });
+      }
+    } catch (err) {
+      setJogFeedback({ type: 'error', text: `Lỗi gửi lệnh: ${err?.message || 'Không xác định'}` });
+    }
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = setTimeout(() => setJogBusy(false), 700);
+    if (jogTimerRef.current) clearTimeout(jogTimerRef.current);
+    jogTimerRef.current = setTimeout(() => setJogFeedback(null), 2800);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs">
@@ -157,10 +193,7 @@ export default function ManualControlModal({
               {/* Vị trí nghỉ (Park) */}
               <button
                 type="button"
-                onClick={() => {
-                  onSetMode && onSetMode('PARK');
-                  onPark && onPark();
-                }}
+                onClick={() => onSetMode && onSetMode('PARK')}
                 className={`p-2.5 text-left border rounded-sm transition-colors cursor-pointer ${
                   mode === 'PARK'
                     ? 'border-blue-700 bg-blue-50/60 text-blue-900 font-semibold'
@@ -246,9 +279,18 @@ export default function ManualControlModal({
                   3. Điều chỉnh góc quay (Jog)
                 </span>
                 {!isManual && (
-                  <span className="text-[11px] text-amber-700 block">
-                    (Jog chỉ khả dụng khi đang ở chế độ Thủ công)
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="text-[11px] text-amber-700">
+                      (Đang ở chế độ <b>{mode || 'AUTO'}</b> — cần bật Thủ công để Jog)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onSetMode && onSetMode('MANUAL')}
+                      className="px-2 py-0.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xs cursor-pointer"
+                    >
+                      Bấm để bật Thủ công &amp; mở khóa Jog
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -287,6 +329,11 @@ export default function ManualControlModal({
                 <span className="text-zinc-500 block">Động cơ 2: Độ ngửa ε (Elevation)</span>
                 <span className="text-base sm:text-lg font-bold text-zinc-900 block mt-0.5">
                   {epsVal !== null ? formatValueOrDash(epsVal, 1, '°') : '--'}
+                  {signedTilt2 !== null && (
+                    <span className="text-xs font-semibold text-zinc-600 ml-1.5">
+                      (Góc nghiêng: {formatSignedNumber(signedTilt2, 1, '°')})
+                    </span>
+                  )}
                 </span>
                 <span className="text-[11px] text-zinc-500 block mt-0.5">
                   Giới hạn mềm: {elSoftLimitStr}
@@ -295,26 +342,26 @@ export default function ManualControlModal({
             </div>
 
             {/* Bàn phím Jog 4 hướng */}
-            <div className={`flex flex-col items-center justify-center pt-2 gap-2 ${!isManual ? 'opacity-40 pointer-events-none' : ''}`}>
-              {/* Ngửa lên */}
+            <div className={`flex flex-col items-center justify-center pt-2 gap-2 ${!canJog ? 'opacity-40 pointer-events-none' : ''}`}>
+              {/* Nghiêng sáng */}
               <button
                 type="button"
-                disabled={!isManual}
-                onClick={() => onJog && onJog('elevation', stepSize)}
-                className="w-48 py-2 bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                title="Ngửa tấm pin lên (ε tăng)"
+                disabled={!canJog || jogBusy}
+                onClick={() => handleJogClick('elevation', stepSize)}
+                className="w-56 py-2 bg-white hover:bg-zinc-100 disabled:cursor-not-allowed border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Nghiêng về phía sáng (+tilt, tiến về CTHT 2)"
               >
                 <ArrowUp className="w-3.5 h-3.5 text-zinc-600" />
-                <span>Ngửa +{formatDecimal(stepSize, 0)}° (ε tăng)</span>
+                <span>Nghiêng sáng +{formatDecimal(stepSize, 0)}° (Về CTHT 2)</span>
               </button>
 
               {/* Trái / Phải */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={!isManual}
-                  onClick={() => onJog && onJog('azimuth', -stepSize)}
-                  className="w-44 py-2 bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                  disabled={!canJog || jogBusy}
+                  onClick={() => handleJogClick('azimuth', -stepSize)}
+                  className="w-44 py-2 bg-white hover:bg-zinc-100 disabled:cursor-not-allowed border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   title="Quay sang trái (φ giảm)"
                 >
                   <ArrowLeft className="w-3.5 h-3.5 text-zinc-600" />
@@ -323,9 +370,9 @@ export default function ManualControlModal({
 
                 <button
                   type="button"
-                  disabled={!isManual}
-                  onClick={() => onJog && onJog('azimuth', stepSize)}
-                  className="w-44 py-2 bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                  disabled={!canJog || jogBusy}
+                  onClick={() => handleJogClick('azimuth', stepSize)}
+                  className="w-44 py-2 bg-white hover:bg-zinc-100 disabled:cursor-not-allowed border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   title="Quay sang phải (φ tăng)"
                 >
                   <span>Phải +{formatDecimal(stepSize, 0)}° (φ tăng)</span>
@@ -333,18 +380,30 @@ export default function ManualControlModal({
                 </button>
               </div>
 
-              {/* Cúi xuống */}
+              {/* Nghiêng chiều */}
               <button
                 type="button"
-                disabled={!isManual}
-                onClick={() => onJog && onJog('elevation', -stepSize)}
-                className="w-48 py-2 bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                title="Cúi tấm pin xuống (ε giảm)"
+                disabled={!canJog || jogBusy}
+                onClick={() => handleJogClick('elevation', -stepSize)}
+                className="w-56 py-2 bg-white hover:bg-zinc-100 disabled:cursor-not-allowed border border-zinc-300 text-zinc-800 font-semibold text-xs rounded-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Nghiêng về phía chiều (−tilt, ra xa CTHT 2)"
               >
                 <ArrowDown className="w-3.5 h-3.5 text-zinc-600" />
-                <span>Cúi −{formatDecimal(stepSize, 0)}° (ε giảm)</span>
+                <span>Nghiêng chiều −{formatDecimal(stepSize, 0)}° (Ra xa CTHT 2)</span>
               </button>
             </div>
+
+            {jogFeedback && (
+              <div className={`text-[11px] font-medium px-2.5 py-1.5 rounded-xs border text-center ${
+                jogFeedback.type === 'error'
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : jogFeedback.type === 'ok'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+              }`}>
+                {jogFeedback.text}
+              </div>
+            )}
           </div>
 
           {/* 4. TÁC VỤ BẢO VỆ & XÁC NHẬN */}

@@ -140,6 +140,7 @@ export default function App() {
   // Mỗi khi mở trang hoặc reload, LUÔN tính toán lại theo mốc giờ thực tế hiện tại
   const [themeMode, setThemeMode] = useState(() => getAutoThemeByTime());
   const isManualThemeOverrideRef = useRef(false);
+  const optimisticModeRef = useRef({ mode: null, until: 0 });
 
   // Xóa sạch cache cũ để mỗi lần reload trang luôn tính theo mốc giờ
   useEffect(() => {
@@ -458,7 +459,22 @@ export default function App() {
       if (firebaseConfig.databaseURL && firebaseConfig.apiKey) {
         firebaseServiceRef.current.init(firebaseConfig, {
           onTelemetry: (fbTelemetry) => {
-            setTelemetry(fbTelemetry);
+            const opt = optimisticModeRef.current;
+            let nextTelemetry = fbTelemetry;
+            if (opt.mode && Date.now() < opt.until) {
+              if (fbTelemetry?.system?.mode === opt.mode) {
+                optimisticModeRef.current = { mode: null, until: 0 };
+              } else {
+                nextTelemetry = {
+                  ...fbTelemetry,
+                  system: {
+                    ...fbTelemetry.system,
+                    mode: opt.mode
+                  }
+                };
+              }
+            }
+            setTelemetry(nextTelemetry);
 
             // Update real-time intraday curve with live data
             const now = new Date();
@@ -744,6 +760,7 @@ export default function App() {
 
   // Command Handlers
   const handleSetMode = (mode) => {
+    optimisticModeRef.current = { mode, until: Date.now() + 12000 };
     if (dataSource === 'mock') {
       mockEngineRef.current.setMode(mode);
     } else if (dataSource === 'firebase') {
@@ -935,14 +952,21 @@ export default function App() {
     }));
   };
 
-  const handleJog = (axis, step) => {
+  const handleJog = async (axis, step) => {
     if (dataSource === 'mock') {
       mockEngineRef.current.jog(axis, step);
+      return true;
     } else if (dataSource === 'firebase') {
+      optimisticModeRef.current = { mode: 'MANUAL', until: Date.now() + 12000 };
+      setTelemetry((prev) => ({
+        ...prev,
+        system: { ...prev.system, mode: 'MANUAL' }
+      }));
       const dir = step > 0 ? 'CW' : 'CCW';
-      firebaseServiceRef.current.jogMotor(axis, dir, Math.abs(step));
+      return await firebaseServiceRef.current.jogMotor(axis, dir, Math.abs(step));
     } else {
       esp32ServiceRef.current?.jog(axis, step * 100, step);
+      return true;
     }
   };
 

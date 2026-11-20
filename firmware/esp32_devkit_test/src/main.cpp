@@ -100,6 +100,7 @@ volatile bool remoteParkTrigger = false;
 volatile bool remoteJogTrigger = false;
 volatile int remoteJogAxis = 1;
 volatile float remoteJogDeltaDeg = 0.0f;
+volatile bool remoteManualOverride = false;
 volatile bool remoteTestDirTrigger = false;
 volatile int remoteTestDirAxis = 1;
 volatile int remoteTestDirDir = 1;
@@ -404,6 +405,7 @@ static const uint32_t EL_HOME_FAST_SPEED_HZ    = 3000;
 static const uint32_t EL_HOME_RETRACT_SPEED_HZ = 2500;
 static const uint32_t EL_HOME_ACCEL_HZ_S       = 5000;
 static const uint32_t EL_STALL_RETRY_SPEED_HZ  = 1800;
+static const uint32_t EL_JOG_SPEED_HZ          = 2000;
 
 inline float getPulsesPerCountEl() {
   return (EL_DM556_PULSES_PER_REV * EL_GEAR_RATIO) / EL_ENCODER_CPR; // 4800 / 2400 = 2.0 xung/count
@@ -496,7 +498,7 @@ inline float getAzMaxSoftLimitDeg() {
   return ParamRegistry.get("SOFT_MAX_AZ", 200.0f);
 }
 inline float getElMinSoftLimitDeg() {
-  return ParamRegistry.get("L_EL_MIN_SOFT", 10.0f);
+  return ParamRegistry.get("L_EL_MIN_SOFT", 30.0f);
 }
 inline float getElMaxSoftLimitDeg() {
   return ParamRegistry.get("SOFT_MAX_EL", 90.0f);
@@ -3092,12 +3094,15 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
   });
 
   t_httpUpdate_return ret;
+  vTaskPrioritySet(NULL, 1); // Tam nang uu tien de tai nhanh khi dong bo TCP
   if (fotaUrl.startsWith("https://")) {
     WiFiClientSecure secureClient;
     secureClient.setInsecure(); // Bo qua xac thuc chung chi SSL (cho phep tai tu GitHub/CDN an toan)
+    secureClient.setTimeout(25);
     ret = httpUpdate.update(secureClient, fotaUrl);
   } else {
     WiFiClient client;
+    client.setTimeout(25);
     ret = httpUpdate.update(client, fotaUrl);
   }
 
@@ -3115,6 +3120,7 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     otaStatus.set("status", "NO_UPDATES");
     safeSetJsonFbdo("/solar/ota", &otaStatus);
     otaInProgress = false;
+    vTaskPrioritySet(NULL, tskIDLE_PRIORITY);
     if (stepper1) stepper1->enableOutputs();
     if (stepper2) stepper2->enableOutputs();
   } else {
@@ -3125,6 +3131,7 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     otaStatus.set("error", err);
     safeSetJsonFbdo("/solar/ota", &otaStatus);
     otaInProgress = false;
+    vTaskPrioritySet(NULL, tskIDLE_PRIORITY);
     if (stepper1) stepper1->enableOutputs();
     if (stepper2) stepper2->enableOutputs();
   }
@@ -3195,10 +3202,11 @@ void checkRemoteFirebaseCommands() {
       cmdTimestamp = (uint64_t)jsonData.doubleValue;
     }
 
-    uint32_t ttlMs = 60000; // Mặc định 60 giây
+    uint32_t ttlMs = 120000; // Mặc định 120 giây (chống lệch giờ đồng hồ trình duyệt/RTC)
     if (json.get(jsonData, "ttl") && jsonData.intValue > 0) {
       ttlMs = (uint32_t)jsonData.intValue;
     }
+    if (ttlMs < 120000) ttlMs = 120000;
 
     uint64_t nowEpochMs = (uint64_t)getRtcEpochUTC7() * 1000ULL;
     if (cmdTimestamp > 0 && nowEpochMs > 1700000000000ULL) {
@@ -3263,6 +3271,7 @@ void checkRemoteFirebaseCommands() {
       // LỆNH NGỦ ĐÊM / THỨC DẬY TỪ XA
       else if (cmd.equalsIgnoreCase("sleep")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = false;
           remoteSleepTrigger = true;
           shouldAck = true;
           Serial.println(">> [REMOTE] Nhan lenh SLEEP dua he thong vao trang "
@@ -3271,6 +3280,7 @@ void checkRemoteFirebaseCommands() {
       } else if (cmd.equalsIgnoreCase("wake") ||
                  cmd.equalsIgnoreCase("wakeup")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = false;
           remoteWakeTrigger = true;
           shouldAck = true;
           Serial.println(
@@ -3280,6 +3290,7 @@ void checkRemoteFirebaseCommands() {
       // LỆNH TEST NGỦ (HOME -> VÀO THẾ NGỦ NGAY LẬP TỨC, KHÔNG ẢNH HƯỞNG GIỜ RTC)
       else if (cmd.equalsIgnoreCase("test_sleep")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = false;
           remoteTestSleepTrigger = true;
           shouldAck = true;
           Serial.println(">> [REMOTE] Nhan lenh TEST SLEEP (Home -> Ngu ngay)!");
@@ -3288,6 +3299,7 @@ void checkRemoteFirebaseCommands() {
       // LỆNH TEST WAKE UP (CHỈ KHẢ DỤNG KHI ĐANG NGỦ -> HOME -> ĐÓN BÌNH MINH)
       else if (cmd.equalsIgnoreCase("test_wake") || cmd.equalsIgnoreCase("test_wakeup")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = false;
           remoteTestWakeTrigger = true;
           shouldAck = true;
           Serial.println(">> [REMOTE] Nhan lenh TEST WAKE UP (Home -> Don binh minh)!");
@@ -3295,6 +3307,7 @@ void checkRemoteFirebaseCommands() {
       }
       // LỆNH QUAY VỀ TRẠNG THÁI THẬT (RESET / RESUME REAL STATE)
       else if (cmd.equalsIgnoreCase("resume_real") || cmd.equalsIgnoreCase("reset_real")) {
+        remoteManualOverride = false;
         remoteResumeRealTrigger = true;
         shouldAck = true;
         Serial.println(">> [REMOTE] Nhan lenh RESUME REAL STATE (Home -> Bam theo gio RTC)!");
@@ -3302,6 +3315,7 @@ void checkRemoteFirebaseCommands() {
       // 3. LỆNH ĐƯA VỀ VỊ TRÍ NGHỈ (PARK)
       else if (cmd.equalsIgnoreCase("park")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = false;
           remoteParkTrigger = true;
           shouldAck = true;
           Serial.println(
@@ -3314,6 +3328,8 @@ void checkRemoteFirebaseCommands() {
         if (jsonData.success) {
           String m = jsonData.stringValue;
           if (m.equalsIgnoreCase("MANUAL")) {
+            remoteManualOverride = true;
+            isTestSleepMode = false;
             currentTrackSource = TRACK_SRC_OFF;
             autoOpticalTracking = false;
             if (stepper1)
@@ -3321,21 +3337,26 @@ void checkRemoteFirebaseCommands() {
             if (stepper2)
               stepper2->stopMove();
             systemFsmState = FSM_STATE_IDLE;
+            telemetryDirty = true;
             Serial.println(">> [REMOTE] Da chuyen sang che do THU CONG "
                            "(MANUAL). Cho phep Jog goc!");
             shouldAck = true;
           } else if (m.equalsIgnoreCase("AUTO")) {
             if (!isEmergencyCoverActive) {
+              remoteManualOverride = false;
+              isTestSleepMode = false;
               currentTrackSource = TRACK_SRC_HYBRID;
               autoOpticalTracking = true;
               trackCyclePhase = TRACK_CYCLE_ADJUSTING;
               isMaxAzimuthReached = false;
               systemFsmState = FSM_STATE_TRACKING;
+              telemetryDirty = true;
               Serial.println(
                   ">> [REMOTE] Da chuyen sang che do TU DONG (AUTO HYBRID).");
               shouldAck = true;
             }
           } else if (m.equalsIgnoreCase("PARK")) {
+            remoteManualOverride = false;
             remoteParkTrigger = true;
             shouldAck = true;
           }
@@ -3344,6 +3365,17 @@ void checkRemoteFirebaseCommands() {
       // 5. LỆNH ĐIỀU CHỈNH GÓC QUAY (JOG)
       else if (cmd.equalsIgnoreCase("jog")) {
         if (!isEmergencyCoverActive) {
+          remoteManualOverride = true;
+          isTestSleepMode = false;
+          currentTrackSource = TRACK_SRC_OFF;
+          autoOpticalTracking = false;
+          if (systemFsmState == FSM_STATE_LIGHT_SLEEP ||
+              systemFsmState == FSM_STATE_PREP_SLEEP ||
+              systemFsmState == FSM_STATE_TRACKING ||
+              systemFsmState == FSM_STATE_PARK) {
+            systemFsmState = FSM_STATE_IDLE;
+          }
+
           int ax = 1;
           json.get(jsonData, "axis");
           if (jsonData.success) {
@@ -3354,25 +3386,26 @@ void checkRemoteFirebaseCommands() {
               ax = 1;
           }
 
-          float stepDeg = 5.0f;
+          float rawStep = 5.0f;
           json.get(jsonData, "step");
           if (jsonData.success)
-            stepDeg = fabs((float)jsonData.doubleValue);
+            rawStep = (float)jsonData.doubleValue;
+          float stepDeg = fabs(rawStep);
           if (stepDeg <= 0.01f)
             stepDeg = 5.0f;
 
-          String dirStr = "CW";
-          json.get(jsonData, "direction");
-          if (jsonData.success)
-            dirStr = jsonData.stringValue;
+          bool hasDir = json.get(jsonData, "direction");
+          String dirStr = hasDir ? jsonData.stringValue : (rawStep < 0.0f ? "CCW" : "CW");
 
-          float delta = (dirStr.equalsIgnoreCase("CCW") || dirStr == "-1")
+          float delta = (dirStr.equalsIgnoreCase("CCW") || dirStr == "-1" ||
+                         dirStr.equalsIgnoreCase("DOWN") || dirStr.equalsIgnoreCase("LEFT"))
                             ? -stepDeg
                             : stepDeg;
 
           remoteJogAxis = ax;
           remoteJogDeltaDeg = delta;
           remoteJogTrigger = true;
+          telemetryDirty = true;
           shouldAck = true;
           Serial.printf(">> [REMOTE] Nhan lenh JOG Truc %d buoc %+.1f do\n", ax,
                         delta);
@@ -3602,9 +3635,11 @@ void telemetryTask(void *pvParameters) {
     }
 
     rtcWdtTelStage = 3;
-    // Đọc lệnh từ xa (Emergency Cover / Unlock) qua Firebase RTDB mỗi 5.0s
-    // So le thời gian: chỉ chạy khi cách lần push Telemetry ít nhất 2.0s để tránh nghẽn socket song song
-    if (!otaInProgress && now - lastRemoteCheck >= 5000 && (now - lastFbPushTime >= 2000)) {
+    // Đọc lệnh từ xa (Emergency Cover / Unlock / Jog) qua Firebase RTDB
+    // Khi đang ở chế độ Thủ công (MANUAL) giảm chu kỳ xuống 1.5s để bấm nút Jog mượt hơn
+    unsigned long remotePollInterval = (remoteManualOverride || currentTrackSource == TRACK_SRC_OFF) ? 1500UL : 5000UL;
+    unsigned long remoteFbStagger = (remoteManualOverride || currentTrackSource == TRACK_SRC_OFF) ? 500UL : 2000UL;
+    if (!otaInProgress && now - lastRemoteCheck >= remotePollInterval && (now - lastFbPushTime >= remoteFbStagger)) {
       lastRemoteCheck = now;
       if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
         checkRemoteFirebaseCommands();
@@ -3844,7 +3879,7 @@ bool moveMotorSteps(int axis, bool direction, int32_t steps,
   if (speedHz == 0)
     speedHz = manualSpeedHz;
   s->setSpeedInHz(speedHz);
-  s->setAcceleration(stepperAccel);
+  s->setAcceleration((axis == 2) ? EL_TRACK_ACCEL_HZ_S : stepperAccel);
 
   int32_t delta = (direction == DIR_AWAY_HOME) ? steps : -steps;
   s->move(delta); // Non-blocking: phần cứng RMT/MCPWM tự phát xung, CPU không
@@ -4542,13 +4577,17 @@ void setup() {
   // Khởi tạo Bảng tham số trung tâm (ParamRegistry) & Nạp dữ liệu NVS Flash
   // (CalibrationStore)
   CalibrationStore.begin();
-  if (!prefs.getBool("mig_az200", false)) {
+  if (!prefs.getBool("mig_v234b", false)) {
     float oldSoftMaxAz = ParamRegistry.get("SOFT_MAX_AZ", 200.0f);
+    float oldSoftMinEl = ParamRegistry.get("L_EL_MIN_SOFT", 30.0f);
+    float oldSoftMaxEl = ParamRegistry.get("SOFT_MAX_EL", 90.0f);
     ParamRegistry.set("SOFT_MAX_AZ", 200.0f, PARAM_SRC_MANUAL, "V234");
+    ParamRegistry.set("L_EL_MIN_SOFT", 30.0f, PARAM_SRC_MANUAL, "V234");
+    ParamRegistry.set("SOFT_MAX_EL", 90.0f, PARAM_SRC_MANUAL, "V234");
     CalibrationStore.save();
-    prefs.putBool("mig_az200", true);
-    Serial.printf(">> [MIGRATION v2.3.4] Nang SOFT_MAX_AZ: %.2f° -> 200.00° (Da luu NVS)\n",
-                  oldSoftMaxAz);
+    prefs.putBool("mig_v234b", true);
+    Serial.printf(">> [MIGRATION v2.3.4] AZ max: %.1f->200.0° | EL: [%.1f, %.1f]->[30.0, 90.0]° (Da luu NVS)\n",
+                  oldSoftMaxAz, oldSoftMinEl, oldSoftMaxEl);
   }
   loadLastHandledCmdId();
 
@@ -6123,12 +6162,55 @@ void loop() {
     remoteJogTrigger = false;
     int ax = remoteJogAxis;
     float delta = remoteJogDeltaDeg;
-    float startDeg = (ax == 1) ? getAngleDeg1() : getElevationEpsilon();
-    float targetDeg = startDeg + delta;
-    Serial.printf("\n>> [REMOTE JOG] Truc %d: Tu %+.2f do -> Muc tieu: %+.2f "
-                  "do (Nhay %+.1f do)\n",
-                  ax, startDeg, targetDeg, delta);
-    stepPositionControl(ax, targetDeg, manualSpeedHz);
+    if (ax == 1) {
+      if (homedAz) {
+        float startDeg = getAngleDeg1();
+        float targetDeg = clampVal(startDeg + delta, 0.0f, CFG_I_AZ_MAX_SOFT_LIMIT_DEG - 0.2f);
+        Serial.printf("\n>> [REMOTE JOG AZ] Tu %+.2f° -> %+.2f° (Nhay %+.1f°)\n",
+                      startDeg, targetDeg, delta);
+        stepPositionControl(1, targetDeg, manualSpeedHz);
+      } else if (stepper1) {
+        bool awayFromHome = (delta > 0.0f);
+        if (!awayFromHome && isHome1Triggered()) {
+          stepper1->stopMove();
+          Serial.println("\n>> [REMOTE JOG AZ CHAN] Dang cham CTHT 1, chan quay am!");
+        } else {
+          float pulsesPerDeg1 = getPulsesPerCount() / getDegPerCount();
+          int32_t steps = (int32_t)lroundf(fabs(delta) * pulsesPerDeg1);
+          if (steps > 4000) steps = 4000;
+          m1MovingAwayFromHome = awayFromHome;
+          stepper1->setSpeedInHz(manualSpeedHz);
+          stepper1->setAcceleration(stepperAccel);
+          stepper1->move(awayFromHome ? steps : -steps);
+          Serial.printf("\n>> [REMOTE JOG AZ UNHOMED] Phat tuong doi %+ld buoc (%+.1f°)\n",
+                        (long)(awayFromHome ? steps : -steps), delta);
+        }
+      }
+    } else {
+      if (homedEl) {
+        float startTilt = getAxis2TiltSignedDeg();
+        float targetTilt = clampVal(startTilt + delta, EL_MIN_SAFE_TILT_DEG, EL_MAX_SAFE_TILT_DEG);
+        Serial.printf("\n>> [REMOTE JOG EL] Tilt tu %+.2f° -> %+.2f° (Nhay %+.1f°)\n",
+                      startTilt, targetTilt, delta);
+        stepPositionControl(2, targetTilt, EL_JOG_SPEED_HZ);
+      } else if (stepper2) {
+        // Quy uoc tiltSigned: +delta = nghieng sang phia sang (+60°, ve CTHT 2), -delta = nghieng chieu (-30°, ra xa CTHT 2)
+        bool towardHome = (delta > 0.0f);
+        if (towardHome && isHome2Triggered()) {
+          stepper2->stopMove();
+          Serial.println("\n>> [REMOTE JOG EL CHAN] Dang cham CTHT 2, chan quay ve Home!");
+        } else {
+          int32_t steps = (int32_t)lroundf(fabs(delta) * 1470.0f);
+          if (steps > 15000) steps = 15000;
+          m2MovingAwayFromHome = !towardHome;
+          stepper2->setSpeedInHz(EL_JOG_SPEED_HZ);
+          stepper2->setAcceleration(EL_TRACK_ACCEL_HZ_S);
+          stepper2->move(towardHome ? -steps : steps);
+          Serial.printf("\n>> [REMOTE JOG EL UNHOMED] Phat tuong doi %+ld buoc (%+.1f°)\n",
+                        (long)(towardHome ? -steps : steps), delta);
+        }
+      }
+    }
     requestTelemetryPrint();
   }
 
@@ -6245,46 +6327,48 @@ void loop() {
   if (!isTestSleepMode && !isEmergencyCoverActive && (millis() - lastNightCheckMs >= 3000)) {
     lastNightCheckMs = millis();
     updateEsp2PowerBySchedule();
-    int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
-    float curTemp = 0.0f;
-    if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-      bool isNightWindow =
-          (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR);
+    if (!remoteManualOverride) {
+      int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
+      float curTemp = 0.0f;
+      if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
+        bool isNightWindow =
+            (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR);
 
-      if (isNightWindow) {
-        // Trong khung giờ ngủ đêm (18:00 - 04:00)
-        if (!disableNightSleep) {
-          if (systemFsmState != FSM_STATE_LIGHT_SLEEP &&
-              systemFsmState != FSM_STATE_PREP_SLEEP) {
-            if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE &&
-                (millis() - lastSerialCharMs >= 15000)) {
-              Serial.printf("\n>> [AUTO NIGHT] Da den gio ngu dem "
-                            "(%02d:%02d:%02d). Kich hoat ngu dem giu WiFi!\n",
-                            curH, curMin, curS);
-              enterNightSleepUntil4AM();
+        if (isNightWindow) {
+          // Trong khung giờ ngủ đêm (18:00 - 04:00)
+          if (!disableNightSleep) {
+            if (systemFsmState != FSM_STATE_LIGHT_SLEEP &&
+                systemFsmState != FSM_STATE_PREP_SLEEP) {
+              if (stateM1 == STATE_IDLE && stateM2 == STATE_IDLE &&
+                  (millis() - lastSerialCharMs >= 15000)) {
+                Serial.printf("\n>> [AUTO NIGHT] Da den gio ngu dem "
+                              "(%02d:%02d:%02d). Kich hoat ngu dem giu WiFi!\n",
+                              curH, curMin, curS);
+                enterNightSleepUntil4AM();
+              }
+            }
+          } else {
+            // Khi đã bật Vô hiệu hóa ngủ đêm (disableNightSleep == true):
+            // Tấm pin giữ nguyên vị trí cuối buổi chiều (isMaxAzimuthReached = true), tuyệt đối không ngủ!
+            if (systemFsmState == FSM_STATE_LIGHT_SLEEP ||
+                systemFsmState == FSM_STATE_PREP_SLEEP) {
+              moveToAfternoonHoldPosition();
+            } else {
+              isMaxAzimuthReached = true;
+              systemFsmState = FSM_STATE_TRACKING;
             }
           }
         } else {
-          // Khi đã bật Vô hiệu hóa ngủ đêm (disableNightSleep == true):
-          // Tấm pin giữ nguyên vị trí cuối buổi chiều (isMaxAzimuthReached = true), tuyệt đối không ngủ!
+          // Trong khung giờ ban ngày (04:00 - 19:00): Nếu hệ thống còn đang ở
+          // trạng thái ngủ thì đánh thức
           if (systemFsmState == FSM_STATE_LIGHT_SLEEP ||
               systemFsmState == FSM_STATE_PREP_SLEEP) {
-            moveToAfternoonHoldPosition();
-          } else {
-            isMaxAzimuthReached = true;
-            systemFsmState = FSM_STATE_TRACKING;
+            Serial.printf(
+                "\n>> [AUTO DAWN] Da den gio thuc day (%02d:%02d:%02d). Kich "
+                "hoat danh thuc don binh minh!\n",
+                curH, curMin, curS);
+            wakeUpAtDawn();
           }
-        }
-      } else {
-        // Trong khung giờ ban ngày (04:00 - 19:00): Nếu hệ thống còn đang ở
-        // trạng thái ngủ thì đánh thức
-        if (systemFsmState == FSM_STATE_LIGHT_SLEEP ||
-            systemFsmState == FSM_STATE_PREP_SLEEP) {
-          Serial.printf(
-              "\n>> [AUTO DAWN] Da den gio thuc day (%02d:%02d:%02d). Kich "
-              "hoat danh thuc don binh minh!\n",
-              curH, curMin, curS);
-          wakeUpAtDawn();
         }
       }
     }

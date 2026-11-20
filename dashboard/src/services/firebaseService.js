@@ -1136,6 +1136,8 @@ export class FirebaseSolarService {
         rtcOffsetMs,
         rtcTime: tracking.rtcTime || null,
         rtcTemp: tracking.rtcTemp !== undefined ? Number(tracking.rtcTemp) : null,
+        homingFault: Boolean(tracking.homingFault),
+        stallFaultM2: Boolean(tracking.stallFaultM2),
         errors: {
           sensorLost: Boolean(tracking.sensorLost),
           driverFault: Boolean(tracking.estop || tracking.driverFault),
@@ -1200,6 +1202,8 @@ export class FirebaseSolarService {
         step_error_counts: stepErrorCountsAz,
         step_error_deg: stepErrorDegAz,
         isHomed: tracking.isHomed !== undefined ? Boolean(tracking.isHomed) : Boolean(tracking.systemHomed || true),
+        homedAz: tracking.homedAz !== undefined ? Boolean(tracking.homedAz) : undefined,
+        homedEl: tracking.homedEl !== undefined ? Boolean(tracking.homedEl) : undefined,
         limit_az_min: Boolean(tracking.limitHome),
         limit_az_max: false,
         limit_el_min: Boolean(tracking.limitHome2 || tracking.limitSwitch90),
@@ -1300,7 +1304,7 @@ export class FirebaseSolarService {
       await set(controlRef, {
         id: cmdId,
         ...commandObj,
-        ttl: 30000,
+        ttl: 120000,
         ack: false,
         timestamp: Date.now()
       });

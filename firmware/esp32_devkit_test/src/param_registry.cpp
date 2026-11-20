@@ -82,7 +82,7 @@ void ParamRegistryClass::init() {
   registerParam("H_AZ_OFFSET",         0.0f,     "deg",   -180.0f,   180.0f,   POLICY_MANUAL_ONLY,     "INIT");
   registerParam("J_EL_HOME",           90.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("J_EL_ZENITH",         50.0f,    "deg",     10.0f,    90.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
-  registerParam("L_EL_MIN_SOFT",       10.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
+  registerParam("L_EL_MIN_SOFT",       30.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
   registerParam("SOFT_MAX_EL",         90.0f,    "deg",   -180.0f,   360.0f,   POLICY_AUTO_ON_CONFIRM, "B6");
 
   // 7. Vị trí góc khởi đầu mặc định khi chưa bắt đầu ngày mới
