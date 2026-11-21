@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.7"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.8"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -84,6 +84,8 @@ bool remoteIsSleeping     = false;   // Trạng thái ngủ thực tế từ ESP
 bool remoteSleepDisabled  = false;   // Cờ vô hiệu hóa ngủ đêm
 bool remoteMotorsMoving   = false;   // Tránh đóng relay đúng lúc motor đang quay mạnh
 bool forceSingleTest      = false;   // Cờ kích hoạt test 1 chu kỳ ngay lập tức
+bool ntpConfigured        = false;   // Cờ đã gọi configTime() sau khi WiFi kết nối
+unsigned long lastNtpRetryMs = 0;    // Mốc thời gian thử kích hoạt lại NTP khi chưa đồng bộ
 
 // Trạng thái Đèn 12V (Relay Kênh 5 - Relay E)
 bool lamp12vState         = false;   // true = Đang BẬT đèn 12V, false = Đang TẮT đèn 12V
@@ -517,6 +519,7 @@ void pushVocIscToFirebase(bool writeHistory) {
   trkPatch.set("lampOffMin", (int)(lampOffSec / 60));
   trkPatch.set("lampAutoPhase", lampAutoPhase ? "ON" : "OFF");
   if (!Firebase.RTDB.updateNode(&fbdo, "/solar/tracking", &trkPatch)) {
+    Serial.printf(">> [FB ERR] Cap nhat /solar/tracking that bai: %s\n", fbdo.errorReason().c_str());
     return; // Mạng đang lag/timeout -> bỏ qua phần còn lại trong lượt này tránh nghẽn loop()
   }
 
@@ -554,6 +557,11 @@ void pushVocIscToFirebase(bool writeHistory) {
   nodeJson.set("ota_hostname", "esp32-voc-isc-node");
   nodeJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
   nodeJson.set("temp_chip_c", temperatureRead());
+  time_t curEpoch = time(nullptr);
+  nodeJson.set("ntp_synced", curEpoch > 1700000000);
+  if (curEpoch > 1700000000) {
+    nodeJson.set("epoch_now", (double)curEpoch);
+  }
   nodeJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &nodeJson);
 
@@ -598,6 +606,7 @@ void pushHeartbeatToFirebase() {
   hbJson.set("relay_interval_sec", (int)relayIntervalSec);
   hbJson.set("temp_chip_c", temperatureRead());
   hbJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
+  hbJson.set("ntp_synced", time(nullptr) > 1700000000);
   hbJson.set("ip", WiFi.localIP().toString());
   hbJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &hbJson);
@@ -746,8 +755,11 @@ void handleSerialCommands() {
     lampCliOverride = -1;
     Serial.println(">> [CLI] Da chuyen Den 12V (Relay E) ve che do TU DONG (15p BAT / 15p TAT khi ngu)!");
   } else if (cmd.equalsIgnoreCase("status")) {
+    time_t stEpoch = time(nullptr);
     Serial.println("\n================ TRANG THAI NODE VOC/ISC (#2) ================");
+    Serial.printf(" Firmware          : %s\n", VOC_ISC_FIRMWARE_VERSION);
     Serial.printf(" WiFi IP           : %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf(" NTP Epoch         : %ld (%s)\n", (long)stEpoch, (stEpoch > 1700000000) ? "SYNCED" : "NOT_SYNCED");
     Serial.printf(" Chu ky Relay A-D  : %lu giay\n", (unsigned long)relayIntervalSec);
     Serial.printf(" Trang thai Ngu    : %s (Vo hieu hoa ngu: %s)\n",
                   isSystemCurrentlySleeping() ? "DANG NGU (Khoa Relay A-D, Chay Den 12V 15p/15p)" : "THUC (Cho phep Relay A-D)",
@@ -832,6 +844,8 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\n>> [WIFI OK] IP ESP32-S3 #2: %s\n", WiFi.localIP().toString().c_str());
     configTime(7 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    ntpConfigured = true;
+    lastNtpRetryMs = millis();
   } else {
     Serial.println("\n>> [WIFI] Chua ket noi duoc ngay, se tu dong ket noi ngam...");
   }
@@ -890,6 +904,13 @@ void loop() {
     }
   } else {
     wifiLostSinceMs = 0;
+    time_t nowCheck = time(nullptr);
+    if (!ntpConfigured || (nowCheck < 1700000000 && (millis() - lastNtpRetryMs >= 30000))) {
+      configTime(7 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+      ntpConfigured = true;
+      lastNtpRetryMs = millis();
+      Serial.println(">> [NTP] Kich hoat dong bo gio NTP (UTC+7)...");
+    }
   }
 
   // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 15 giây (khi đang ở MEAS_IDLE)

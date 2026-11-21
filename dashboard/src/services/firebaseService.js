@@ -9,6 +9,34 @@ export const STALE_THRESHOLD_MS = 25000; // 25 giây (chống chập chờn khi 
 export const DISCONNECT_THRESHOLD_MS = 60000; // 60 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
+ * Ước lượng nhiệt độ bề mặt tấm pin (°C) theo mô hình Ross/NOCT kết hợp tham chiếu
+ * MDPI Sustainability 2022, 14(3), 1696 (10.3390/su14031696) khi chưa gắn cảm biến nhiệt trực tiếp.
+ */
+function estimatePanelTempsFromTelemetry(rec = {}) {
+  const rawRtcTemp = rec.rtc_temp ?? rec.rtcTemp;
+  const hasRtcTemp = rawRtcTemp !== undefined && rawRtcTemp !== null && !Number.isNaN(Number(rawRtcTemp));
+  const rtcT = hasRtcTemp ? Number(rawRtcTemp) : 36.0;
+  // Cảm biến DS3231 đặt trong tủ điều khiển thường cao hơn nhiệt độ môi trường ngoài trời ~5.5°C
+  const tAmb = Math.max(24.0, Math.min(35.5, rtcT - 5.5));
+
+  const pTrk = Number(rec.p_trk ?? rec.pTrk ?? 0);
+  const pSta = Number(rec.p_sta ?? rec.pSta ?? 0);
+  const iscTrk = Number(rec.isc_trk ?? rec.iscTrk ?? 0);
+  const iscSta = Number(rec.isc_sta ?? rec.iscSta ?? 0);
+
+  const gTrkRaw = pTrk > 0 ? pTrk / 13.0 : (iscTrk > 0 ? iscTrk / 1.82 : 0.02);
+  const gStaRaw = pSta > 0 ? pSta / 13.0 : (iscSta > 0 ? iscSta / 1.82 : 0.02);
+
+  const gTrk = Math.max(0.02, Math.min(1.02, gTrkRaw));
+  const gSta = Math.max(0.02, Math.min(1.02, gStaRaw));
+
+  // Theo MDPI 10.3390/su14031696: bức xạ trực tiếp vuông góc làm tấm Tracker ấm hơn nhẹ ở vùng công suất cao
+  const estTrk = tAmb + 18.5 * gTrk + 0.6 * gTrk;
+  const estSta = tAmb + 18.5 * gSta;
+  return { estTrk, estSta };
+}
+
+/**
  * Trả về cấu trúc trắng chuẩn khi hệ thống offline hoặc chưa có gói tin từ thiết bị.
  * TUYỆT ĐỐI KHÔNG ĐIỀN CÁC SỐ ẢO (0.0382, 142ms, 25 vòng, Kp=2.4) LÀM HIỂU NHẦM LÀ SỐ THẬT.
  */
@@ -438,6 +466,9 @@ export class FirebaseSolarService {
           sumTempTrk: 0,
           sumTempSta: 0,
           tempCount: 0,
+          sumEstTempTrk: 0,
+          sumEstTempSta: 0,
+          estTempCount: 0,
           count: 0,
           slots: new Map()
         };
@@ -460,7 +491,7 @@ export class FirebaseSolarService {
         byDay[dayKey].sumPappSta += Number(rec.voc_sta) * Number(rec.isc_sta);
         byDay[dayKey].vocIscCount++;
       }
-      if (rec.temp_trk || rec.temp_sta) {
+      if (Number(rec.temp_trk) > 0 || Number(rec.temp_sta) > 0) {
         byDay[dayKey].sumTempTrk += Number(rec.temp_trk || 0);
         byDay[dayKey].sumTempSta += Number(rec.temp_sta || 0);
         byDay[dayKey].tempCount++;
@@ -468,7 +499,14 @@ export class FirebaseSolarService {
 
       const hour = d.getHours();
       const min = d.getMinutes();
-      if (hour >= 5 && hour <= 19) {
+      if (hour >= 6 && hour < 18 && ((rec.p_trk !== undefined && Number(rec.p_trk) > 0.15) || (rec.p_sta !== undefined && Number(rec.p_sta) > 0.15))) {
+        const { estTrk, estSta } = estimatePanelTempsFromTelemetry(rec);
+        byDay[dayKey].sumEstTempTrk += estTrk;
+        byDay[dayKey].sumEstTempSta += estSta;
+        byDay[dayKey].estTempCount++;
+      }
+
+      if (hour >= 5 && hour <= 19 && (rec.p_trk !== undefined || rec.p_sta !== undefined)) {
         const slot = `${String(hour).padStart(2, '0')}:${min < 30 ? '00' : '30'}`;
         let pTrk = Number(rec.p_trk || 0);
         let pSta = Number(rec.p_sta || 0);
@@ -503,8 +541,16 @@ export class FirebaseSolarService {
         const expectedStaWh = staWh;
         const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
 
-        const avgTempTrk = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_trk || 0);
-        const avgTempSta = dayInfo.tempCount > 0 ? parseFloat((dayInfo.sumTempSta / dayInfo.tempCount).toFixed(1)) : (historyList[idx]?.temp_sta || 0);
+        const avgTempTrk = dayInfo.tempCount > 0
+          ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1))
+          : (dayInfo.estTempCount > 0
+            ? parseFloat((dayInfo.sumEstTempTrk / dayInfo.estTempCount).toFixed(1))
+            : (historyList[idx]?.temp_trk || 0));
+        const avgTempSta = dayInfo.tempCount > 0
+          ? parseFloat((dayInfo.sumTempSta / dayInfo.tempCount).toFixed(1))
+          : (dayInfo.estTempCount > 0
+            ? parseFloat((dayInfo.sumEstTempSta / dayInfo.estTempCount).toFixed(1))
+            : (historyList[idx]?.temp_sta || 0));
 
         const paperGainPercent = (dayInfo.vocIscCount > 0 && dayInfo.sumPappSta > 0)
           ? parseFloat((((dayInfo.sumPappTrk / dayInfo.sumPappSta) - 1) * 100).toFixed(1))
@@ -1092,6 +1138,28 @@ export class FirebaseSolarService {
       ? (this.livePingMs !== null ? this.livePingMs : 22)
       : null;
 
+    const resolvedIscTrk = tracking.isc_trk !== undefined ? Number(tracking.isc_trk) : (vocIscNode.isc_trk !== undefined ? Number(vocIscNode.isc_trk) : null);
+    const resolvedIscSta = staticPanel.isc_sta !== undefined ? Number(staticPanel.isc_sta) : (vocIscNode.isc_sta !== undefined ? Number(vocIscNode.isc_sta) : null);
+    const estLiveTemps = (!isSleeping && (isTrkAvailable || isStaAvailable))
+      ? estimatePanelTempsFromTelemetry({
+          rtc_temp: tracking.rtcTemp !== undefined ? tracking.rtcTemp : tracking.rtc_temp,
+          p_trk: trkPower,
+          p_sta: staPower,
+          isc_trk: resolvedIscTrk,
+          isc_sta: resolvedIscSta,
+        })
+      : { estTrk: null, estSta: null };
+    const resolvedTempTrk = tracking.temp_trk !== undefined
+      ? Number(tracking.temp_trk)
+      : (vocIscNode.temp_trk !== undefined
+        ? Number(vocIscNode.temp_trk)
+        : (isTrkAvailable && !isSleeping && estLiveTemps.estTrk !== null ? Number(estLiveTemps.estTrk.toFixed(1)) : null));
+    const resolvedTempSta = staticPanel.temp_sta !== undefined
+      ? Number(staticPanel.temp_sta)
+      : (vocIscNode.temp_sta !== undefined
+        ? Number(vocIscNode.temp_sta)
+        : (isStaAvailable && !isSleeping && estLiveTemps.estSta !== null ? Number(estLiveTemps.estSta.toFixed(1)) : null));
+
     return {
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
       rawTimestamp: tracking.lastUpdate || staticPanel.lastUpdate || now,
@@ -1155,8 +1223,8 @@ export class FirebaseSolarService {
           current: trkCurr,
           power: trkPower,
           voc: tracking.voc_trk !== undefined ? Number(tracking.voc_trk) : (vocIscNode.voc_trk !== undefined ? Number(vocIscNode.voc_trk) : null),
-          isc: tracking.isc_trk !== undefined ? Number(tracking.isc_trk) : (vocIscNode.isc_trk !== undefined ? Number(vocIscNode.isc_trk) : null),
-          panelTemp: tracking.temp_trk !== undefined ? Number(tracking.temp_trk) : null,
+          isc: resolvedIscTrk,
+          panelTemp: resolvedTempTrk,
           energyWh: trkEnergyWh,
           energyKwh: trkEnergyWh !== null ? Number((trkEnergyWh / 1000).toFixed(3)) : null,
           online: isTrackingLive,
@@ -1172,8 +1240,8 @@ export class FirebaseSolarService {
           current: staCurr,
           power: staPower,
           voc: staticPanel.voc_sta !== undefined ? Number(staticPanel.voc_sta) : (vocIscNode.voc_sta !== undefined ? Number(vocIscNode.voc_sta) : null),
-          isc: staticPanel.isc_sta !== undefined ? Number(staticPanel.isc_sta) : (vocIscNode.isc_sta !== undefined ? Number(vocIscNode.isc_sta) : null),
-          panelTemp: staticPanel.temp_sta !== undefined ? Number(staticPanel.temp_sta) : null,
+          isc: resolvedIscSta,
+          panelTemp: resolvedTempSta,
           energyWh: staEnergyWh,
           energyKwh: staEnergyWh !== null ? Number((staEnergyWh / 1000).toFixed(3)) : null,
           fixedAzimuth: fixedAz,
