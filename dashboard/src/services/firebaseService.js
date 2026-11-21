@@ -425,9 +425,16 @@ export class FirebaseSolarService {
   
   processHistory(historyData, trackingData = {}, force = false) {
     if (!historyData || typeof historyData !== 'object') return;
-    const historyCount = Object.keys(historyData).length;
-    if (!force && historyCount === this.lastHistoryCount && this.hasProcessedHistory) return;
+    const keys = Object.keys(historyData);
+    const historyCount = keys.length;
+    const tailSig = keys.slice(-3).map((k) => {
+      const r = historyData[k] || {};
+      return `${k}:${r.wh_trk ?? ''}:${r.voc_trk ?? ''}:${r.isc_trk ?? ''}:${r.temp_trk ?? ''}:${r.temp_sta ?? ''}`;
+    }).join('|');
+    const historySig = `${historyCount}|${tailSig}`;
+    if (!force && historySig === this.lastHistorySig && this.hasProcessedHistory) return;
     this.lastHistoryCount = historyCount;
+    this.lastHistorySig = historySig;
     this.hasProcessedHistory = true;
 
     let historyList = generate30DaysHistory();
@@ -492,17 +499,18 @@ export class FirebaseSolarService {
         byDay[dayKey].sumPappSta += Number(rec.voc_sta) * Number(rec.isc_sta);
         byDay[dayKey].vocIscCount++;
       }
-      if (Number(rec.temp_trk) > 0) {
-        byDay[dayKey].sumTempTrk += Number(rec.temp_trk);
-        byDay[dayKey].tempTrkCount++;
-      }
-      if (Number(rec.temp_sta) > 0) {
-        byDay[dayKey].sumTempSta += Number(rec.temp_sta);
-        byDay[dayKey].tempStaCount++;
-      }
-
       const hour = d.getHours();
       const min = d.getMinutes();
+      if (hour >= 6 && hour < 18) {
+        if (Number(rec.temp_trk) > 0) {
+          byDay[dayKey].sumTempTrk += Number(rec.temp_trk);
+          byDay[dayKey].tempTrkCount++;
+        }
+        if (Number(rec.temp_sta) > 0) {
+          byDay[dayKey].sumTempSta += Number(rec.temp_sta);
+          byDay[dayKey].tempStaCount++;
+        }
+      }
       const hasDaytimePowerOrIsc = (
         (rec.p_trk !== undefined && Number(rec.p_trk) > 0.15) ||
         (rec.p_sta !== undefined && Number(rec.p_sta) > 0.15) ||
@@ -545,9 +553,11 @@ export class FirebaseSolarService {
         if (Number(rec.voc_sta) > 0) { acc.vocStaSum += Number(rec.voc_sta); acc.vocStaCount++; }
         if (Number(rec.isc_trk) > 0) { acc.iscTrkSum += Number(rec.isc_trk); acc.iscTrkCount++; }
         if (Number(rec.isc_sta) > 0) { acc.iscStaSum += Number(rec.isc_sta); acc.iscStaCount++; }
-        if (Number(rec.temp_trk) > 0) { acc.tempTrkSum += Number(rec.temp_trk); acc.tempTrkCount++; }
-        if (Number(rec.temp_sta) > 0) { acc.tempStaSum += Number(rec.temp_sta); acc.tempStaCount++; }
-        if ((Number(rec.temp_trk) <= 0 || Number(rec.temp_sta) <= 0) && hour >= 6 && hour < 18 && hasDaytimePowerOrIsc) {
+        const hasRealTempTrk = Number(rec.temp_trk) > 0;
+        const hasRealTempSta = Number(rec.temp_sta) > 0;
+        if (hasRealTempTrk) { acc.tempTrkSum += Number(rec.temp_trk); acc.tempTrkCount++; }
+        if (hasRealTempSta) { acc.tempStaSum += Number(rec.temp_sta); acc.tempStaCount++; }
+        if ((!hasRealTempTrk || !hasRealTempSta) && hour >= 6 && hour < 18 && hasDaytimePowerOrIsc) {
           const { estTrk, estSta } = estimatePanelTempsFromTelemetry(rec);
           acc.estTempTrkSum += estTrk;
           acc.estTempStaSum += estSta;

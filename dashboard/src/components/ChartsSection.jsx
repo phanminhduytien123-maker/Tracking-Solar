@@ -1085,9 +1085,6 @@ export default function ChartsSection({
                 </strong>
               </span>
             </div>
-            <span className="text-zinc-500 dark:text-slate-400">
-              Cảm biến DS18B20 (GPIO 15/16 ESP2) đo ban ngày &amp; tự tắt khi ngủ đêm
-            </span>
           </div>
         </div>
 
@@ -1142,8 +1139,18 @@ export default function ChartsSection({
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">Voc Sta (V)</th>
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">Isc Trk (A)</th>
                   <th className="py-3 px-3.5 text-right whitespace-nowrap">Isc Sta (A)</th>
-                  <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Trk (°C)</th>
-                  <th className="py-3 px-3.5 text-right whitespace-nowrap">T° Sta (°C)</th>
+                  <th
+                    className="py-3 px-3.5 text-right whitespace-nowrap"
+                    title="Nhiệt độ bề mặt trung bình ban ngày (06:00 – 18:00)"
+                  >
+                    T° Trk (°C)
+                  </th>
+                  <th
+                    className="py-3 px-3.5 text-right whitespace-nowrap"
+                    title="Nhiệt độ bề mặt trung bình ban ngày (06:00 – 18:00)"
+                  >
+                    T° Sta (°C)
+                  </th>
                   <th
                     className="py-3 px-3.5 text-right whitespace-nowrap"
                     title="Tính theo thông số không tải (Voc × Isc): ((Voc_trk × Isc_trk) / (Voc_sta × Isc_sta) - 1) × 100%"
