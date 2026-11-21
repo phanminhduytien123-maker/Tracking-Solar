@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.2.0"
+#define VOC_ISC_FIRMWARE_VERSION "1.2.1"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -707,27 +707,32 @@ void reportEsp2BootOtaReadiness() {
 
 bool eraseVerifyBlock64K(const esp_partition_t *part, size_t blkOff,
                          uint8_t *checkBuf, uint32_t &retryCounter) {
+  auto isBlockAllFf = [&]() -> bool {
+    for (size_t s = 0; s < 0x10000UL; s += 4096UL) {
+      if (esp_partition_read(part, blkOff + s, checkBuf, 4096UL) != ESP_OK) {
+        return false;
+      }
+      for (size_t i = 0; i < 4096UL; i++) {
+        if (checkBuf[i] != 0xFF) return false;
+      }
+    }
+    return true;
+  };
+
   for (int attempt = 1; attempt <= 8; attempt++) {
     esp_err_t e = esp_partition_erase_range(part, blkOff, 0x10000UL);
     delay(30);
-    bool allFf = (e == ESP_OK);
-    if (allFf) {
-      for (size_t s = 0; s < 0x10000UL; s += 4096UL) {
-        if (esp_partition_read(part, blkOff + s, checkBuf, 4096UL) != ESP_OK) {
-          allFf = false;
-          break;
-        }
-        for (size_t i = 0; i < 4096UL; i++) {
-          if (checkBuf[i] != 0xFF) {
-            allFf = false;
-            break;
-          }
-        }
-        if (!allFf) break;
-      }
-    }
-    if (allFf) {
+    if (e == ESP_OK && isBlockAllFf()) {
       return true;
+    }
+    if ((part->address + blkOff) < 0x020000UL) {
+      for (size_t s = 0; s < 0x10000UL; s += 4096UL) {
+        esp_partition_erase_range(part, blkOff + s, 4096UL);
+      }
+      delay(30);
+      if (isBlockAllFf()) {
+        return true;
+      }
     }
     retryCounter++;
     Serial.printf(">> [FOTA ERASE RETRY] Block 0x%06X lan %d/8 (err=%s) -> cho 250ms...\n",
@@ -850,7 +855,9 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     {
       HTTPClient http;
       http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+      http.setConnectTimeout(25000);
       http.setTimeout(25000);
+      http.useHTTP10(true);
       bool began = false;
       WiFiClientSecure secClient;
       WiFiClient plainClient;
@@ -915,7 +922,9 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     if (failReason.length() == 0) {
       HTTPClient http;
       http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+      http.setConnectTimeout(25000);
       http.setTimeout(25000);
+      http.useHTTP10(true);
       bool began = false;
       WiFiClientSecure secClient;
       WiFiClient plainClient;
