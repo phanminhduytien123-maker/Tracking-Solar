@@ -16,20 +16,21 @@
 #include <DallasTemperature.h>
 #include <Firebase_ESP_Client.h>
 #include <HTTPClient.h>
-#include <HTTPUpdate.h>
 #include <OneWire.h>
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <addons/RTDBHelper.h>
 #include <addons/TokenHelper.h>
+#include <esp_err.h>
 #include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <esp_task_wdt.h>
 #include <time.h>
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.9"
+#define VOC_ISC_FIRMWARE_VERSION "1.2.0"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -704,6 +705,65 @@ void reportEsp2BootOtaReadiness() {
   }
 }
 
+bool eraseVerifyBlock64K(const esp_partition_t *part, size_t blkOff,
+                         uint8_t *checkBuf, uint32_t &retryCounter) {
+  for (int attempt = 1; attempt <= 8; attempt++) {
+    esp_err_t e = esp_partition_erase_range(part, blkOff, 0x10000UL);
+    delay(30);
+    bool allFf = (e == ESP_OK);
+    if (allFf) {
+      for (size_t s = 0; s < 0x10000UL; s += 4096UL) {
+        if (esp_partition_read(part, blkOff + s, checkBuf, 4096UL) != ESP_OK) {
+          allFf = false;
+          break;
+        }
+        for (size_t i = 0; i < 4096UL; i++) {
+          if (checkBuf[i] != 0xFF) {
+            allFf = false;
+            break;
+          }
+        }
+        if (!allFf) break;
+      }
+    }
+    if (allFf) {
+      return true;
+    }
+    retryCounter++;
+    Serial.printf(">> [FOTA ERASE RETRY] Block 0x%06X lan %d/8 (err=%s) -> cho 250ms...\n",
+                  (unsigned)(part->address + blkOff), attempt, esp_err_to_name(e));
+    delay(250);
+  }
+  return false;
+}
+
+bool writeVerifyChunk(const esp_partition_t *part, size_t offset,
+                      const uint8_t *data, size_t len, uint8_t *verifyBuf,
+                      uint32_t &retryCounter) {
+  for (int attempt = 1; attempt <= 5; attempt++) {
+    esp_err_t w = esp_partition_write(part, offset, data, len);
+    esp_err_t r = (w == ESP_OK) ? esp_partition_read(part, offset, verifyBuf, len) : w;
+    if (w == ESP_OK && r == ESP_OK && memcmp(data, verifyBuf, len) == 0) {
+      return true;
+    }
+    if (w == ESP_OK && r == ESP_OK) {
+      for (size_t i = 0; i < len; i++) {
+        if (verifyBuf[i] != data[i] && ((verifyBuf[i] & data[i]) != data[i])) {
+          Serial.printf(">> [FOTA WRITE FAIL] Bit 0->1 khong the ghi tai 0x%06X (flash=0x%02X, want=0x%02X)\n",
+                        (unsigned)(part->address + offset + i), verifyBuf[i], data[i]);
+          return false;
+        }
+      }
+    }
+    retryCounter++;
+    Serial.printf(">> [FOTA WRITE RETRY] Offset 0x%06X (%u B) lan %d/5 (err=%s)\n",
+                  (unsigned)(part->address + offset), (unsigned)len, attempt,
+                  esp_err_to_name(r));
+    delay(25);
+  }
+  return false;
+}
+
 void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
   String trimmedUrl = fotaUrl;
   trimmedUrl.trim();
@@ -761,48 +821,217 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
   Serial.printf(">> [FOTA HEAP] Sau dong Firebase SSL -> FreeHeap=%uB, MaxAlloc=%uB\n",
                 (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 
-  // 4. Go Watchdog trong thoi gian tai va ghi Flash tranh reset oan khi mang cham
+  // 4. Go Watchdog trong thoi gian xoa/tai/ghi Flash tranh reset oan khi chip S25FL128S xoa lau
   esp_task_wdt_reset();
   esp_task_wdt_delete(NULL);
 
-  // 5. Tai firmware & ghi Flash trong block doc lap de huy sach bo nho TLS truoc khi ket noi lai Firebase
-  t_httpUpdate_return ret = HTTP_UPDATE_FAILED;
-  int errCode = 0;
-  String errStr = "";
-  {
-    HTTPUpdate fotaUpdater(25000);
-    fotaUpdater.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    fotaUpdater.rebootOnUpdate(false);
+  // 5. Engine Cloud FOTA 64KB verify-on-erase & verify-on-write (tuong thich S25FL128S 01:2018)
+  const esp_partition_t *updatePart = esp_ota_get_next_update_partition(NULL);
+  bool fotaOk = false;
+  String failReason = "";
+  size_t totalSize = 0;
+  size_t bytesWritten = 0;
+  uint32_t eraseRetries = 0;
+  uint32_t writeRetries = 0;
 
-    static unsigned long lastProgressPrint = 0;
-    lastProgressPrint = 0;
-    fotaUpdater.onProgress([](size_t current, size_t total) {
-      if (total > 0) {
-        int pct = (int)((current * 100UL) / total);
-        if (millis() - lastProgressPrint >= 1500 || pct == 100) {
-          lastProgressPrint = millis();
-          Serial.printf(">> [ESP2 FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n",
-                        pct, (unsigned)current, (unsigned)total);
+  uint8_t *chunkBuf = (uint8_t *)malloc(4096UL);
+  uint8_t *verifyBuf = (uint8_t *)malloc(4096UL);
+
+  if (!updatePart) {
+    failReason = "No next OTA partition found";
+  } else if (!chunkBuf || !verifyBuf) {
+    failReason = "Out of heap for 4KB OTA buffers";
+  } else {
+    bool isHttps = trimmedUrl.startsWith("https://");
+    int contentLen = -1;
+    int headCode = 0;
+
+    // Pha 1: HTTP HEAD lay dung luong chinh xac
+    {
+      HTTPClient http;
+      http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+      http.setTimeout(25000);
+      bool began = false;
+      WiFiClientSecure secClient;
+      WiFiClient plainClient;
+      if (isHttps) {
+        secClient.setInsecure();
+        secClient.setTimeout(25);
+        began = http.begin(secClient, trimmedUrl);
+      } else {
+        plainClient.setTimeout(25);
+        began = http.begin(plainClient, trimmedUrl);
+      }
+      if (!began) {
+        failReason = "HTTP HEAD begin failed";
+      } else {
+        headCode = http.sendRequest("HEAD");
+        contentLen = http.getSize();
+        http.end();
+      }
+    }
+
+    if (failReason.length() == 0) {
+      if (headCode != HTTP_CODE_OK || contentLen <= 4096 ||
+          (size_t)contentLen > updatePart->size) {
+        char buf[96];
+        snprintf(buf, sizeof(buf), "Invalid HEAD code=%d size=%d partMax=%u",
+                 headCode, contentLen, (unsigned)updatePart->size);
+        failReason = buf;
+      } else {
+        totalSize = (size_t)contentLen;
+      }
+    }
+
+    // Pha 2: Pre-erase toan bo block 64KB + xac minh 0xFF truoc khi mo luong GET
+    if (failReason.length() == 0) {
+      size_t eraseSize = (totalSize + 0xFFFFUL) & ~0xFFFFUL;
+      if (eraseSize > updatePart->size) {
+        failReason = "Aligned erase size exceeds OTA partition";
+      } else {
+        Serial.printf(">> [FOTA ERASE] Xoa %u KB (%s @ 0x%06X) theo block 64KB...\n",
+                      (unsigned)(eraseSize / 1024UL), updatePart->label,
+                      (unsigned)updatePart->address);
+        for (size_t blkOff = 0; blkOff < eraseSize; blkOff += 0x10000UL) {
+          if (!eraseVerifyBlock64K(updatePart, blkOff, verifyBuf, eraseRetries)) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "64KB erase verify failed at 0x%06X",
+                     (unsigned)(updatePart->address + blkOff));
+            failReason = buf;
+            break;
+          }
+        }
+        if (failReason.length() == 0) {
+          Serial.printf(">> [FOTA ERASE OK] Da xac minh 0xFF sach se (erase_retries=%lu)\n",
+                        (unsigned long)eraseRetries);
         }
       }
-    });
-
-    if (trimmedUrl.startsWith("https://")) {
-      WiFiClientSecure secureClient;
-      secureClient.setInsecure();
-      secureClient.setTimeout(25);
-      ret = fotaUpdater.update(secureClient, trimmedUrl);
-    } else {
-      WiFiClient client;
-      client.setTimeout(25);
-      ret = fotaUpdater.update(client, trimmedUrl);
     }
 
-    if (ret != HTTP_UPDATE_OK) {
-      errCode = fotaUpdater.getLastError();
-      errStr = fotaUpdater.getLastErrorString();
+    // Pha 3: HTTP GET stream theo tung block 4KB va xac minh bit-for-bit sau khi ghi
+    uint8_t first16[16];
+    memset(first16, 0xFF, sizeof(first16));
+
+    if (failReason.length() == 0) {
+      HTTPClient http;
+      http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+      http.setTimeout(25000);
+      bool began = false;
+      WiFiClientSecure secClient;
+      WiFiClient plainClient;
+      if (isHttps) {
+        secClient.setInsecure();
+        secClient.setTimeout(25);
+        began = http.begin(secClient, trimmedUrl);
+      } else {
+        plainClient.setTimeout(25);
+        began = http.begin(plainClient, trimmedUrl);
+      }
+
+      if (!began) {
+        failReason = "HTTP GET begin failed";
+      } else {
+        int getCode = http.GET();
+        int getLen = http.getSize();
+        if (getCode != HTTP_CODE_OK || (getLen >= 0 && (size_t)getLen != totalSize)) {
+          char buf[80];
+          snprintf(buf, sizeof(buf), "Invalid GET code=%d len=%d expected=%u",
+                   getCode, getLen, (unsigned)totalSize);
+          failReason = buf;
+        } else {
+          WiFiClient *stream = http.getStreamPtr();
+          size_t bufFill = 0;
+          unsigned long lastDataMs = millis();
+          unsigned long lastProgressPrint = 0;
+
+          while (bytesWritten + bufFill < totalSize) {
+            int avail = stream ? stream->available() : 0;
+            if (avail > 0) {
+              size_t toRead = (size_t)avail;
+              size_t space = 4096UL - bufFill;
+              size_t remainTotal = totalSize - (bytesWritten + bufFill);
+              if (toRead > space) toRead = space;
+              if (toRead > remainTotal) toRead = remainTotal;
+              int got = stream->read(chunkBuf + bufFill, toRead);
+              if (got > 0) {
+                bufFill += (size_t)got;
+                lastDataMs = millis();
+              }
+            } else {
+              if (!http.connected()) {
+                failReason = "HTTP stream closed early";
+                break;
+              }
+              if (millis() - lastDataMs > 25000UL) {
+                failReason = "HTTP stream stall timeout (>25s)";
+                break;
+              }
+              delay(1);
+            }
+
+            if (bufFill == 4096UL || (bytesWritten + bufFill == totalSize)) {
+              bool writeOk = false;
+              if (bytesWritten == 0) {
+                if (bufFill < 16 || chunkBuf[0] != 0xE9) {
+                  failReason = "Invalid ESP32-S3 magic byte (expected 0xE9)";
+                  break;
+                }
+                memcpy(first16, chunkBuf, 16);
+                writeOk = writeVerifyChunk(updatePart, 16, chunkBuf + 16,
+                                           bufFill - 16, verifyBuf, writeRetries);
+              } else {
+                writeOk = writeVerifyChunk(updatePart, bytesWritten, chunkBuf,
+                                           bufFill, verifyBuf, writeRetries);
+              }
+              if (!writeOk) {
+                char buf[80];
+                snprintf(buf, sizeof(buf), "Write verify failed at offset 0x%06X",
+                         (unsigned)bytesWritten);
+                failReason = buf;
+                break;
+              }
+
+              bytesWritten += bufFill;
+              bufFill = 0;
+
+              int pct = (int)((bytesWritten * 100UL) / totalSize);
+              if (millis() - lastProgressPrint >= 1500UL || bytesWritten == totalSize) {
+                lastProgressPrint = millis();
+                Serial.printf(">> [ESP2 FOTA] Tai & xac minh: %d%% (%u / %u B | wr_retry=%lu)\n",
+                              pct, (unsigned)bytesWritten, (unsigned)totalSize,
+                              (unsigned long)writeRetries);
+              }
+            }
+          }
+        }
+        http.end();
+      }
+    }
+
+    if (failReason.length() == 0 && bytesWritten != totalSize) {
+      char buf[80];
+      snprintf(buf, sizeof(buf), "Incomplete download %u / %u bytes",
+               (unsigned)bytesWritten, (unsigned)totalSize);
+      failReason = buf;
+    }
+
+    // Pha 4: Ghi 16 byte header (magic 0xE9) & kich hoat phan vung boot moi
+    if (failReason.length() == 0) {
+      if (!writeVerifyChunk(updatePart, 0, first16, 16, verifyBuf, writeRetries)) {
+        failReason = "Failed to write/verify header bytes 0..15";
+      } else {
+        esp_err_t bootErr = esp_ota_set_boot_partition(updatePart);
+        if (bootErr != ESP_OK) {
+          failReason = "esp_ota_set_boot_partition failed: " + String(esp_err_to_name(bootErr));
+        } else {
+          fotaOk = true;
+        }
+      }
     }
   }
+
+  if (chunkBuf) free(chunkBuf);
+  if (verifyBuf) free(verifyBuf);
 
   // 6. Khoi phuc lai buffer Firebase & ghi ket qua cuoi len /solar/ota_esp2
   fbdo.setBSSLBufferSize(4096, 2048);
@@ -815,13 +1044,20 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
   finalOta.set("trigger", false);
   finalOta.set("url", trimmedUrl);
   finalOta.set("target_version", targetVersion);
+  if (updatePart) {
+    finalOta.set("target_partition", updatePart->label);
+  }
+  finalOta.set("bytes_written", (int)bytesWritten);
+  finalOta.set("erase_retries", (int)eraseRetries);
+  finalOta.set("write_retries", (int)writeRetries);
   finalOta.set("updated_at/.sv", "timestamp");
 
-  if (ret == HTTP_UPDATE_OK) {
-    Serial.println("\n>> [ESP2 FOTA SUCCESS] Ghi Flash thanh cong 100%! Dang luu trang thai...");
+  if (fotaOk) {
+    Serial.printf("\n>> [ESP2 FOTA SUCCESS] Ghi & xac minh 100%% (%u B, er_retry=%lu, wr_retry=%lu)!\n",
+                  (unsigned)bytesWritten, (unsigned long)eraseRetries, (unsigned long)writeRetries);
     finalOta.set("status", "SUCCESS");
     finalOta.set("progress", 100);
-    finalOta.set("current_version", targetVersion.length() > 0 ? targetVersion : "NEW_VERSION");
+    finalOta.set("current_version", targetVersion.length() > 0 ? targetVersion : VOC_ISC_FIRMWARE_VERSION);
     finalOta.set("error", "");
     if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
       if (!Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &finalOta)) {
@@ -834,17 +1070,13 @@ void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
     Serial.println(">> [ESP2 FOTA] Khoi dong lai ESP32 #2 de chay firmware moi...");
     ESP.restart();
     return;
-  } else if (ret == HTTP_UPDATE_NO_UPDATES) {
-    Serial.println(">> [ESP2 FOTA] Khong co ban cap nhat moi.");
-    finalOta.set("status", "NO_UPDATES");
-    finalOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
-    finalOta.set("error", "");
   } else {
-    String fullErr = "(" + String(errCode) + ") " + errStr;
-    Serial.printf(">> [ESP2 FOTA ERROR] Loi %s\n", fullErr.c_str());
+    int failPct = (totalSize > 0) ? (int)((bytesWritten * 100UL) / totalSize) : 0;
+    Serial.printf(">> [ESP2 FOTA ERROR] %s\n", failReason.c_str());
     finalOta.set("status", "FAILED");
+    finalOta.set("progress", failPct);
     finalOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
-    finalOta.set("error", fullErr);
+    finalOta.set("error", failReason);
   }
 
   if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
