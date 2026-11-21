@@ -13,9 +13,11 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <DallasTemperature.h>
 #include <Firebase_ESP_Client.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
+#include <OneWire.h>
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -27,7 +29,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.1.8"
+#define VOC_ISC_FIRMWARE_VERSION "1.1.9"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -36,6 +38,10 @@
 #define PIN_ADC_ISC_TRK     7   // ADC1_CH6: ACS712 #2 (Tấm Xoay - qua cầu 10k/20k)
 #define PIN_ADC_VOC_STA     4   // ADC1_CH3: FZ0430 #1 (Tấm Cố Định)
 #define PIN_ADC_ISC_STA     5   // ADC1_CH4: ACS712 #1 (Tấm Cố Định - qua cầu 10k/20k)
+
+// Cảm biến nhiệt độ bề mặt 2 tấm pin DS18B20 (đúng PCB Board 2: trở kéo 4.7k lên +3.3V_ESP2)
+#define PIN_TEMP_TRK        15  // J_TEMP_TRK1 (Pad 8 ESP2): DS18B20 #1 - Nhiệt độ Tấm Xoay (Tracker)
+#define PIN_TEMP_STA        16  // J_TEMP_STA1 (Pad 9 ESP2): DS18B20 #2 - Nhiệt độ Tấm Cố Định (Static)
 
 // Chân điều khiển Module Relay A, B, C, D (Đo Voc/Isc ban ngày)
 #define PIN_RELAY_A_CUT     38  // Relay A (Ngắt tải Tấm Xoay) - Đổi từ GPIO 14 sang GPIO 38 để High-Z khi mất nguồn
@@ -113,6 +119,25 @@ float rawVocStaMv = 0.0f;
 float rawIscTrkMv = 0.0f;
 float rawIscStaMv = 0.0f;
 uint32_t totalMeasureCycles = 0;
+
+// Cảm biến nhiệt độ bề mặt 2 tấm pin DS18B20 (1-Wire độc lập, chỉ đọc & gửi ban ngày khi thức)
+OneWire oneWireTrk(PIN_TEMP_TRK);
+OneWire oneWireSta(PIN_TEMP_STA);
+DallasTemperature dsTrk(&oneWireTrk);
+DallasTemperature dsSta(&oneWireSta);
+
+float liveTempTrk = 0.0f;
+float liveTempSta = 0.0f;
+bool tempTrkValid = false;
+bool tempStaValid = false;
+uint8_t tempTrkCount = 0;
+uint8_t tempStaCount = 0;
+uint8_t tempTrkFailStreak = 0;
+uint8_t tempStaFailStreak = 0;
+bool tempConvPending = false;
+unsigned long tempConvStartMs = 0;
+unsigned long lastTempPollMs = 0;
+unsigned long lastTempScanMs = 0;
 
 // Máy trạng thái hữu hạn (FSM) đóng ngắt Relay A-B-C-D không chặn (Non-blocking)
 enum MeasureFsmState {
@@ -516,10 +541,15 @@ void pushVocIscToFirebase(bool writeHistory) {
     }
   }
 
+  bool sleeping = isSystemCurrentlySleeping();
+
   // Cập nhật trực tiếp vào /solar/tracking và /solar/static để Web Dashboard hiển thị tức thời
   FirebaseJson trkPatch;
   trkPatch.set("voc_trk", liveVocTrk);
   trkPatch.set("isc_trk", liveIscTrk);
+  if (!sleeping && tempTrkValid) {
+    trkPatch.set("temp_trk", liveTempTrk);
+  }
   trkPatch.set("relayIntervalSec", (int)relayIntervalSec);
   trkPatch.set("lamp12vOn", lamp12vState);
   trkPatch.set("lampAutoDisabled", lampAutoDisabled);
@@ -536,6 +566,9 @@ void pushVocIscToFirebase(bool writeHistory) {
   FirebaseJson staPatch;
   staPatch.set("voc_sta", liveVocSta);
   staPatch.set("isc_sta", liveIscSta);
+  if (!sleeping && tempStaValid) {
+    staPatch.set("temp_sta", liveTempSta);
+  }
   Firebase.RTDB.updateNode(&fbdo, "/solar/static", &staPatch);
 
   // Cập nhật nhánh chuyên biệt /solar/voc_isc_node để giám sát chẩn đoán
@@ -544,6 +577,14 @@ void pushVocIscToFirebase(bool writeHistory) {
   nodeJson.set("isc_trk", liveIscTrk);
   nodeJson.set("voc_sta", liveVocSta);
   nodeJson.set("isc_sta", liveIscSta);
+  if (!sleeping && tempTrkValid) {
+    nodeJson.set("temp_trk", liveTempTrk);
+  }
+  if (!sleeping && tempStaValid) {
+    nodeJson.set("temp_sta", liveTempSta);
+  }
+  nodeJson.set("temp_trk_connected", !sleeping && tempTrkValid);
+  nodeJson.set("temp_sta_connected", !sleeping && tempStaValid);
   nodeJson.set("raw_voc_trk_mv", rawVocTrkMv);
   nodeJson.set("raw_voc_sta_mv", rawVocStaMv);
   nodeJson.set("raw_isc_trk_mv", rawIscTrkMv);
@@ -579,8 +620,8 @@ void pushVocIscToFirebase(bool writeHistory) {
   nodeJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &nodeJson);
 
-  // Ghi lịch sử Voc/Isc mỗi chu kỳ đo (60s/lần) vào /solar/history để tích phân theo từng thời điểm
-  if (writeHistory) {
+  // Ghi lịch sử Voc/Isc (+ nhiệt độ tấm pin nếu đã gắn) mỗi chu kỳ đo vào /solar/history
+  if (writeHistory && !sleeping) {
     time_t nowEpoch = time(nullptr);
     if (nowEpoch > 1700000000) {
       uint32_t slotEpoch = ((uint32_t)nowEpoch / 60UL) * 60UL;
@@ -592,6 +633,8 @@ void pushVocIscToFirebase(bool writeHistory) {
       hVocJson.set("isc_trk", liveIscTrk);
       hVocJson.set("voc_sta", liveVocSta);
       hVocJson.set("isc_sta", liveIscSta);
+      if (tempTrkValid) hVocJson.set("temp_trk", liveTempTrk);
+      if (tempStaValid) hVocJson.set("temp_sta", liveTempSta);
       hVocJson.set("source", "device");
       Firebase.RTDB.updateNode(&fbdo, histPath, &hVocJson);
     }
@@ -602,6 +645,7 @@ void pushVocIscToFirebase(bool writeHistory) {
 void pushHeartbeatToFirebase() {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
 
+  bool sleeping = isSystemCurrentlySleeping();
   unsigned long lampRemainSec = 0;
   if (!lampAutoDisabled && wasSleepingForLamp) {
     unsigned long currentTargetMs = (lampAutoPhase ? lampOnSec : lampOffSec) * 1000UL;
@@ -613,12 +657,16 @@ void pushHeartbeatToFirebase() {
 
   FirebaseJson hbJson;
   hbJson.set("online", true);
-  hbJson.set("is_sleeping", isSystemCurrentlySleeping());
+  hbJson.set("is_sleeping", sleeping);
   hbJson.set("lamp_12v_on", lamp12vState);
   hbJson.set("lamp_auto_phase", lampAutoPhase ? "ON" : "OFF");
   hbJson.set("lamp_remain_sec", (int)lampRemainSec);
   hbJson.set("relay_interval_sec", (int)relayIntervalSec);
   hbJson.set("temp_chip_c", temperatureRead());
+  hbJson.set("temp_trk_connected", !sleeping && tempTrkValid);
+  hbJson.set("temp_sta_connected", !sleeping && tempStaValid);
+  if (!sleeping && tempTrkValid) hbJson.set("temp_trk", liveTempTrk);
+  if (!sleeping && tempStaValid) hbJson.set("temp_sta", liveTempSta);
   hbJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
   hbJson.set("fota_ready", true);
   hbJson.set("ota_node", "/solar/ota_esp2");
@@ -954,10 +1002,10 @@ void runMeasurementStateMachine() {
         measState = MEAS_IDLE;
         totalMeasureCycles++;
 
-        Serial.printf(">> [VOC/ISC #%lu] TRK: Voc=%.2fV, Isc=%.3fA | STA: Voc=%.2fV, Isc=%.3fA | Chu ky: %lus | Den 12V: %s\n",
+        Serial.printf(">> [VOC/ISC #%lu] TRK: Voc=%.2fV, Isc=%.3fA, T=%.1fC | STA: Voc=%.2fV, Isc=%.3fA, T=%.1fC | Chu ky: %lus | Den 12V: %s\n",
                       (unsigned long)totalMeasureCycles,
-                      liveVocTrk, liveIscTrk,
-                      liveVocSta, liveIscSta,
+                      liveVocTrk, liveIscTrk, tempTrkValid ? liveTempTrk : 0.0f,
+                      liveVocSta, liveIscSta, tempStaValid ? liveTempSta : 0.0f,
                       (unsigned long)relayIntervalSec,
                       lamp12vState ? "ON" : "OFF");
 
@@ -966,6 +1014,101 @@ void runMeasurementStateMachine() {
       }
       break;
     }
+  }
+}
+
+// -------------------------------------------------------------------------
+// 8B. ĐỌC NHIỆT ĐỘ BỀ MẶT 2 TẤM PIN DS18B20 KHÔNG CHẶN (TẮT KHI NGỦ)
+// -------------------------------------------------------------------------
+void initTempSensors() {
+  dsTrk.begin();
+  dsTrk.setResolution(12);
+  dsTrk.setWaitForConversion(false);
+  tempTrkCount = dsTrk.getDeviceCount();
+
+  dsSta.begin();
+  dsSta.setResolution(12);
+  dsSta.setWaitForConversion(false);
+  tempStaCount = dsSta.getDeviceCount();
+
+  lastTempScanMs = millis();
+  Serial.printf(">> [TEMP DS18B20] TRK (GPIO %d): %u cam bien | STA (GPIO %d): %u cam bien\n",
+                PIN_TEMP_TRK, (unsigned)tempTrkCount, PIN_TEMP_STA, (unsigned)tempStaCount);
+}
+
+void readSingleDs18b20(DallasTemperature &bus, const char *label, uint8_t pin,
+                       uint8_t &devCount, uint8_t &failStreak,
+                       bool &isValid, float &liveVal) {
+  if (devCount == 0) {
+    isValid = false;
+    return;
+  }
+  float t = bus.getTempCByIndex(0);
+  if (t > -20.0f && t < 110.0f && fabs(t - 85.0f) > 0.01f) {
+    liveVal = isValid ? (0.7f * liveVal + 0.3f * t) : t;
+    isValid = true;
+    failStreak = 0;
+  } else {
+    failStreak++;
+    if (failStreak >= 3) {
+      isValid = false;
+      devCount = 0; // Cho phép quét lại khi gắn hoặc nối lại cảm biến
+      Serial.printf(">> [TEMP] Mat ket noi DS18B20 %s (GPIO %u) -> Chuyen che do cho quet lai\n",
+                    label, (unsigned)pin);
+    }
+  }
+}
+
+void updatePanelTemperatures() {
+  if (otaInProgress) return;
+
+  // Ban đêm / khi hệ thống ngủ: dừng đọc và không gửi dữ liệu nhiệt độ tấm pin
+  if (isSystemCurrentlySleeping()) {
+    tempConvPending = false;
+    tempTrkValid = false;
+    tempStaValid = false;
+    return;
+  }
+
+  unsigned long now = millis();
+
+  // Quét lại mỗi 60 giây nếu có kênh chưa gắn cảm biến (hỗ trợ gắn DS18B20 sau)
+  if ((tempTrkCount == 0 || tempStaCount == 0) && (now - lastTempScanMs >= 60000UL)) {
+    lastTempScanMs = now;
+    if (tempTrkCount == 0) {
+      dsTrk.begin();
+      dsTrk.setResolution(12);
+      dsTrk.setWaitForConversion(false);
+      tempTrkCount = dsTrk.getDeviceCount();
+      if (tempTrkCount > 0) {
+        tempTrkFailStreak = 0;
+        Serial.printf(">> [TEMP] Phat hien DS18B20 TRK tren GPIO %d!\n", PIN_TEMP_TRK);
+      }
+    }
+    if (tempStaCount == 0) {
+      dsSta.begin();
+      dsSta.setResolution(12);
+      dsSta.setWaitForConversion(false);
+      tempStaCount = dsSta.getDeviceCount();
+      if (tempStaCount > 0) {
+        tempStaFailStreak = 0;
+        Serial.printf(">> [TEMP] Phat hien DS18B20 STA tren GPIO %d!\n", PIN_TEMP_STA);
+      }
+    }
+  }
+
+  if (tempTrkCount == 0 && tempStaCount == 0) return;
+
+  if (!tempConvPending && (now - lastTempPollMs >= 10000UL)) {
+    if (tempTrkCount > 0) dsTrk.requestTemperatures();
+    if (tempStaCount > 0) dsSta.requestTemperatures();
+    tempConvPending = true;
+    tempConvStartMs = now;
+  } else if (tempConvPending && (now - tempConvStartMs >= 800UL)) {
+    readSingleDs18b20(dsTrk, "TRK", PIN_TEMP_TRK, tempTrkCount, tempTrkFailStreak, tempTrkValid, liveTempTrk);
+    readSingleDs18b20(dsSta, "STA", PIN_TEMP_STA, tempStaCount, tempStaFailStreak, tempStaValid, liveTempSta);
+    tempConvPending = false;
+    lastTempPollMs = now;
   }
 }
 
@@ -1008,10 +1151,12 @@ void handleSerialCommands() {
                   remoteSleepDisabled ? "BAT" : "TAT");
     Serial.printf(" Den 12V (Relay E) : %s (GPIO %d)\n",
                   lamp12vState ? "DANG BAT (ON)" : "DANG TAT (OFF)", PIN_RELAY_E_LAMP12V);
-    Serial.printf(" Tam Xoay (TRK)    : Voc = %.2f V | Isc = %.3f A\n",
-                  liveVocTrk, liveIscTrk);
-    Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A\n",
-                  liveVocSta, liveIscSta);
+    Serial.printf(" Tam Xoay (TRK)    : Voc = %.2f V | Isc = %.3f A | Temp (G%d) = %s\n",
+                  liveVocTrk, liveIscTrk, PIN_TEMP_TRK,
+                  tempTrkValid ? (String(liveTempTrk, 1) + " C").c_str() : "CHUA GAN");
+    Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A | Temp (G%d) = %s\n",
+                  liveVocSta, liveIscSta, PIN_TEMP_STA,
+                  tempStaValid ? (String(liveTempSta, 1) + " C").c_str() : "CHUA GAN");
     Serial.println("==============================================================\n");
   } else if (cmd.startsWith("fota ")) {
     String url = cmd.substring(5);
@@ -1056,6 +1201,9 @@ void setup() {
   analogSetPinAttenuation(PIN_ADC_ISC_TRK, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_VOC_STA, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_ISC_STA, ADC_11db);
+
+  // BƯỚC 2B: Khởi tạo 2 cảm biến nhiệt độ DS18B20 độc lập (GPIO 15 TRK, GPIO 16 STA)
+  initTempSensors();
 
   // BƯỚC 3: Khôi phục cấu hình từ NVS Flash
   prefs.begin("voc_isc_cfg", false);
@@ -1211,8 +1359,9 @@ void loop() {
     pushHeartbeatToFirebase();
   }
 
-  // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc (Chỉ chạy khi thức)
+  // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc + đọc nhiệt độ DS18B20 (Chỉ chạy khi thức)
   if (!otaInProgress) {
+    updatePanelTemperatures();
     runMeasurementStateMachine();
   }
 

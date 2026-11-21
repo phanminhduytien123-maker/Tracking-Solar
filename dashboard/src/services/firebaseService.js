@@ -465,7 +465,8 @@ export class FirebaseSolarService {
           vocIscCount: 0,
           sumTempTrk: 0,
           sumTempSta: 0,
-          tempCount: 0,
+          tempTrkCount: 0,
+          tempStaCount: 0,
           sumEstTempTrk: 0,
           sumEstTempSta: 0,
           estTempCount: 0,
@@ -491,31 +492,67 @@ export class FirebaseSolarService {
         byDay[dayKey].sumPappSta += Number(rec.voc_sta) * Number(rec.isc_sta);
         byDay[dayKey].vocIscCount++;
       }
-      if (Number(rec.temp_trk) > 0 || Number(rec.temp_sta) > 0) {
-        byDay[dayKey].sumTempTrk += Number(rec.temp_trk || 0);
-        byDay[dayKey].sumTempSta += Number(rec.temp_sta || 0);
-        byDay[dayKey].tempCount++;
+      if (Number(rec.temp_trk) > 0) {
+        byDay[dayKey].sumTempTrk += Number(rec.temp_trk);
+        byDay[dayKey].tempTrkCount++;
+      }
+      if (Number(rec.temp_sta) > 0) {
+        byDay[dayKey].sumTempSta += Number(rec.temp_sta);
+        byDay[dayKey].tempStaCount++;
       }
 
       const hour = d.getHours();
       const min = d.getMinutes();
-      if (hour >= 6 && hour < 18 && ((rec.p_trk !== undefined && Number(rec.p_trk) > 0.15) || (rec.p_sta !== undefined && Number(rec.p_sta) > 0.15))) {
+      const hasDaytimePowerOrIsc = (
+        (rec.p_trk !== undefined && Number(rec.p_trk) > 0.15) ||
+        (rec.p_sta !== undefined && Number(rec.p_sta) > 0.15) ||
+        Number(rec.isc_trk) > 0.05 ||
+        Number(rec.isc_sta) > 0.05
+      );
+      if (hour >= 6 && hour < 18 && hasDaytimePowerOrIsc) {
         const { estTrk, estSta } = estimatePanelTempsFromTelemetry(rec);
         byDay[dayKey].sumEstTempTrk += estTrk;
         byDay[dayKey].sumEstTempSta += estSta;
         byDay[dayKey].estTempCount++;
       }
 
-      if (hour >= 5 && hour <= 19 && (rec.p_trk !== undefined || rec.p_sta !== undefined)) {
+      if (hour >= 5 && hour <= 19) {
         const slot = `${String(hour).padStart(2, '0')}:${min < 30 ? '00' : '30'}`;
-        let pTrk = Number(rec.p_trk || 0);
-        let pSta = Number(rec.p_sta || 0);
-        if (pTrk > 50) pTrk = pTrk / 37.0;
-        if (pSta > 50) pSta = pSta / 37.0;
-        byDay[dayKey].slots.set(slot, {
-          pTracking: parseFloat(pTrk.toFixed(1)),
-          pStatic: parseFloat(pSta.toFixed(1))
-        });
+        let acc = byDay[dayKey].slots.get(slot);
+        if (!acc) {
+          acc = {
+            pTrkSum: 0, pStaSum: 0, pCount: 0,
+            vocTrkSum: 0, vocTrkCount: 0,
+            vocStaSum: 0, vocStaCount: 0,
+            iscTrkSum: 0, iscTrkCount: 0,
+            iscStaSum: 0, iscStaCount: 0,
+            tempTrkSum: 0, tempTrkCount: 0,
+            tempStaSum: 0, tempStaCount: 0,
+            estTempTrkSum: 0, estTempStaSum: 0, estTempCount: 0
+          };
+          byDay[dayKey].slots.set(slot, acc);
+        }
+        if (rec.p_trk !== undefined || rec.p_sta !== undefined) {
+          let pTrk = Number(rec.p_trk || 0);
+          let pSta = Number(rec.p_sta || 0);
+          if (pTrk > 50) pTrk = pTrk / 37.0;
+          if (pSta > 50) pSta = pSta / 37.0;
+          acc.pTrkSum += pTrk;
+          acc.pStaSum += pSta;
+          acc.pCount++;
+        }
+        if (Number(rec.voc_trk) > 0) { acc.vocTrkSum += Number(rec.voc_trk); acc.vocTrkCount++; }
+        if (Number(rec.voc_sta) > 0) { acc.vocStaSum += Number(rec.voc_sta); acc.vocStaCount++; }
+        if (Number(rec.isc_trk) > 0) { acc.iscTrkSum += Number(rec.isc_trk); acc.iscTrkCount++; }
+        if (Number(rec.isc_sta) > 0) { acc.iscStaSum += Number(rec.isc_sta); acc.iscStaCount++; }
+        if (Number(rec.temp_trk) > 0) { acc.tempTrkSum += Number(rec.temp_trk); acc.tempTrkCount++; }
+        if (Number(rec.temp_sta) > 0) { acc.tempStaSum += Number(rec.temp_sta); acc.tempStaCount++; }
+        if ((Number(rec.temp_trk) <= 0 || Number(rec.temp_sta) <= 0) && hour >= 6 && hour < 18 && hasDaytimePowerOrIsc) {
+          const { estTrk, estSta } = estimatePanelTempsFromTelemetry(rec);
+          acc.estTempTrkSum += estTrk;
+          acc.estTempStaSum += estSta;
+          acc.estTempCount++;
+        }
       }
     });
 
@@ -541,13 +578,13 @@ export class FirebaseSolarService {
         const expectedStaWh = staWh;
         const gain = expectedStaWh > 0 ? parseFloat((((trkWh / expectedStaWh) - 1) * 100).toFixed(1)) : 0;
 
-        const avgTempTrk = dayInfo.tempCount > 0
-          ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempCount).toFixed(1))
+        const avgTempTrk = dayInfo.tempTrkCount > 0
+          ? parseFloat((dayInfo.sumTempTrk / dayInfo.tempTrkCount).toFixed(1))
           : (dayInfo.estTempCount > 0
             ? parseFloat((dayInfo.sumEstTempTrk / dayInfo.estTempCount).toFixed(1))
             : (historyList[idx]?.temp_trk || 0));
-        const avgTempSta = dayInfo.tempCount > 0
-          ? parseFloat((dayInfo.sumTempSta / dayInfo.tempCount).toFixed(1))
+        const avgTempSta = dayInfo.tempStaCount > 0
+          ? parseFloat((dayInfo.sumTempSta / dayInfo.tempStaCount).toFixed(1))
           : (dayInfo.estTempCount > 0
             ? parseFloat((dayInfo.sumEstTempSta / dayInfo.estTempCount).toFixed(1))
             : (historyList[idx]?.temp_sta || 0));
@@ -579,9 +616,13 @@ export class FirebaseSolarService {
       }
     });
 
-    // 2. Tạo hồ sơ công suất trong ngày (intradayProfilesByDate) cho TẤT CẢ các ngày có dữ liệu
+    // 2. Tạo hồ sơ trong ngày (intradayProfilesByDate: Công suất + T° + Voc + Isc) cho TẤT CẢ các ngày
+    const parseDayKeyVal = (k) => {
+      const [dd, mm] = String(k).split('/').map(Number);
+      return (mm || 0) * 100 + (dd || 0);
+    };
     const allIntradayProfiles = {};
-    const availableDates = Object.keys(byDay).sort().reverse(); // Ngày mới nhất lên trước
+    const availableDates = Object.keys(byDay).sort((a, b) => parseDayKeyVal(b) - parseDayKeyVal(a));
 
     // Đảm bảo luôn có ngày hôm nay trong danh sách
     if (!availableDates.includes(todayStr)) {
@@ -593,13 +634,23 @@ export class FirebaseSolarService {
       const daySlots = byDay[dKey]?.slots;
       if (daySlots) {
         profile.forEach((pt) => {
-          if (daySlots.has(pt.time)) {
-            const slotData = daySlots.get(pt.time);
-            pt.pTracking = slotData.pTracking;
-            pt.pStatic = slotData.pStatic;
-            const exp = slotData.pStatic;
-            pt.gain = exp > 0 ? parseFloat((((slotData.pTracking / exp) - 1) * 100).toFixed(1)) : 0;
+          const acc = daySlots.get(pt.time);
+          if (!acc) return;
+          if (acc.pCount > 0) {
+            pt.pTracking = parseFloat((acc.pTrkSum / acc.pCount).toFixed(1));
+            pt.pStatic = parseFloat((acc.pStaSum / acc.pCount).toFixed(1));
+            pt.gain = pt.pStatic > 0 ? parseFloat((((pt.pTracking / pt.pStatic) - 1) * 100).toFixed(1)) : 0;
           }
+          pt.vocTrk = acc.vocTrkCount > 0 ? parseFloat((acc.vocTrkSum / acc.vocTrkCount).toFixed(2)) : null;
+          pt.vocSta = acc.vocStaCount > 0 ? parseFloat((acc.vocStaSum / acc.vocStaCount).toFixed(2)) : null;
+          pt.iscTrk = acc.iscTrkCount > 0 ? parseFloat((acc.iscTrkSum / acc.iscTrkCount).toFixed(2)) : null;
+          pt.iscSta = acc.iscStaCount > 0 ? parseFloat((acc.iscStaSum / acc.iscStaCount).toFixed(2)) : null;
+          pt.tempTrk = acc.tempTrkCount > 0
+            ? parseFloat((acc.tempTrkSum / acc.tempTrkCount).toFixed(1))
+            : (acc.estTempCount > 0 ? parseFloat((acc.estTempTrkSum / acc.estTempCount).toFixed(1)) : null);
+          pt.tempSta = acc.tempStaCount > 0
+            ? parseFloat((acc.tempStaSum / acc.tempStaCount).toFixed(1))
+            : (acc.estTempCount > 0 ? parseFloat((acc.estTempStaSum / acc.estTempCount).toFixed(1)) : null);
         });
       }
       allIntradayProfiles[dKey] = profile;

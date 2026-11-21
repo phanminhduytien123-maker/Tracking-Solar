@@ -132,7 +132,13 @@ export function generateIntradayProfile() {
       time: hStr,
       pTracking: 0.0,
       pStatic: 0.0,
-      gain: 0.0
+      gain: 0.0,
+      vocTrk: null,
+      vocSta: null,
+      iscTrk: null,
+      iscSta: null,
+      tempTrk: null,
+      tempSta: null
     });
   }
   return points;
