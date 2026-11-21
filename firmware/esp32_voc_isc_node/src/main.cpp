@@ -14,10 +14,14 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <Firebase_ESP_Client.h>
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <addons/RTDBHelper.h>
 #include <addons/TokenHelper.h>
+#include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
 #include <time.h>
 
@@ -86,6 +90,9 @@ bool remoteMotorsMoving   = false;   // Tránh đóng relay đúng lúc motor đ
 bool forceSingleTest      = false;   // Cờ kích hoạt test 1 chu kỳ ngay lập tức
 bool ntpConfigured        = false;   // Cờ đã gọi configTime() sau khi WiFi kết nối
 unsigned long lastNtpRetryMs = 0;    // Mốc thời gian thử kích hoạt lại NTP khi chưa đồng bộ
+volatile bool otaInProgress  = false;// Khóa toàn bộ relay & polling khi đang nạp OTA/FOTA
+unsigned long lastFotaCheckMs = 0;   // Mốc thời gian kiểm tra /solar/ota_esp2 mỗi 15s
+bool otaBootStatusReported   = false;// Đã báo phiên bản & phân vùng lên /solar/ota_esp2 sau khi khởi động
 
 // Trạng thái Đèn 12V (Relay Kênh 5 - Relay E)
 bool lamp12vState         = false;   // true = Đang BẬT đèn 12V, false = Đang TẮT đèn 12V
@@ -195,6 +202,9 @@ float readAdcMilliVoltsFiltered(uint8_t pin) {
 // -------------------------------------------------------------------------
 void pushVocIscToFirebase(bool writeHistory = false);
 void pushHeartbeatToFirebase();
+void executeCloudFOTA(const String &fotaUrl, const String &targetVersion = "");
+void checkEsp2CloudFotaTrigger();
+void reportEsp2BootOtaReadiness();
 unsigned long lastHeartbeatMs = 0;
 
 // Hàm trả về true khi hệ thống đang trong trạng thái ngủ đêm
@@ -556,6 +566,10 @@ void pushVocIscToFirebase(bool writeHistory) {
   nodeJson.set("ip", WiFi.localIP().toString());
   nodeJson.set("ota_hostname", "esp32-voc-isc-node");
   nodeJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
+  nodeJson.set("fota_ready", true);
+  nodeJson.set("ota_node", "/solar/ota_esp2");
+  nodeJson.set("free_heap", (int)ESP.getFreeHeap());
+  nodeJson.set("rssi", WiFi.RSSI());
   nodeJson.set("temp_chip_c", temperatureRead());
   time_t curEpoch = time(nullptr);
   nodeJson.set("ntp_synced", curEpoch > 1700000000);
@@ -606,10 +620,234 @@ void pushHeartbeatToFirebase() {
   hbJson.set("relay_interval_sec", (int)relayIntervalSec);
   hbJson.set("temp_chip_c", temperatureRead());
   hbJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
+  hbJson.set("fota_ready", true);
+  hbJson.set("ota_node", "/solar/ota_esp2");
+  hbJson.set("free_heap", (int)ESP.getFreeHeap());
+  hbJson.set("rssi", WiFi.RSSI());
   hbJson.set("ntp_synced", time(nullptr) > 1700000000);
   hbJson.set("ip", WiFi.localIP().toString());
   hbJson.set("updated_at/.sv", "timestamp");
   Firebase.RTDB.updateNode(&fbdo, "/solar/voc_isc_node", &hbJson);
+}
+
+// -------------------------------------------------------------------------
+// 7B. CẬP NHẬT FIRMWARE TỪ XA QUA CLOUD (CLOUD FOTA - /solar/ota_esp2)
+// -------------------------------------------------------------------------
+void reportEsp2BootOtaReadiness() {
+  if (otaBootStatusReported || otaInProgress) return;
+  if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
+  const esp_partition_t *running = esp_ota_get_running_partition();
+  const char *partLabel = running ? running->label : "unknown";
+
+  FirebaseJson bootOta;
+  bootOta.set("fota_ready", true);
+  bootOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
+  bootOta.set("partition", partLabel);
+  bootOta.set("ip", WiFi.localIP().toString());
+  bootOta.set("rssi", WiFi.RSSI());
+  bootOta.set("free_heap", (int)ESP.getFreeHeap());
+  bootOta.set("updated_at/.sv", "timestamp");
+
+  if (Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &bootOta)) {
+    otaBootStatusReported = true;
+    Serial.printf(">> [FOTA READY] Da bao trang thai len /solar/ota_esp2 (FW %s, Part %s, Heap %uB, RSSI %ddBm)\n",
+                  VOC_ISC_FIRMWARE_VERSION, partLabel, (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
+  }
+}
+
+void executeCloudFOTA(const String &fotaUrl, const String &targetVersion) {
+  String trimmedUrl = fotaUrl;
+  trimmedUrl.trim();
+  if (trimmedUrl.length() <= 12 || (!trimmedUrl.startsWith("https://") && !trimmedUrl.startsWith("http://"))) {
+    Serial.println(">> [FOTA ERROR] URL FOTA khong hop le -> Tu choi nap!");
+    if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+      FirebaseJson errOta;
+      errOta.set("trigger", false);
+      errOta.set("status", "FAILED");
+      errOta.set("error", "Invalid FOTA URL");
+      errOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
+      errOta.set("target_version", targetVersion);
+      errOta.set("updated_at/.sv", "timestamp");
+      Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &errOta);
+    }
+    return;
+  }
+
+  otaInProgress = true;
+
+  // 1. Ngat an toan toan bo 5 Relay (A/B/C/D & E) truoc khi ghi Flash
+  forceAllRelaysOff();
+  setLamp12vRelay(false);
+
+  Serial.println("\n=======================================================");
+  Serial.println(">> [ESP2 FOTA START] Nhan lenh cap nhat firmware tu xa qua Cloud!");
+  Serial.printf(">> URL          : %s\n", trimmedUrl.c_str());
+  Serial.printf(">> Phien ban    : %s -> %s\n",
+                VOC_ISC_FIRMWARE_VERSION,
+                targetVersion.length() > 0 ? targetVersion.c_str() : "(khong ro)");
+  Serial.printf(">> Free Heap    : %u bytes | WiFi RSSI: %d dBm\n",
+                (unsigned)ESP.getFreeHeap(), WiFi.RSSI());
+  Serial.println("=======================================================");
+
+  // 2. Bao trang thai DOWNLOADING len /solar/ota_esp2 truoc khi dong session BearSSL
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    FirebaseJson otaStatus;
+    otaStatus.set("trigger", false);
+    otaStatus.set("status", "DOWNLOADING");
+    otaStatus.set("progress", 0);
+    otaStatus.set("current_version", VOC_ISC_FIRMWARE_VERSION);
+    otaStatus.set("target_version", targetVersion);
+    otaStatus.set("url", trimmedUrl);
+    otaStatus.set("error", "");
+    otaStatus.set("free_heap_before", (int)ESP.getFreeHeap());
+    otaStatus.set("rssi", WiFi.RSSI());
+    otaStatus.set("updated_at/.sv", "timestamp");
+    Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &otaStatus);
+  }
+
+  // 3. Giai phong RAM BearSSL cua Firebase truoc khi mo WiFiClientSecure (mbedTLS ~50KB)
+  fbdo.clear();
+  fbPoll.clear();
+  delay(50);
+  Serial.printf(">> [FOTA HEAP] Sau dong Firebase SSL -> FreeHeap=%uB, MaxAlloc=%uB\n",
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+
+  // 4. Go Watchdog trong thoi gian tai va ghi Flash tranh reset oan khi mang cham
+  esp_task_wdt_reset();
+  esp_task_wdt_delete(NULL);
+
+  // 5. Tai firmware & ghi Flash trong block doc lap de huy sach bo nho TLS truoc khi ket noi lai Firebase
+  t_httpUpdate_return ret = HTTP_UPDATE_FAILED;
+  int errCode = 0;
+  String errStr = "";
+  {
+    HTTPUpdate fotaUpdater(25000);
+    fotaUpdater.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    fotaUpdater.rebootOnUpdate(false);
+
+    static unsigned long lastProgressPrint = 0;
+    lastProgressPrint = 0;
+    fotaUpdater.onProgress([](size_t current, size_t total) {
+      if (total > 0) {
+        int pct = (int)((current * 100UL) / total);
+        if (millis() - lastProgressPrint >= 1500 || pct == 100) {
+          lastProgressPrint = millis();
+          Serial.printf(">> [ESP2 FOTA] Tien do tai & ghi Flash: %d%% (%u / %u bytes)\n",
+                        pct, (unsigned)current, (unsigned)total);
+        }
+      }
+    });
+
+    if (trimmedUrl.startsWith("https://")) {
+      WiFiClientSecure secureClient;
+      secureClient.setInsecure();
+      secureClient.setTimeout(25);
+      ret = fotaUpdater.update(secureClient, trimmedUrl);
+    } else {
+      WiFiClient client;
+      client.setTimeout(25);
+      ret = fotaUpdater.update(client, trimmedUrl);
+    }
+
+    if (ret != HTTP_UPDATE_OK) {
+      errCode = fotaUpdater.getLastError();
+      errStr = fotaUpdater.getLastErrorString();
+    }
+  }
+
+  // 6. Khoi phuc lai buffer Firebase & ghi ket qua cuoi len /solar/ota_esp2
+  fbdo.setBSSLBufferSize(4096, 2048);
+  fbdo.setResponseSize(2048);
+  fbPoll.setBSSLBufferSize(4096, 1024);
+  fbPoll.setResponseSize(2048);
+  delay(200);
+
+  FirebaseJson finalOta;
+  finalOta.set("trigger", false);
+  finalOta.set("url", trimmedUrl);
+  finalOta.set("target_version", targetVersion);
+  finalOta.set("updated_at/.sv", "timestamp");
+
+  if (ret == HTTP_UPDATE_OK) {
+    Serial.println("\n>> [ESP2 FOTA SUCCESS] Ghi Flash thanh cong 100%! Dang luu trang thai...");
+    finalOta.set("status", "SUCCESS");
+    finalOta.set("progress", 100);
+    finalOta.set("current_version", targetVersion.length() > 0 ? targetVersion : "NEW_VERSION");
+    finalOta.set("error", "");
+    if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+      if (!Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &finalOta)) {
+        delay(500);
+        Firebase.ready();
+        Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &finalOta);
+      }
+    }
+    delay(1200);
+    Serial.println(">> [ESP2 FOTA] Khoi dong lai ESP32 #2 de chay firmware moi...");
+    ESP.restart();
+    return;
+  } else if (ret == HTTP_UPDATE_NO_UPDATES) {
+    Serial.println(">> [ESP2 FOTA] Khong co ban cap nhat moi.");
+    finalOta.set("status", "NO_UPDATES");
+    finalOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
+    finalOta.set("error", "");
+  } else {
+    String fullErr = "(" + String(errCode) + ") " + errStr;
+    Serial.printf(">> [ESP2 FOTA ERROR] Loi %s\n", fullErr.c_str());
+    finalOta.set("status", "FAILED");
+    finalOta.set("current_version", VOC_ISC_FIRMWARE_VERSION);
+    finalOta.set("error", fullErr);
+  }
+
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    if (!Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &finalOta)) {
+      delay(500);
+      Firebase.ready();
+      Firebase.RTDB.updateNode(&fbdo, "/solar/ota_esp2", &finalOta);
+    }
+  }
+
+  // 7. Phuc hoi Watchdog & trang thai hoat dong binh thuong neu khong reboot
+  esp_task_wdt_add(NULL);
+  esp_task_wdt_reset();
+  otaInProgress = false;
+  if (lampAutoDisabled) {
+    setLamp12vRelay(lampManualState);
+  }
+}
+
+void checkEsp2CloudFotaTrigger() {
+  if (otaInProgress || measState != MEAS_IDLE || relaysCurrentlyActive) return;
+  if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
+  if (Firebase.RTDB.getJSON(&fbPoll, "/solar/ota_esp2")) {
+    FirebaseJson &json = fbPoll.jsonObject();
+    FirebaseJsonData d;
+
+    bool trigger = false;
+    json.get(d, "trigger");
+    if (d.success) trigger = d.boolValue;
+
+    if (trigger) {
+      String url = "";
+      json.get(d, "url");
+      if (d.success) {
+        url = d.stringValue;
+        url.trim();
+      }
+
+      String targetVer = "";
+      json.get(d, "target_version");
+      if (d.success) {
+        targetVer = d.stringValue;
+        targetVer.trim();
+      }
+
+      // Xoa co trigger ngay lap tuc truoc khi tai de chong bootloop
+      Firebase.RTDB.setBool(&fbdo, "/solar/ota_esp2/trigger", false);
+      executeCloudFOTA(url, targetVer);
+    }
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -756,9 +994,13 @@ void handleSerialCommands() {
     Serial.println(">> [CLI] Da chuyen Den 12V (Relay E) ve che do TU DONG (15p BAT / 15p TAT khi ngu)!");
   } else if (cmd.equalsIgnoreCase("status")) {
     time_t stEpoch = time(nullptr);
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const char *partLabel = running ? running->label : "unknown";
     Serial.println("\n================ TRANG THAI NODE VOC/ISC (#2) ================");
-    Serial.printf(" Firmware          : %s\n", VOC_ISC_FIRMWARE_VERSION);
-    Serial.printf(" WiFi IP           : %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf(" Firmware          : %s (Partition: %s)\n", VOC_ISC_FIRMWARE_VERSION, partLabel);
+    Serial.printf(" Cloud FOTA Node   : /solar/ota_esp2\n");
+    Serial.printf(" WiFi IP           : %s (RSSI: %d dBm)\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    Serial.printf(" Free Heap         : %u bytes\n", (unsigned)ESP.getFreeHeap());
     Serial.printf(" NTP Epoch         : %ld (%s)\n", (long)stEpoch, (stEpoch > 1700000000) ? "SYNCED" : "NOT_SYNCED");
     Serial.printf(" Chu ky Relay A-D  : %lu giay\n", (unsigned long)relayIntervalSec);
     Serial.printf(" Trang thai Ngu    : %s (Vo hieu hoa ngu: %s)\n",
@@ -771,6 +1013,10 @@ void handleSerialCommands() {
     Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A\n",
                   liveVocSta, liveIscSta);
     Serial.println("==============================================================\n");
+  } else if (cmd.startsWith("fota ")) {
+    String url = cmd.substring(5);
+    url.trim();
+    executeCloudFOTA(url, "CLI_TEST");
   } else if (cmd.startsWith("interval ")) {
     int sec = cmd.substring(9).toInt();
     if (sec >= 3 && sec <= 3600) {
@@ -863,17 +1109,36 @@ void setup() {
   fbPoll.setBSSLBufferSize(4096, 1024);
   fbPoll.setResponseSize(2048);
 
+  // Xac nhan firmware hien tai hop le (huy co rollback neu vua FOTA thanh cong)
+  esp_ota_mark_app_valid_cancel_rollback();
+  const esp_partition_t *bootPart = esp_ota_get_running_partition();
+  Serial.printf(">> [BOOT] ESP32 #2 FW v%s | Partition: %s | FreeHeap: %uB\n",
+                VOC_ISC_FIRMWARE_VERSION,
+                bootPart ? bootPart->label : "unknown",
+                (unsigned)ESP.getFreeHeap());
+
   // BƯỚC 6: Khởi tạo ArduinoOTA cho ESP32-S3 #2
   ArduinoOTA.setHostname("esp32-voc-isc-node");
   ArduinoOTA.setPassword("solar2026");
   ArduinoOTA.onStart([]() {
+    otaInProgress = true;
     esp_task_wdt_delete(NULL); // Hủy watchdog trong lúc đang nạp OTA để không bị timeout
     forceAllRelaysOff();
     setLamp12vRelay(false);
     Serial.println("\n>> [OTA] Ngat toan bo Relay an toan & bat dau nap OTA...");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    static unsigned long lastOtaPrintMs = 0;
+    if (total > 0 && (millis() - lastOtaPrintMs >= 1500 || progress == total)) {
+      lastOtaPrintMs = millis();
+      Serial.printf(">> [OTA] Tien do: %u%%\n", (unsigned)((progress * 100UL) / total));
+    }
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf(">> [OTA ERROR] Loi [%u]\n", (unsigned)error);
+    esp_task_wdt_add(NULL);
     esp_task_wdt_reset();
+    otaInProgress = false;
   });
   ArduinoOTA.begin();
 
@@ -882,11 +1147,13 @@ void setup() {
   esp_task_wdt_add(NULL);
 
   lastCycleFinishMs = millis();
-  Serial.println(">> [READY] He thong do Voc/Isc & Den 12V da san sang!\n");
+  Serial.println(">> [READY] He thong do Voc/Isc, Den 12V & Cloud FOTA (/solar/ota_esp2) da san sang!\n");
 }
 
 void loop() {
-  esp_task_wdt_reset();
+  if (!otaInProgress) {
+    esp_task_wdt_reset();
+  }
 
   if (WiFi.status() == WL_CONNECTED) {
     ArduinoOTA.handle();
@@ -897,7 +1164,7 @@ void loop() {
   static unsigned long lastWifiCheckMs = 0;
   if (WiFi.status() != WL_CONNECTED) {
     if (wifiLostSinceMs == 0) wifiLostSinceMs = millis();
-    if ((millis() - wifiLostSinceMs >= 30000) && (millis() - lastWifiCheckMs >= 30000)) {
+    if (!otaInProgress && (millis() - wifiLostSinceMs >= 30000) && (millis() - lastWifiCheckMs >= 30000)) {
       lastWifiCheckMs = millis();
       WiFi.disconnect(false);
       WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -905,7 +1172,7 @@ void loop() {
   } else {
     wifiLostSinceMs = 0;
     time_t nowCheck = time(nullptr);
-    if (!ntpConfigured || (nowCheck < 1700000000 && (millis() - lastNtpRetryMs >= 30000))) {
+    if (!otaInProgress && (!ntpConfigured || (nowCheck < 1700000000 && (millis() - lastNtpRetryMs >= 30000)))) {
       configTime(7 * 3600, 0, "pool.ntp.org", "time.nist.gov");
       ntpConfigured = true;
       lastNtpRetryMs = millis();
@@ -913,25 +1180,41 @@ void loop() {
     }
   }
 
+  // Bao san sang FOTA mot lan sau khi khoi dong & kiem tra co kich hoat FOTA tu xa moi 15s (ca ngay lan dem)
+  if (!otaInProgress && measState == MEAS_IDLE && !relaysCurrentlyActive &&
+      WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    if (!otaBootStatusReported) {
+      reportEsp2BootOtaReadiness();
+    }
+    if (millis() - lastFotaCheckMs >= 15000) {
+      lastFotaCheckMs = millis();
+      checkEsp2CloudFotaTrigger();
+    }
+  }
+
   // Đồng bộ trạng thái ngủ (isSleeping, sleepDisabled) và chu kỳ Relay từ Firebase mỗi 15 giây (khi đang ở MEAS_IDLE)
   static unsigned long lastFirebaseSyncMs = 0;
-  if (measState == MEAS_IDLE && (millis() - lastFirebaseSyncMs >= 15000)) {
+  if (!otaInProgress && measState == MEAS_IDLE && (millis() - lastFirebaseSyncMs >= 15000)) {
     lastFirebaseSyncMs = millis();
     pollSystemStateAndConfig();
   }
 
   // Cập nhật chu trình Đèn 12V qua Relay Kênh 5 (Relay E):
   // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
-  updateNightLamp12vCycle();
+  if (!otaInProgress) {
+    updateNightLamp12vCycle();
+  }
 
   // Heartbeat mỗi 20 giây (cả ngày lẫn đêm khi MEAS_IDLE) để Web luôn báo ESP2 Online (< 45s)
-  if (measState == MEAS_IDLE && (millis() - lastHeartbeatMs >= 20000)) {
+  if (!otaInProgress && measState == MEAS_IDLE && (millis() - lastHeartbeatMs >= 20000)) {
     lastHeartbeatMs = millis();
     pushHeartbeatToFirebase();
   }
 
   // Chạy máy trạng thái đóng ngắt Relay A-B-C-D đo Voc & Isc (Chỉ chạy khi thức)
-  runMeasurementStateMachine();
+  if (!otaInProgress) {
+    runMeasurementStateMachine();
+  }
 
   // Xử lý lệnh Serial CLI
   handleSerialCommands();
