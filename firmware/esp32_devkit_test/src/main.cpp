@@ -27,7 +27,7 @@
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.3.5"
+#define CURRENT_FIRMWARE_VERSION "2.3.6"
 #define MANUAL_SERIAL_TEST_MODE 0
 
 #include <FastAccelStepper.h>
@@ -54,6 +54,11 @@ RTC_NOINIT_ATTR uint8_t rtcWdtIsrHit;
 RTC_NOINIT_ATTR char rtcWdtTask0[16];
 RTC_NOINIT_ATTR char rtcWdtTask1[16];
 RTC_NOINIT_ATTR int rtcMaintDoneDay;
+RTC_NOINIT_ATTR uint32_t rtcPosMagic;
+RTC_NOINIT_ATTR int32_t rtcSavedEnc1;
+RTC_NOINIT_ATTR int32_t rtcSavedEnc2;
+RTC_NOINIT_ATTR uint8_t rtcSavedHomed;
+RTC_NOINIT_ATTR uint8_t rtcSavedSleeping;
 static uint16_t bootPrevWdtStage = 0xFFFF;
 static uint32_t bootPrevWdtUptimeS = 0;
 static uint16_t bootPrevWdtTelStage = 0xFFFF;
@@ -178,14 +183,23 @@ FirebaseAuth auth;
 FirebaseConfig fbConfig;
 SemaphoreHandle_t fbdoMutex = NULL;
 
+inline void enforceFbdoShortTimeouts() {
+  if (fbdo.tcpClient.client()) {
+    fbdo.tcpClient.client()->setHandshakeTimeout(8); // 8s thay vi 60s mac dinh
+    fbdo.tcpClient.client()->setTimeout(5);          // 5s thay vi 4000s do don vi ms/s
+  }
+}
+
 bool safeUpdateNodeFbdo(const char *path, FirebaseJson *json,
                         uint32_t timeoutMs = 1500) {
   if (!fbdoMutex) {
+    enforceFbdoShortTimeouts();
     return Firebase.RTDB.updateNode(&fbdo, path, json);
   }
   if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
     return false;
   }
+  enforceFbdoShortTimeouts();
   bool ok = Firebase.RTDB.updateNode(&fbdo, path, json);
   xSemaphoreGive(fbdoMutex);
   return ok;
@@ -194,6 +208,7 @@ bool safeUpdateNodeFbdo(const char *path, FirebaseJson *json,
 bool safeGetJsonStrFbdo(const char *path, String &outStr,
                          uint32_t timeoutMs = 3000) {
   if (!fbdoMutex) {
+    enforceFbdoShortTimeouts();
     if (!Firebase.RTDB.getJSON(&fbdo, path)) return false;
     outStr = fbdo.jsonString();
     return true;
@@ -201,6 +216,7 @@ bool safeGetJsonStrFbdo(const char *path, String &outStr,
   if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
     return false;
   }
+  enforceFbdoShortTimeouts();
   bool ok = Firebase.RTDB.getJSON(&fbdo, path);
   if (ok) {
     outStr = fbdo.jsonString();
@@ -212,11 +228,13 @@ bool safeGetJsonStrFbdo(const char *path, String &outStr,
 bool safeSetJsonFbdo(const char *path, FirebaseJson *json,
                      uint32_t timeoutMs = 3000) {
   if (!fbdoMutex) {
+    enforceFbdoShortTimeouts();
     return Firebase.RTDB.setJSON(&fbdo, path, json);
   }
   if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
     return false;
   }
+  enforceFbdoShortTimeouts();
   bool ok = Firebase.RTDB.setJSON(&fbdo, path, json);
   xSemaphoreGive(fbdoMutex);
   return ok;
@@ -224,11 +242,13 @@ bool safeSetJsonFbdo(const char *path, FirebaseJson *json,
 
 bool safeSetBoolFbdo(const char *path, bool val, uint32_t timeoutMs = 3000) {
   if (!fbdoMutex) {
+    enforceFbdoShortTimeouts();
     return Firebase.RTDB.setBool(&fbdo, path, val);
   }
   if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
     return false;
   }
+  enforceFbdoShortTimeouts();
   bool ok = Firebase.RTDB.setBool(&fbdo, path, val);
   xSemaphoreGive(fbdoMutex);
   return ok;
@@ -236,11 +256,13 @@ bool safeSetBoolFbdo(const char *path, bool val, uint32_t timeoutMs = 3000) {
 
 bool safeSetIntFbdo(const char *path, int val, uint32_t timeoutMs = 3000) {
   if (!fbdoMutex) {
+    enforceFbdoShortTimeouts();
     return Firebase.RTDB.setInt(&fbdo, path, val);
   }
   if (xSemaphoreTake(fbdoMutex, pdMS_TO_TICKS(timeoutMs)) != pdTRUE) {
     return false;
   }
+  enforceFbdoShortTimeouts();
   bool ok = Firebase.RTDB.setInt(&fbdo, path, val);
   xSemaphoreGive(fbdoMutex);
   return ok;
@@ -998,10 +1020,11 @@ bool isHome1Triggered() {
 }
 
 bool isHome2Triggered() {
+  // CTHT 2 (Trục 2 Vít me): Lọc 15 mẫu x 200us = 3.0ms (chuẩn v2.3.4 nhạy và chính xác, không bỏ lỡ hành trình vít me)
   if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
     return false;
-  for (int i = 0; i < 30; i++) {
-    esp_rom_delay_us(500);
+  for (int i = 0; i < 15; i++) {
+    esp_rom_delay_us(200);
     if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
       return false;
   }
@@ -1319,9 +1342,14 @@ void enterNightSleepUntil4AM() {
 
   systemFsmState = FSM_STATE_PREP_SLEEP;
 
-  // 1. Tự động về Home cả 2 trục để chốt mốc tuyệt đối 0.0°
-  Serial.println("   [1/4] Dang chay Homing ca 2 truc ve switch...");
-  bool homeOk = runDualHomingToSwitches();
+  // 1. Tự động về Home cả 2 trục để chốt mốc tuyệt đối 0.0° (Bỏ qua nếu vừa Homing xong lúc khởi động!)
+  bool homeOk = (systemHomed && homedAz && homedEl && !homingFault);
+  if (homeOk && abs(getEncoderCount1()) <= 30 && abs(getEncoderCount2()) <= 1000) {
+    Serial.println("   [1/4] He thong vua Homing xong va dang o moc Home -> Bo qua Homing lap lan 2!");
+  } else {
+    Serial.println("   [1/4] Dang chay Homing ca 2 truc ve switch...");
+    homeOk = runDualHomingToSwitches();
+  }
   if (!homeOk) {
     Serial.println(">> [NIGHT SLEEP WARN] Homing 2 truc that bai! Giu nguyen co FAULT va tam dung qua dem toi 04:00 (khong chay tiep Zenith).");
     if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
@@ -1342,13 +1370,30 @@ void enterNightSleepUntil4AM() {
   Serial.println("   [2/4] Truc 1 giu moc Home (0.0°). Truc 2 dua ve nam ngang Zenith (0.0° tilt)...");
   stepPositionControl(2, 0.0f, EL_TRACK_BASE_SPEED_HZ);
 
-  // Chờ Trục 2 chạy đến vị trí Zenith và dừng hẳn (tối đa 65 giây)
+  // Chờ Trục 2 chạy đến vị trí Zenith và dừng hẳn (tối đa 65 giây, có giám sát kẹt Encoder thời gian thực)
   unsigned long startWait = millis();
+  unsigned long lastZenStallCheckMs = millis();
+  int32_t lastZenSteps = stepper2 ? stepper2->getCurrentPosition() : 0;
+  int32_t lastZenEnc = getEncoderCount2();
   while ((stepper2 && stepper2->isRunning()) &&
          (millis() - startWait < 65000)) {
     vTaskDelay(pdMS_TO_TICKS(50));
     esp_task_wdt_reset();
     updateHardwareEncoders();
+    if (millis() - lastZenStallCheckMs >= 500) {
+      int32_t curSteps = stepper2->getCurrentPosition();
+      int32_t curEnc = getEncoderCount2();
+      if (abs(curSteps - lastZenSteps) >= 800 && abs(curEnc - lastZenEnc) < 15) {
+        stepper2->forceStop();
+        stallFaultM2 = true;
+        Serial.printf("\n>> [STALL GUARD ZENITH] Phat hien ket Truc 2 khi ve Zenith (Steps: %ld, dEnc: %ld) -> DUNG KHAN CAP!\n",
+                      (long)abs(curSteps - lastZenSteps), (long)abs(curEnc - lastZenEnc));
+        break;
+      }
+      lastZenStallCheckMs = millis();
+      lastZenSteps = curSteps;
+      lastZenEnc = curEnc;
+    }
   }
   if (stepper1)
     stepper1->stopMove();
@@ -3937,9 +3982,13 @@ bool homeAxisToSwitch(int axis) {
   uint32_t &glitchGlobal = (axis == 1) ? homeGlitchCount1 : homeGlitchCount2;
   uint32_t localGlitches = 0;
 
-  // Dừng động cơ hoàn toàn rồi xác nhận lại switch lúc đứng yên (chống nhiễu EMI DM556 / rung cơ khí)
+  // Dừng động cơ hoàn toàn rồi xác nhận lại switch lúc đứng yên (chống nhiễu EMI DM556 cho Trục 1)
+  // Riêng Trục 2 (Vít me): CTHT 2 đã lọc 3ms chuẩn xác; khi chạm tuyệt đối DỪNG NGAY không chạy ép tiếp vào công tắc!
   auto confirmStaticTouch = [&](uint32_t settleMs) -> bool {
     s->forceStop();
+    if (axis == 2) {
+      return true;
+    }
     uint32_t tSettle = millis();
     while (millis() - tSettle < settleMs) {
       if (checkCancel())
@@ -3960,7 +4009,9 @@ bool homeAxisToSwitch(int axis) {
   uint32_t fastSpd = (axis == 1) ? HOME_FAST_SPEED_HZ : EL_HOME_FAST_SPEED_HZ;
   uint32_t homeAccel = (axis == 1) ? stepperAccel : EL_HOME_ACCEL_HZ_S;
   uint32_t retractSpd = (axis == 1) ? manualSpeedHz : EL_HOME_RETRACT_SPEED_HZ;
-  uint32_t timeoutTouch1 = (axis == 1) ? 65000 : 75000;
+  uint32_t timeoutTouch1 = (axis == 1) ? 45000 : 50000;
+  // Giới hạn số bước tối đa cho phép khi Homing (Trục 1: 48,000 bước ~225°; Trục 2: 140,000 bước ~70,000 counts vít me)
+  const int32_t maxHomeSteps = (axis == 1) ? 48000 : 140000;
 
   // BƯỚC 0: NẾU ĐANG CHẠM HOME TỪ TRƯỚC -> LÙI RA XA ĐỂ NHẢ SWITCH
   if (isTriggered()) {
@@ -3971,9 +4022,29 @@ bool homeAxisToSwitch(int axis) {
     s->setAcceleration(homeAccel);
     s->runForward();
     uint32_t tRetract0 = millis();
+    uint32_t tStall0 = millis();
+    int32_t lastSteps0 = s->getCurrentPosition();
+    int32_t lastEnc0 = getEncoderCount2();
     while (isTriggered()) {
       if (checkCancel())
         return false;
+      if (axis == 2 && (millis() - tRetract0 > 450) && (millis() - tStall0 >= 400)) {
+        int32_t curSteps0 = s->getCurrentPosition();
+        int32_t curEnc0 = getEncoderCount2();
+        if (abs(curSteps0 - lastSteps0) >= 700 && abs(curEnc0 - lastEnc0) < 12) {
+          s->forceStop();
+          stallFaultM2 = true;
+          stateM1 = STATE_IDLE;
+          stateM2 = STATE_IDLE;
+          Serial.printf("\n>> [STALL GUARD BUOC 0 %s] Phat hien ket co khi/mat nguon khi lui switch (dSteps=%ld, dEnc=%ld) -> DUNG KHAN CAP!\n",
+                        axisName, (long)abs(curSteps0 - lastSteps0), (long)abs(curEnc0 - lastEnc0));
+          requestTelemetryPrint();
+          return false;
+        }
+        tStall0 = millis();
+        lastSteps0 = curSteps0;
+        lastEnc0 = curEnc0;
+      }
       if (millis() - tRetract0 > 10000) {
         s->stopMove();
         stateM1 = STATE_IDLE;
@@ -4000,13 +4071,17 @@ bool homeAxisToSwitch(int axis) {
   // =========================================================================
   // QUY TRÌNH HOMING 3 LẦN CHẠM XÁC THỰC CÔNG NGHIỆP (TRIPLE-CONFIRMED HOMING)
   // Mỗi lần chạm cách nhau ít nhất >= 0.5s và bắt buộc có chuyển động lùi cơ
-  // khí
+  // khí + BẢO VỆ KẸT ENCODER (<0.85s) & GIỚI HẠN BƯỚC CỨNG
   // =========================================================================
 
   // --- LẦN 1: TIẾP CẬN NHANH ---
   Serial.printf(
-      ">> [%s HOMING 1/3] Dang chay nhanh tiep can Home (%lu Hz, Timeout: %lu s)...\n",
-      axisName, (unsigned long)fastSpd, (unsigned long)(timeoutTouch1 / 1000));
+      ">> [%s HOMING 1/3] Dang chay nhanh tiep can Home (%lu Hz, Timeout: %lu s, MaxSteps: %ld)...\n",
+      axisName, (unsigned long)fastSpd, (unsigned long)(timeoutTouch1 / 1000), (long)maxHomeSteps);
+  int32_t touch1StartSteps = s->getCurrentPosition();
+  uint32_t lastStallCheck1Ms = millis();
+  int32_t lastStallSteps1 = touch1StartSteps;
+  int32_t lastStallEnc1 = getEncoderCount2();
   s->setSpeedInHz(fastSpd);
   s->setAcceleration(homeAccel);
   s->runBackward();
@@ -4014,6 +4089,37 @@ bool homeAxisToSwitch(int axis) {
   while (true) {
     if (checkCancel())
       return false;
+    int32_t traveledSteps1 = abs(s->getCurrentPosition() - touch1StartSteps);
+    if (traveledSteps1 > maxHomeSteps) {
+      s->forceStop();
+      stateM1 = STATE_IDLE;
+      stateM2 = STATE_IDLE;
+      Serial.printf(
+          "\n>> [GIOI HAN BUOC HOMING %s] Da chay %ld buoc (> %ld buoc) ma chua cham CTHT -> DUNG KHAN CAP BAO VE CO KHI!\n",
+          axisName, (long)traveledSteps1, (long)maxHomeSteps);
+      requestTelemetryPrint();
+      return false;
+    }
+    if (axis == 2 && (millis() - tStart > 500) && (millis() - lastStallCheck1Ms >= 400)) {
+      int32_t curSteps1 = s->getCurrentPosition();
+      int32_t curEnc1 = getEncoderCount2();
+      int32_t dSteps1 = abs(curSteps1 - lastStallSteps1);
+      int32_t dEnc1 = abs(curEnc1 - lastStallEnc1);
+      if (dSteps1 >= 800 && dEnc1 < 15) {
+        s->forceStop();
+        stallFaultM2 = true;
+        stateM1 = STATE_IDLE;
+        stateM2 = STATE_IDLE;
+        Serial.printf(
+            "\n>> [STALL GUARD HOMING TRUC 2] Phat hien ket vit me / kich hanh trinh / mat nguon (Phat %ld xung, Encoder chi nhich %ld count trong 400ms) -> NGAT KHAN CAP TRONG <0.85s!\n",
+            (long)dSteps1, (long)dEnc1);
+        requestTelemetryPrint();
+        return false;
+      }
+      lastStallCheck1Ms = millis();
+      lastStallSteps1 = curSteps1;
+      lastStallEnc1 = curEnc1;
+    }
     if (millis() - tStart > timeoutTouch1) {
       s->stopMove();
       stateM1 = STATE_IDLE;
@@ -4039,6 +4145,9 @@ bool homeAxisToSwitch(int axis) {
         requestTelemetryPrint();
         return false;
       }
+      lastStallCheck1Ms = millis();
+      lastStallSteps1 = s->getCurrentPosition();
+      lastStallEnc1 = getEncoderCount2();
       s->setSpeedInHz(fastSpd);
       s->setAcceleration(homeAccel);
       s->runBackward();
@@ -4956,11 +5065,45 @@ void setup() {
   Serial.println(">> [MANUAL SERIAL TEST MODE] Tam tat WiFi/Firebase de giam dong USB & chong Reset WDT!");
 #endif
 
+  // Lưu chẩn đoán WDT của lần chạy trước TRƯỚC khi khởi tạo TelemetryTask (tránh TelemetryTask mới ghi đè rtcWdtTelStage!)
+  bool hadValidRtcMagic = (rtcWdtMagic == 0xA55A5AA5UL);
+  bool hadValidPosMagic = (rtcPosMagic == 0x504F5336UL);
+  int32_t prevSavedEnc1 = hadValidPosMagic ? rtcSavedEnc1 : 0;
+  int32_t prevSavedEnc2 = hadValidPosMagic ? rtcSavedEnc2 : 0;
+  uint8_t prevSavedHomed = hadValidPosMagic ? rtcSavedHomed : 0;
+  uint8_t prevSavedSleeping = hadValidPosMagic ? rtcSavedSleeping : 0;
+  if (hadValidRtcMagic) {
+    bootPrevWdtStage = rtcWdtStage;
+    bootPrevWdtUptimeS = rtcWdtUptimeS;
+    bootPrevWdtTelStage = rtcWdtTelStage;
+    if (rtcWdtIsrHit == 1) {
+      rtcWdtTask0[15] = '\0';
+      rtcWdtTask1[15] = '\0';
+      snprintf(bootPrevWdtTask0, sizeof(bootPrevWdtTask0), "%s", rtcWdtTask0);
+      snprintf(bootPrevWdtTask1, sizeof(bootPrevWdtTask1), "%s", rtcWdtTask1);
+    }
+    Serial.printf(">> [WDT DIAGNOSTIC] Truoc reset: stage=%u | tel=%u | uptime=%lus | CPU0=%s | CPU1=%s\n",
+                  (unsigned)bootPrevWdtStage, (unsigned)bootPrevWdtTelStage,
+                  (unsigned long)bootPrevWdtUptimeS, bootPrevWdtTask0, bootPrevWdtTask1);
+  } else {
+    rtcMaintDoneDay = -1;
+    prevSavedHomed = 0;
+    prevSavedSleeping = 0;
+  }
+  rtcWdtMagic = 0xA55A5AA5UL;
+  rtcWdtStage = 0;
+  rtcWdtUptimeS = 0;
+  rtcWdtTelStage = 0;
+  rtcWdtIsrHit = 0;
+  rtcWdtTask0[0] = '\0';
+  rtcWdtTask1[0] = '\0';
+
   // 8. Khoi tao Background Task tren Core 1
   if (!i2cMutex)
     i2cMutex = xSemaphoreCreateMutex();
   if (!fbdoMutex)
     fbdoMutex = xSemaphoreCreateMutex();
+  enforceFbdoShortTimeouts();
   xTaskCreatePinnedToCore(telemetryTask, "TelemetryTask",
                           16384, // 16 KB stack phong phu chong tran Stack khi BearSSL & JSON xu ly
                           NULL,
@@ -5003,7 +5146,7 @@ void setup() {
                  "Host: esp32-solar-tracker.local)!");
 #endif
 
-  // 10. TỰ ĐỘNG DUAL HOMING VỀ CÔNG TẮC HÀNH TRÌNH KHI CẤP ĐIỆN (CHỐT SWITCH 0° -> HANDS-FREE 30 NGÀY)
+  // 10. TỰ ĐỘNG DUAL HOMING VỀ CÔNG TẮC HÀNH TRÌNH KHI CẤP ĐIỆN (CÓ KHÓA CHỐNG TỰ HOME LẶP BAN ĐÊM)
 #if MANUAL_SERIAL_TEST_MODE
   Serial.println("\n=======================================================");
   Serial.println(">> [MANUAL SERIAL TEST MODE] DA TAM VO HIEU HOA TU DONG!");
@@ -5017,74 +5160,92 @@ void setup() {
   isMaxAzimuthReached = false;
   systemFsmState = FSM_STATE_IDLE;
 #else
-  Serial.println("\n=======================================================");
-  Serial.println(
-      ">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU DUAL HOMING TO SWITCHES...");
-  Serial.println("=======================================================");
-  runDualHomingToSwitches();
-
   int curY = 0, curM = 0, curD = 0, curH = 0, curMin = 0, curS = 0;
   float curTemp = 0.0f;
-  if (readDS3231(curY, curM, curD, curH, curMin, curS, curTemp)) {
-    Serial.printf(
-        "\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d ngay %02d/%02d/%04d\n",
-        curH, curMin, curS, curD, curM, curY);
-    if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
-      if (disableNightSleep) {
-        Serial.println(">> [BOOT NIGHT - NO SLEEP] Cap nguon ban dem nhung da BAT VO HIEU HOA NGU -> Dua ve giu buoc cuoi chieu!");
-        moveToAfternoonHoldPosition();
-      } else {
-        Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%02d:00 - "
-                      "%02d:00) -> Chay quy trinh ngu dem ngay lap tuc!\n",
-                      NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
-        enterNightSleepUntil4AM();
+  bool hasRtcBoot = readDS3231(curY, curM, curD, curH, curMin, curS, curTemp);
+  bool isNightBoot = hasRtcBoot && (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR);
+
+  // Nếu hệ thống bị सॉफ्ट/WDT reset giữa đêm khi ĐÃ HOMED & ĐANG NGỦ ĐÔNG -> Khôi phục tọa độ từ RTC RAM, TUYỆT ĐỐI KHÔNG TỰ QUAY MOTOR GIỮA ĐÊM!
+  if (isNightBoot && !disableNightSleep && hadValidRtcMagic &&
+      prevSavedHomed == 1 && prevSavedSleeping == 1 &&
+      rstReason != ESP_RST_POWERON && rstReason != ESP_RST_EXT &&
+      prevSavedEnc1 >= -50 && prevSavedEnc1 <= 4000 &&
+      prevSavedEnc2 >= -500 && prevSavedEnc2 <= (EL_SCREW_MAX_COUNTS + 1000)) {
+    resetEncoder1(prevSavedEnc1);
+    resetEncoder2(prevSavedEnc2);
+    if (stepper1) {
+      int32_t s1Pos = (int32_t)((float)prevSavedEnc1 * getPulsesPerCount());
+      stepper1->forceStopAndNewPosition(s1Pos);
+    }
+    if (stepper2) {
+      int32_t s2Pos = (int32_t)((float)abs(prevSavedEnc2) * getPulsesPerCountEl());
+      stepper2->forceStopAndNewPosition(s2Pos);
+    }
+    homedAz = true;
+    homedEl = true;
+    systemHomed = true;
+    homingFault = false;
+    stallFaultM2 = false;
+    currentTrackSource = TRACK_SRC_OFF;
+    autoOpticalTracking = false;
+    systemFsmState = FSM_STATE_LIGHT_SLEEP;
+    Serial.printf("\n>> [NIGHT SAFE RECOVERY] Reset (%d) trong gio ngu dem -> Khoi phuc toa do RTC RAM (AzCnt=%ld, ElCnt=%ld) & tiep tuc NGU DONG AN TOAN (Khong quay motor giua dem)!\n",
+                  (int)rstReason, (long)prevSavedEnc1, (long)prevSavedEnc2);
+  } else {
+    Serial.println("\n=======================================================");
+    Serial.println(
+        ">> [POWER ON] HE THONG DUOC CAP NGUON -> BAT DAU DUAL HOMING TO SWITCHES...");
+    Serial.println("=======================================================");
+    bool bootHomeOk = runDualHomingToSwitches();
+
+    if (hasRtcBoot) {
+      Serial.printf(
+          "\n>> [BOOT RTC] Gio he thong: %02d:%02d:%02d ngay %02d/%02d/%04d\n",
+          curH, curMin, curS, curD, curM, curY);
+      if (curH >= NIGHT_SLEEP_START_HOUR || curH < NIGHT_SLEEP_END_HOUR) {
+        if (!bootHomeOk) {
+          Serial.println(">> [BOOT NIGHT FAULT] Homing luc khoi dong that bai -> KHOA AN TOAN O TRANG THAI NGU DONG (KHONG HOMING LAP LAN 2)!");
+          currentTrackSource = TRACK_SRC_OFF;
+          autoOpticalTracking = false;
+          systemFsmState = FSM_STATE_LIGHT_SLEEP;
+        } else if (disableNightSleep) {
+          Serial.println(">> [BOOT NIGHT - NO SLEEP] Cap nguon ban dem nhung da BAT VO HIEU HOA NGU -> Dua ve giu buoc cuoi chieu!");
+          moveToAfternoonHoldPosition();
+        } else {
+          Serial.printf(">> [BOOT NIGHT] Cap nguon trong gio ngu dem (%02d:00 - "
+                        "%02d:00) -> Dua Truc 2 ve Zenith ngu dem (Khong Homing lap)!\n",
+                        NIGHT_SLEEP_START_HOUR, NIGHT_SLEEP_END_HOUR);
+          enterNightSleepUntil4AM();
+        }
+      } else if (bootHomeOk) {
+        Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 18:00) -> Chay "
+                       "PSO va bat dau bam Hybrid!");
+        runPsoOptimization();
+        currentTrackSource = TRACK_SRC_HYBRID;
+        autoOpticalTracking = true;
+        trackCyclePhase = TRACK_CYCLE_ADJUSTING;
+        isMaxAzimuthReached = false;
+        systemFsmState = FSM_STATE_TRACKING;
       }
-    } else {
-      Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 22:00) -> Chay "
-                     "PSO va bat dau bam Hybrid!");
+    } else if (bootHomeOk) {
+      Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay PSO va bat dau bam "
+                     "Hybrid mac dinh...");
       runPsoOptimization();
       currentTrackSource = TRACK_SRC_HYBRID;
       autoOpticalTracking = true;
       trackCyclePhase = TRACK_CYCLE_ADJUSTING;
-      isMaxAzimuthReached = false;
       systemFsmState = FSM_STATE_TRACKING;
     }
-  } else {
-    Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay PSO va bat dau bam "
-                   "Hybrid mac dinh...");
-    runPsoOptimization();
-    currentTrackSource = TRACK_SRC_HYBRID;
-    autoOpticalTracking = true;
-    trackCyclePhase = TRACK_CYCLE_ADJUSTING;
-    systemFsmState = FSM_STATE_TRACKING;
   }
 #endif
 
   // 11. Đăng ký Task Watchdog 30s bảo vệ Core 1 trước khi bắt đầu loop()
   // (Đặt ở cuối setup để quá trình khởi động/homing ban đầu không bị Watchdog ngắt oan)
-  if (rtcWdtMagic == 0xA55A5AA5UL) {
-    bootPrevWdtStage = rtcWdtStage;
-    bootPrevWdtUptimeS = rtcWdtUptimeS;
-    bootPrevWdtTelStage = rtcWdtTelStage;
-    if (rtcWdtIsrHit == 1) {
-      rtcWdtTask0[15] = '\0';
-      rtcWdtTask1[15] = '\0';
-      snprintf(bootPrevWdtTask0, sizeof(bootPrevWdtTask0), "%s", rtcWdtTask0);
-      snprintf(bootPrevWdtTask1, sizeof(bootPrevWdtTask1), "%s", rtcWdtTask1);
-    }
-    Serial.printf(">> [WDT DIAGNOSTIC] Truoc reset: stage=%u | tel=%u | uptime=%lus | CPU0=%s | CPU1=%s\n",
-                  (unsigned)bootPrevWdtStage, (unsigned)bootPrevWdtTelStage,
-                  (unsigned long)bootPrevWdtUptimeS, bootPrevWdtTask0, bootPrevWdtTask1);
-  } else {
-    rtcMaintDoneDay = -1;
-  }
-  rtcWdtMagic = 0xA55A5AA5UL;
-  rtcWdtStage = 0;
-  rtcWdtUptimeS = 0;
-  rtcWdtTelStage = 0;
-  rtcWdtIsrHit = 0;
-  rtcWdtTask0[0] = '\0';
-  rtcWdtTask1[0] = '\0';
+  rtcPosMagic = 0x504F5336UL;
+  rtcSavedEnc1 = getEncoderCount1();
+  rtcSavedEnc2 = getEncoderCount2();
+  rtcSavedHomed = (systemHomed && homedAz && homedEl && !homingFault) ? 1 : 0;
+  rtcSavedSleeping = (systemFsmState == FSM_STATE_LIGHT_SLEEP || systemFsmState == FSM_STATE_PREP_SLEEP) ? 1 : 0;
   esp_task_wdt_init(30, true);
   esp_task_wdt_add(NULL);
 
@@ -5540,9 +5701,14 @@ void handleCliCommand(const String &cmdStr) {
 // 12. LOOP CHÍNH
 // -------------------------------------------------------------------------
 void loop() {
-  // 1. Reset Task Watchdog bảo vệ Core 1 (Mục 2)
+  // 1. Reset Task Watchdog bảo vệ Core 1 (Mục 2) & Lưu tọa độ RTC RAM bảo vệ ngủ đêm
   rtcWdtStage = 1;
   rtcWdtUptimeS = (uint32_t)(millis() / 1000UL);
+  rtcPosMagic = 0x504F5336UL;
+  rtcSavedEnc1 = getEncoderCount1();
+  rtcSavedEnc2 = getEncoderCount2();
+  rtcSavedHomed = (systemHomed && homedAz && homedEl && !homingFault && !stallFaultM2) ? 1 : 0;
+  rtcSavedSleeping = (systemFsmState == FSM_STATE_LIGHT_SLEEP || systemFsmState == FSM_STATE_PREP_SLEEP) ? 1 : 0;
   esp_task_wdt_reset();
 
   // 1B. Giám sát Cross-Core Watchdog: Nếu TelemetryTask bị đóng băng > 90 giây mà không cập nhật heartbeat
