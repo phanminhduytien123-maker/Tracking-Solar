@@ -158,22 +158,60 @@ function calculateNoaaSolarPosition(dateObj, latDeg = 10.78816, lonDeg = 106.666
 }
 
 /**
- * Quy đổi tọa độ thiên văn NOAA sang không gian 3D:
+ * Quy đổi tọa độ thiên văn NOAA sang không gian 3D thuần vật lý (bán cầu thiên cầu thực tế):
  * - Trái (-X) = BẮC (0°)
  * - Trên (-Z) = ĐÔNG (90°)
- * - Phải (+X) = NAM (180°)
+ * - Phải (+X) = NAM (180° — phía ngoài ban công tấm cố định)
  * - Dưới (+Z) = TÂY (270°)
  */
-function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 4.5) {
+const SUN_ARC_SOUTH_OFFSET = 1.8;
+
+function noaaTo3DPosition(azimuthDeg, elevationDeg, radius = 9.2) {
   const azRad = THREE.MathUtils.degToRad(azimuthDeg);
-  const elRad = THREE.MathUtils.degToRad(Math.max(2, elevationDeg));
-  const sinEl = Math.sin(elRad);
-  const horizRadius = radius * Math.cos(elRad) * (1 - 0.16 * sinEl);
-  const centerXOffset = -1.55 * sinEl;
-  const x = centerXOffset - horizRadius * Math.cos(azRad);
-  const y = radius * sinEl + 0.75 * sinEl + 0.35;
+  const elRad = THREE.MathUtils.degToRad(Math.max(0, elevationDeg));
+  const horizRadius = radius * Math.cos(elRad);
+  const x = SUN_ARC_SOUTH_OFFSET - horizRadius * Math.cos(azRad);
+  const y = radius * Math.sin(elRad) + 0.35;
   const z = -horizRadius * Math.sin(azRad);
   return new THREE.Vector3(x, y, z);
+}
+
+/**
+ * Tạo sprite nhãn giờ trên quỹ đạo Mặt trời (ví dụ: 09:00, 12:00, 15:00)
+ */
+function createSunTimeSprite(labelText) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  ctx.beginPath();
+  ctx.roundRect(6, 6, 148, 52, 14);
+  ctx.fill();
+
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = '#fef3c7';
+  ctx.font = 'bold 28px "Be Vietnam Pro", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(labelText, 80, 33);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.15, 0.46, 1);
+  return { sprite, mat, tex };
 }
 
 /**
@@ -452,10 +490,10 @@ function createBearingEarGeometry() {
 }
 
 // Góc nhìn tổng quan mặc định, bán kính Mặt trời NOAA & các preset quan sát môi trường sân thượng
-const SUN_ORBIT_RADIUS = 7.8;
-const DEFAULT_CAM_POS = new THREE.Vector3(-9.6, 9.0, 8.6);
-const INTRO_CAM_POS = new THREE.Vector3(-13.2, 12.6, 12.6);
-const DEFAULT_LOOK_AT = new THREE.Vector3(-0.1, 1.35, 0.25);
+const SUN_ORBIT_RADIUS = 9.2;
+const DEFAULT_CAM_POS = new THREE.Vector3(-13.2, 8.8, 11.2);
+const INTRO_CAM_POS = new THREE.Vector3(-16.8, 12.2, 14.8);
+const DEFAULT_LOOK_AT = new THREE.Vector3(0.8, 3.0, 0.0);
 
 const CAMERA_PRESETS = {
   overview: {
@@ -475,8 +513,8 @@ const CAMERA_PRESETS = {
   },
   top: {
     label: 'Trên cao',
-    pos: new THREE.Vector3(-0.1, 25.5, 1.8),
-    lookAt: new THREE.Vector3(-0.1, 0.6, 0.4)
+    pos: new THREE.Vector3(1.2, 29.5, 1.8),
+    lookAt: new THREE.Vector3(1.2, 0.5, 0.0)
   }
 };
 
@@ -606,8 +644,20 @@ export default function CompactInteractiveTwin({
     const { sunGroup, sunRayLine } = sceneObjectsRef.current;
     if (!sunGroup || !sunRayLine) return;
 
-    const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS);
+    const { sunSphereMat, sunHaloMat, sunriseAzDeg } = sunGroup.userData || {};
+    const sunPos = noaaSun.isDaylight
+      ? noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS)
+      : noaaTo3DPosition(sunriseAzDeg ?? 110.4, 0, SUN_ORBIT_RADIUS);
     sunGroup.position.copy(sunPos);
+
+    if (sunSphereMat) {
+      sunSphereMat.transparent = !noaaSun.isDaylight;
+      sunSphereMat.opacity = noaaSun.isDaylight ? 1.0 : 0.38;
+      sunSphereMat.needsUpdate = true;
+    }
+    if (sunHaloMat) {
+      sunHaloMat.opacity = noaaSun.isDaylight ? 0.32 : 0.12;
+    }
 
     const posAttr = sunRayLine.geometry.attributes.position;
     posAttr.setXYZ(0, sunPos.x, sunPos.y, sunPos.z);
@@ -696,7 +746,7 @@ export default function CompactInteractiveTwin({
     const scene = new THREE.Scene();
     scene.background = null;
 
-    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 120);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 180);
     camera.position.copy(DEFAULT_CAM_POS);
 
     const renderer = new THREE.WebGLRenderer({
@@ -724,7 +774,7 @@ export default function CompactInteractiveTwin({
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
     controls.minDistance = 1.3;
-    controls.maxDistance = 28;
+    controls.maxDistance = 42;
     controls.update();
 
     // Đèn chiếu sáng kỹ thuật & ánh sáng bầu trời sân thượng
@@ -838,46 +888,135 @@ export default function CompactInteractiveTwin({
     envLabelNorth.position.set(-5.6, 0.04, 0);
     envCompassGroup.add(envLabelNorth);
 
-    // Quỹ đạo Mặt trời NOAA trong ngày (Từ Đông -> Nam -> Tây)
+    // Quỹ đạo Mặt trời NOAA trong ngày (Từ Đông-Nam -> Nam ngoài ban công -> Tây-Nam)
+    const solarArcGroup = new THREE.Group();
+    scene.add(solarArcGroup);
+    const solarArcDisposables = { geoms: [], mats: [], texs: [] };
+
     const arcPoints = [];
     const sampleDate = new Date();
-    for (let h = 6.0; h <= 17.5; h += 0.5) {
+    let prevSample = null;
+    let sunriseAzDeg = 110.4;
+    const keyHourPoints = new Map();
+
+    for (let h = 5.0; h <= 19.0; h += 0.25) {
       const hh = Math.floor(h);
       const mm = Math.round((h - hh) * 60);
       sampleDate.setHours(hh, mm, 0, 0);
       const p = calculateNoaaSolarPosition(sampleDate, siteLat, siteLon, 7);
-      if (p.elevationDeg > 0) {
-        arcPoints.push(noaaTo3DPosition(p.azimuthDeg, p.elevationDeg, SUN_ORBIT_RADIUS));
+
+      if (prevSample && prevSample.elevationDeg <= 0 && p.elevationDeg > 0) {
+        const frac = -prevSample.elevationDeg / (p.elevationDeg - prevSample.elevationDeg);
+        sunriseAzDeg = prevSample.azimuthDeg + frac * (p.azimuthDeg - prevSample.azimuthDeg);
+        arcPoints.push(noaaTo3DPosition(sunriseAzDeg, 0, SUN_ORBIT_RADIUS));
       }
+
+      if (p.elevationDeg > 0) {
+        const pos3d = noaaTo3DPosition(p.azimuthDeg, p.elevationDeg, SUN_ORBIT_RADIUS);
+        arcPoints.push(pos3d);
+        if (mm === 0 && [7, 9, 12, 15, 17].includes(hh) && p.elevationDeg > 2) {
+          keyHourPoints.set(hh, pos3d.clone());
+        }
+      }
+
+      if (prevSample && prevSample.elevationDeg > 0 && p.elevationDeg <= 0) {
+        const frac = prevSample.elevationDeg / (prevSample.elevationDeg - p.elevationDeg);
+        const sunsetAzDeg = prevSample.azimuthDeg + frac * (p.azimuthDeg - prevSample.azimuthDeg);
+        arcPoints.push(noaaTo3DPosition(sunsetAzDeg, 0, SUN_ORBIT_RADIUS));
+      }
+
+      prevSample = p;
     }
+
     if (arcPoints.length >= 2) {
       const solarCurve = new THREE.CatmullRomCurve3(arcPoints);
-      const arcGeom = new THREE.BufferGeometry().setFromPoints(solarCurve.getPoints(60));
-      const arcMat = new THREE.LineDashedMaterial({
+
+      // Dải cung quỹ đạo Mặt trời trên bầu trời
+      const arcTubeGeom = new THREE.TubeGeometry(solarCurve, 96, 0.055, 8, false);
+      const arcTubeMat = new THREE.MeshBasicMaterial({
         color: 0xf59e0b,
-        dashSize: 0.18,
-        gapSize: 0.1,
         transparent: true,
-        opacity: 0.65
+        opacity: 0.62
       });
-      const arcLine = new THREE.Line(arcGeom, arcMat);
-      arcLine.computeLineDistances();
-      scene.add(arcLine);
+      solarArcDisposables.geoms.push(arcTubeGeom);
+      solarArcDisposables.mats.push(arcTubeMat);
+      solarArcGroup.add(new THREE.Mesh(arcTubeGeom, arcTubeMat));
+
+      // Đường chiếu nét đứt xuống mặt phẳng chân trời Y = 0.03 (thể hiện quỹ đạo lệch hẳn ra ngoài ban công Nam)
+      const groundPts = solarCurve.getPoints(72).map((pt) => new THREE.Vector3(pt.x, 0.03, pt.z));
+      const groundGeom = new THREE.BufferGeometry().setFromPoints(groundPts);
+      const groundMat = new THREE.LineDashedMaterial({
+        color: 0xf59e0b,
+        dashSize: 0.35,
+        gapSize: 0.25,
+        transparent: true,
+        opacity: 0.42
+      });
+      const groundLine = new THREE.Line(groundGeom, groundMat);
+      groundLine.computeLineDistances();
+      solarArcDisposables.geoms.push(groundGeom);
+      solarArcDisposables.mats.push(groundMat);
+      solarArcGroup.add(groundLine);
+
+      // Các mốc giờ tiêu biểu & đường gióng độ cao
+      const beadGeom = new THREE.SphereGeometry(0.11, 14, 14);
+      const beadMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+      const dropMat = new THREE.LineDashedMaterial({
+        color: 0xf59e0b,
+        dashSize: 0.22,
+        gapSize: 0.18,
+        transparent: true,
+        opacity: 0.22
+      });
+      solarArcDisposables.geoms.push(beadGeom);
+      solarArcDisposables.mats.push(beadMat, dropMat);
+
+      keyHourPoints.forEach((pt, hr) => {
+        const bead = new THREE.Mesh(beadGeom, beadMat);
+        bead.position.copy(pt);
+        solarArcGroup.add(bead);
+
+        const labelText = `${String(hr).padStart(2, '0')}:00`;
+        const { sprite, mat, tex } = createSunTimeSprite(labelText);
+        sprite.position.set(pt.x, pt.y + 0.55, pt.z);
+        solarArcDisposables.mats.push(mat);
+        solarArcDisposables.texs.push(tex);
+        solarArcGroup.add(sprite);
+
+        if ([9, 12, 15].includes(hr)) {
+          const dropGeom = new THREE.BufferGeometry().setFromPoints([
+            pt.clone(),
+            new THREE.Vector3(pt.x, 0.03, pt.z)
+          ]);
+          const dropLine = new THREE.Line(dropGeom, dropMat);
+          dropLine.computeLineDistances();
+          solarArcDisposables.geoms.push(dropGeom);
+          solarArcGroup.add(dropLine);
+        }
+      });
     }
 
     // Quả cầu Mặt trời NOAA
     const sunGroup = new THREE.Group();
     sunGroup.name = 'noaaSun';
-    const sunSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.26, 28, 28),
-      new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
-    );
-    const sunHalo = new THREE.Mesh(
-      new THREE.SphereGeometry(0.39, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.3 })
-    );
+    const sunSphereMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      transparent: !noaaSun.isDaylight,
+      opacity: noaaSun.isDaylight ? 1.0 : 0.38
+    });
+    const sunSphere = new THREE.Mesh(new THREE.SphereGeometry(0.36, 28, 28), sunSphereMat);
+    const sunHaloMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: noaaSun.isDaylight ? 0.32 : 0.12
+    });
+    const sunHalo = new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 24), sunHaloMat);
     sunGroup.add(sunSphere, sunHalo);
-    const initSunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS);
+    sunGroup.userData = { sunSphereMat, sunHaloMat, sunriseAzDeg };
+
+    const initSunPos = noaaSun.isDaylight
+      ? noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS)
+      : noaaTo3DPosition(sunriseAzDeg, 0, SUN_ORBIT_RADIUS);
     sunGroup.position.copy(initSunPos);
     scene.add(sunGroup);
 
@@ -2310,8 +2449,8 @@ export default function CompactInteractiveTwin({
       if (raycaster.intersectObjects(sunGroup.children, true).length > 0) {
         setSelectedPanel('sun');
         setActiveViewPreset(null);
-        targetAnglesRef.current.camTargetPos = new THREE.Vector3(-3.8, 7.8, 11.2);
-        targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 2.0, 0);
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(-13.8, 9.6, 11.6);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(2.8, 3.8, 0.0);
         return;
       }
 
@@ -2471,6 +2610,9 @@ export default function CompactInteractiveTwin({
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
       renderer.domElement.removeEventListener('wheel', handleWheel, { capture: true });
       cancelAnimationFrame(animId);
+      solarArcDisposables.geoms.forEach((g) => g.dispose());
+      solarArcDisposables.mats.forEach((m) => m.dispose());
+      solarArcDisposables.texs.forEach((t) => t.dispose());
       rooftopEnv.dispose();
       pmremGenerator.dispose();
       controls.dispose();
