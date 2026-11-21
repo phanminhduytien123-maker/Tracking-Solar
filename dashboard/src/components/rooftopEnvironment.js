@@ -26,7 +26,7 @@ function createMarbleTileTexture() {
       const x0 = col * size;
       const y0 = row * size;
 
-      const shade = 204 + Math.floor(seedRand(idx) * 12);
+      const shade = 168 + Math.floor(seedRand(idx) * 12);
       ctx.fillStyle = `rgb(${shade}, ${shade - 5}, ${shade - 12})`;
       ctx.fillRect(x0 + 2, y0 + 2, size - 4, size - 4);
 
@@ -37,7 +37,7 @@ function createMarbleTileTexture() {
       ctx.clip();
 
       for (let v = 0; v < 4; v++) {
-        ctx.strokeStyle = `rgba(120, 114, 106, ${0.14 + seedRand(idx * 7 + v) * 0.1})`;
+        ctx.strokeStyle = `rgba(98, 92, 85, ${0.14 + seedRand(idx * 7 + v) * 0.1})`;
         ctx.lineWidth = 1.6 + seedRand(idx * 13 + v) * 2.4;
         ctx.beginPath();
         const sx = x0 + seedRand(idx * 19 + v) * size * 0.4;
@@ -58,7 +58,7 @@ function createMarbleTileTexture() {
   }
 
   // Đường ron gạch mảnh sắc nét
-  ctx.strokeStyle = '#78716c';
+  ctx.strokeStyle = '#57534e';
   ctx.lineWidth = 5;
   for (let i = 0; i <= tiles; i++) {
     const pos = i * size;
@@ -394,105 +394,125 @@ export function createRooftopEnvironment() {
 
   const floorTileMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0xaab4c0,
       map: tileTex,
-      roughness: 0.34,
-      metalness: 0.04
+      roughness: 0.56,
+      metalness: 0.04,
+      envMapIntensity: 0.34
     })
   );
   const concreteMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0x8f99a6,
       map: concreteTex,
       roughness: 0.92,
-      metalness: 0.04
+      metalness: 0.04,
+      envMapIntensity: 0.28
     })
   );
   const darkConcreteMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0x6f7985,
       map: darkConcreteTex,
       roughness: 0.94,
-      metalness: 0.05
+      metalness: 0.05,
+      envMapIntensity: 0.24
     })
   );
   const westWallMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0x838d9b,
       map: stuccoTex,
       roughness: 0.9,
-      metalness: 0.03
+      metalness: 0.03,
+      envMapIntensity: 0.26
     }),
     true
   );
   const stainlessMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xdbe2ea,
+      color: 0x9aa6b5,
       metalness: 0.88,
-      roughness: 0.22
+      roughness: 0.3,
+      envMapIntensity: 0.45
     })
   );
   const steelFrameMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x64748b,
+      color: 0x475569,
       metalness: 0.72,
-      roughness: 0.42
+      roughness: 0.45,
+      envMapIntensity: 0.35
     })
   );
   const insulatedPipeMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
+      color: 0x909ba8,
       metalness: 0.65,
-      roughness: 0.38
+      roughness: 0.42,
+      envMapIntensity: 0.38
     })
   );
   const pvcWhiteMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
-      roughness: 0.48,
-      metalness: 0.05
+      color: 0xadb7c4,
+      roughness: 0.52,
+      metalness: 0.05,
+      envMapIntensity: 0.34
     })
   );
   const paintedWhiteMetalMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xf4f6f8,
-      roughness: 0.42,
-      metalness: 0.14
+      color: 0xaeb8c4,
+      roughness: 0.52,
+      metalness: 0.14,
+      envMapIntensity: 0.34
     })
   );
   const cageWhiteCutawayMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      roughness: 0.45,
-      metalness: 0.18
+      color: 0xa1acb8,
+      roughness: 0.5,
+      metalness: 0.18,
+      envMapIntensity: 0.32
     }),
     true
   );
   const corrugatedRoofMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0x8e99a6,
       map: roofColorTex,
       bumpMap: roofBumpTex,
       bumpScale: 0.08,
       metalness: 0.55,
-      roughness: 0.42
+      roughness: 0.52,
+      envMapIntensity: 0.38
     })
   );
   const heaterTankBodyMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0xb4beca,
       map: tankTex,
       metalness: 0.76,
-      roughness: 0.24
+      roughness: 0.32,
+      envMapIntensity: 0.46
     })
   );
   const standingTankMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xcbd5e1,
+      color: 0x8f9ca9,
       metalness: 0.82,
-      roughness: 0.25
+      roughness: 0.34,
+      envMapIntensity: 0.42
     }),
     true
   );
   const standingTankBandMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x1d4ed8,
+      color: 0x1e40af,
       metalness: 0.35,
-      roughness: 0.45
+      roughness: 0.48,
+      envMapIntensity: 0.35
     }),
     true
   );
@@ -500,73 +520,85 @@ export function createRooftopEnvironment() {
     new THREE.MeshStandardMaterial({
       color: 0x0b1f3a,
       metalness: 0.45,
-      roughness: 0.14
+      roughness: 0.18,
+      envMapIntensity: 0.45
     })
   );
   const acWhiteMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xe8e7e2,
-      roughness: 0.46,
-      metalness: 0.1
+      color: 0xaeb4bc,
+      roughness: 0.52,
+      metalness: 0.1,
+      envMapIntensity: 0.32
     })
   );
   const acFrontMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0xb2b8c0,
       map: acFrontTex,
-      roughness: 0.4,
-      metalness: 0.12
+      roughness: 0.46,
+      metalness: 0.12,
+      envMapIntensity: 0.32
     })
   );
   const acRearMat = trackMat(
     new THREE.MeshStandardMaterial({
+      color: 0xaeb4bc,
       map: acRearTex,
-      roughness: 0.55,
-      metalness: 0.25
+      roughness: 0.58,
+      metalness: 0.25,
+      envMapIntensity: 0.32
     })
   );
   const rubberFootMat = trackMat(
     new THREE.MeshStandardMaterial({
       color: 0x1e293b,
       roughness: 0.88,
-      metalness: 0.05
+      metalness: 0.05,
+      envMapIntensity: 0.25
     })
   );
   const skylightRoofMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      roughness: 0.65,
-      metalness: 0.28
+      color: 0x243040,
+      roughness: 0.68,
+      metalness: 0.28,
+      envMapIntensity: 0.32
     })
   );
   const skylightCoreMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x334155,
+      color: 0x273445,
       emissive: 0x0ea5e9,
-      emissiveIntensity: 0.12,
-      roughness: 0.65
+      emissiveIntensity: 0.1,
+      roughness: 0.68,
+      envMapIntensity: 0.28
     })
   );
   const louverWhiteMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xe2e8f0,
-      roughness: 0.45,
-      metalness: 0.12
+      color: 0xa3aebc,
+      roughness: 0.5,
+      metalness: 0.12,
+      envMapIntensity: 0.32
     })
   );
   const stairwellWallMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      roughness: 0.85,
-      metalness: 0.05
+      color: 0x6b7685,
+      roughness: 0.86,
+      metalness: 0.05,
+      envMapIntensity: 0.25
     }),
     true
   );
   const stairwellGlowMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xbaf2ef,
+      color: 0x99d9e8,
       emissive: 0x38bdf8,
-      emissiveIntensity: 0.55,
-      roughness: 0.28
+      emissiveIntensity: 0.42,
+      roughness: 0.32,
+      envMapIntensity: 0.3
     })
   );
   const doorGlassMat = trackMat(
@@ -1063,7 +1095,7 @@ export function createRooftopEnvironment() {
   stairInnerSide.position.set(1.66, 1.075, 5.4);
   westDoorGroup.add(stairInnerBack, stairInnerSide);
 
-  const stairwellLight = new THREE.PointLight(0x7dd3fc, 0.75, 6.0, 1.6);
+  const stairwellLight = new THREE.PointLight(0x7dd3fc, 0.52, 5.5, 1.6);
   stairwellLight.position.set(2.8, 1.15, 5.25);
   westDoorGroup.add(stairwellLight);
 

@@ -728,13 +728,13 @@ export default function CompactInteractiveTwin({
     controls.update();
 
     // Đèn chiếu sáng kỹ thuật & ánh sáng bầu trời sân thượng
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.68);
     scene.add(ambientLight);
 
     const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x64748b, 0.4);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.28);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.42);
     keyLight.position.set(7.5, 13.5, 7.5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
