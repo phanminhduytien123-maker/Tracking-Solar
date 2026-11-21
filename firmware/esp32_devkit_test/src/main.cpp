@@ -27,7 +27,7 @@
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.3.4"
+#define CURRENT_FIRMWARE_VERSION "2.3.5"
 #define MANUAL_SERIAL_TEST_MODE 0
 
 #include <FastAccelStepper.h>
@@ -653,6 +653,8 @@ float m2LastTargetTiltDeg = 0.0f;
 // Do sai so vi tri Homing lan cham 1 (Yeu cau 5)
 float homeErrorDeg1 = 0.0f;
 float homeErrorDeg2 = 0.0f;
+uint32_t homeGlitchCount1 = 0;
+uint32_t homeGlitchCount2 = 0;
 
 // Theo doi so lan Homing va ly do trong ngay (Yeu cau 2)
 uint32_t dailyHomingCount = 0;
@@ -983,13 +985,12 @@ float getElevationEpsilon() {
 static portMUX_TYPE homeMux = portMUX_INITIALIZER_UNLOCKED;
 
 bool isHome1Triggered() {
-  // Bộ lọc xung băm EMI công nghiệp: Đọc nhanh 15 mẫu liên tiếp cách nhau 200us
-  // (3ms) Xung nhiễu từ mạch Buck / Driver DM556 chỉ tồn tại vài micro-giây sẽ
-  // bị loại bỏ 100%
+  // Bộ lọc xung băm EMI công nghiệp: Đọc 30 mẫu liên tiếp cách nhau 500us (15ms)
+  // Xung nhiễu DM556 hoặc tiếp điểm rung ngắn < 15ms bị loại bỏ 100%
   if (digitalRead(M1_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
     return false;
-  for (int i = 0; i < 15; i++) {
-    esp_rom_delay_us(200);
+  for (int i = 0; i < 30; i++) {
+    esp_rom_delay_us(500);
     if (digitalRead(M1_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
       return false;
   }
@@ -999,8 +1000,8 @@ bool isHome1Triggered() {
 bool isHome2Triggered() {
   if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
     return false;
-  for (int i = 0; i < 15; i++) {
-    esp_rom_delay_us(200);
+  for (int i = 0; i < 30; i++) {
+    esp_rom_delay_us(500);
     if (digitalRead(M2_HOME_SW_PIN) != HOME_ACTIVE_LEVEL)
       return false;
   }
@@ -2789,6 +2790,8 @@ void pushTelemetryToFirebase() {
   trk.set("homedEl", homedEl);
   trk.set("homingFault", homingFault);
   trk.set("stallFaultM2", stallFaultM2);
+  trk.set("home_glitch_az", (int)homeGlitchCount1);
+  trk.set("home_glitch_el", (int)homeGlitchCount2);
   trk.set("daily_homing_count", (int)dailyHomingCount);
   trk.set("last_homing_reason", lastHomingReason);
   trk.set("home_error_deg_az", homeErrorDeg1);
@@ -3908,12 +3911,14 @@ bool homeAxisToSwitch(int axis) {
   }
   systemHomed = (homedAz && homedEl);
 
+  bool userCancelled = false;
   auto checkCancel = [&]() -> bool {
     esp_task_wdt_reset();
     updateHardwareEncoders();
     if (Serial.available() > 0) {
       char c = Serial.read();
       if (c == ' ' || c == 'x' || c == 'X') {
+        userCancelled = true;
         s->stopMove();
         stateM1 = STATE_IDLE;
         stateM2 = STATE_IDLE;
@@ -3927,6 +3932,28 @@ bool homeAxisToSwitch(int axis) {
 
   auto isTriggered = [&]() -> bool {
     return (axis == 1) ? isHome1Triggered() : isHome2Triggered();
+  };
+
+  uint32_t &glitchGlobal = (axis == 1) ? homeGlitchCount1 : homeGlitchCount2;
+  uint32_t localGlitches = 0;
+
+  // Dừng động cơ hoàn toàn rồi xác nhận lại switch lúc đứng yên (chống nhiễu EMI DM556 / rung cơ khí)
+  auto confirmStaticTouch = [&](uint32_t settleMs) -> bool {
+    s->forceStop();
+    uint32_t tSettle = millis();
+    while (millis() - tSettle < settleMs) {
+      if (checkCancel())
+        return false;
+      delay(10);
+    }
+    if (isTriggered()) {
+      return true;
+    }
+    localGlitches++;
+    glitchGlobal++;
+    Serial.printf(">> [HOMING GLITCH %s] Nhieu switch (nha khi motor dung, lan #%lu) -> Bo qua & tiep tuc chay ve Home!\n",
+                  axisName, (unsigned long)glitchGlobal);
+    return false;
   };
 
   uint32_t tStart = millis();
@@ -3984,7 +4011,7 @@ bool homeAxisToSwitch(int axis) {
   s->setAcceleration(homeAccel);
   s->runBackward();
 
-  while (!isTriggered()) {
+  while (true) {
     if (checkCancel())
       return false;
     if (millis() - tStart > timeoutTouch1) {
@@ -3996,6 +4023,25 @@ bool homeAxisToSwitch(int axis) {
           axisName, (unsigned long)(timeoutTouch1 / 1000));
       requestTelemetryPrint();
       return false;
+    }
+    if (isTriggered()) {
+      if (confirmStaticTouch(150)) {
+        updateHardwareEncoders();
+        break;
+      }
+      if (userCancelled)
+        return false;
+      if (localGlitches >= 8) {
+        stateM1 = STATE_IDLE;
+        stateM2 = STATE_IDLE;
+        Serial.printf("\n>> [LOI WIRING %s] Vuot qua %lu lan nhieu switch -> Dung an toan!\n",
+                      axisName, (unsigned long)localGlitches);
+        requestTelemetryPrint();
+        return false;
+      }
+      s->setSpeedInHz(fastSpd);
+      s->setAcceleration(homeAccel);
+      s->runBackward();
     }
     delay(1);
   }
@@ -4062,7 +4108,7 @@ bool homeAxisToSwitch(int axis) {
   s->setAcceleration(homeAccel);
   s->runBackward();
 
-  while (!isTriggered()) {
+  while (true) {
     if (checkCancel())
       return false;
     if (millis() - tApproach2 > 15000) {
@@ -4073,6 +4119,23 @@ bool homeAxisToSwitch(int axis) {
           "\n>> [CANH BAO AN TOAN %s] Timeout 15s o lan cham 2! Da dung.\n",
           axisName);
       return false;
+    }
+    if (isTriggered()) {
+      if (confirmStaticTouch(100)) {
+        break;
+      }
+      if (userCancelled)
+        return false;
+      if (localGlitches >= 8) {
+        stateM1 = STATE_IDLE;
+        stateM2 = STATE_IDLE;
+        Serial.printf("\n>> [LOI WIRING %s] Vuot qua %lu lan nhieu switch o lan 2 -> Dung an toan!\n",
+                      axisName, (unsigned long)localGlitches);
+        return false;
+      }
+      s->setSpeedInHz(500);
+      s->setAcceleration(homeAccel);
+      s->runBackward();
     }
     delay(1);
   }
@@ -4132,17 +4195,34 @@ bool homeAxisToSwitch(int axis) {
   s->setAcceleration(homeAccel);
   s->runBackward();
 
-  while (!isTriggered()) {
+  while (true) {
     if (checkCancel())
       return false;
-    if (millis() - tCreepStart > 10000) {
+    if (millis() - tCreepStart > 20000) {
       s->stopMove();
       stateM1 = STATE_IDLE;
       stateM2 = STATE_IDLE;
       Serial.printf(
-          "\n>> [CANH BAO AN TOAN %s] Timeout 10s o lan cham 3! Da dung.\n",
+          "\n>> [CANH BAO AN TOAN %s] Timeout 20s o lan cham 3! Da dung.\n",
           axisName);
       return false;
+    }
+    if (isTriggered()) {
+      if (confirmStaticTouch(100)) {
+        break;
+      }
+      if (userCancelled)
+        return false;
+      if (localGlitches >= 8) {
+        stateM1 = STATE_IDLE;
+        stateM2 = STATE_IDLE;
+        Serial.printf("\n>> [LOI WIRING %s] Vuot qua %lu lan nhieu switch o lan 3 -> Dung an toan!\n",
+                      axisName, (unsigned long)localGlitches);
+        return false;
+      }
+      s->setSpeedInHz(150);
+      s->setAcceleration(homeAccel);
+      s->runBackward();
     }
     delay(1);
   }
@@ -4339,6 +4419,8 @@ bool runDualHomingToSwitches() {
   Serial.println("=======================================================");
 
   // 1. Trục 2 (Elevation) Home trước để nâng giàn pin an toàn, chống cấn khung
+  homeGlitchCount1 = 0;
+  homeGlitchCount2 = 0;
   m2StallRetryCount = 0;
   m2StallRetryPending = false;
   Serial.println(">> [GIAI DOAN 1/2] BAT DAU HOMING TRUC 2 (ELEVATION)...");
@@ -4356,16 +4438,25 @@ bool runDualHomingToSwitches() {
 
   delay(250); // Nghỉ 0.25s triệt tiêu quán tính cơ khí
 
-  // 2. Trục 1 (Azimuth) Home sau khi Trục 2 đã an toàn
+  // 2. Trục 1 (Azimuth) Home sau khi Trục 2 đã an toàn (tự thử lại 1 lần nếu có nhiễu switch)
   Serial.println(">> [GIAI DOAN 2/2] BAT DAU HOMING TRUC 1 (AZIMUTH)...");
   homedAz = homeAxisToSwitch(1);
+  if (!homedAz) {
+    Serial.println(">> [RETRY HOMING AZ] Lan 1 that bai -> Nghi 500ms va thu lai Homing Truc 1...");
+    uint32_t tRetryWait = millis();
+    while (millis() - tRetryWait < 500) {
+      esp_task_wdt_reset();
+      delay(50);
+    }
+    homedAz = homeAxisToSwitch(1);
+  }
   if (!homedAz) {
     homingFault = true;
     systemHomed = false;
     systemFsmState = FSM_STATE_FAULT;
     currentTrackSource = TRACK_SRC_OFF;
     autoOpticalTracking = false;
-    Serial.println(">> [THAT BAI] Homing Truc 1 khong thanh cong! Set FAULT va khoa bam.");
+    Serial.println(">> [THAT BAI] Homing Truc 1 khong thanh cong sau 2 lan thu! Set FAULT va khoa bam.");
     requestTelemetryPrint();
     return false;
   }
