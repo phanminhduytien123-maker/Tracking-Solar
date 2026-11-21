@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { createRooftopEnvironment } from './rooftopEnvironment';
 import {
   formatSignedNumber,
   formatValueOrDash,
@@ -450,10 +451,34 @@ function createBearingEarGeometry() {
   return geom;
 }
 
-// Góc nhìn tổng quan mặc định & góc xuất phát khi chuyển cảnh (Cinematic Camera Fly-in)
-const DEFAULT_CAM_POS = new THREE.Vector3(0, 4.1, 7.9);
-const INTRO_CAM_POS = new THREE.Vector3(0, 7.2, 13.8);
-const DEFAULT_LOOK_AT = new THREE.Vector3(0, 1.25, 0);
+// Góc nhìn tổng quan mặc định, bán kính Mặt trời NOAA & các preset quan sát môi trường sân thượng
+const SUN_ORBIT_RADIUS = 7.8;
+const DEFAULT_CAM_POS = new THREE.Vector3(-9.6, 9.0, 8.6);
+const INTRO_CAM_POS = new THREE.Vector3(-13.2, 12.6, 12.6);
+const DEFAULT_LOOK_AT = new THREE.Vector3(-0.1, 1.35, 0.25);
+
+const CAMERA_PRESETS = {
+  overview: {
+    label: 'Toàn cảnh',
+    pos: DEFAULT_CAM_POS,
+    lookAt: DEFAULT_LOOK_AT
+  },
+  east: {
+    label: 'Phía Đông',
+    pos: new THREE.Vector3(-0.1, 4.2, 4.15),
+    lookAt: new THREE.Vector3(-0.2, 1.85, -3.2)
+  },
+  west: {
+    label: 'Phía Tây',
+    pos: new THREE.Vector3(-2.6, 4.7, -1.55),
+    lookAt: new THREE.Vector3(1.6, 2.2, 4.35)
+  },
+  top: {
+    label: 'Trên cao',
+    pos: new THREE.Vector3(-0.1, 25.5, 1.8),
+    lookAt: new THREE.Vector3(-0.1, 0.6, 0.4)
+  }
+};
 
 /**
  * COMPACT MODE: HIỂN THỊ TRỰC TIẾP TRÊN NỀN THỜI TIẾT (KHÔNG KHUNG, KHÔNG TIÊU ĐỀ, KHÔNG NÚT Rườm Rà)
@@ -488,6 +513,8 @@ export default function CompactInteractiveTwin({
 
   const [isBoxOpen, setIsBoxOpen] = useState(false);
   const [selectedPanel, setSelectedPanel] = useState(null); // null | 'tracker' | 'static' | 'box' | 'sun' | 'anemometer'
+  const [showEnvironment, setShowEnvironment] = useState(true);
+  const [activeViewPreset, setActiveViewPreset] = useState('overview');
   const [clockTick, setClockTick] = useState(0);
 
   useEffect(() => {
@@ -533,6 +560,10 @@ export default function CompactInteractiveTwin({
     sunRayLine: null,
     sw1LedMat: null,
     sw2LedMat: null,
+    rooftopEnvGroup: null,
+    envCompassGroup: null,
+    compactCompassGroup: null,
+    gridHelper: null,
     camera: null,
     controls: null,
     scene: null
@@ -545,7 +576,8 @@ export default function CompactInteractiveTwin({
     camLookAt: null,
     trkPower: 0,
     staPower: 0,
-    focusedPanel: null
+    focusedPanel: null,
+    showEnvironment: true
   });
 
   // Đồng bộ trạng thái đang focus vào tấm pin / hộp điện
@@ -574,7 +606,7 @@ export default function CompactInteractiveTwin({
     const { sunGroup, sunRayLine } = sceneObjectsRef.current;
     if (!sunGroup || !sunRayLine) return;
 
-    const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
+    const sunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS);
     sunGroup.position.copy(sunPos);
 
     const posAttr = sunRayLine.geometry.attributes.position;
@@ -586,6 +618,16 @@ export default function CompactInteractiveTwin({
     sunGroup.visible = true;
     sunRayLine.visible = noaaSun.isDaylight;
   }, [noaaSun]);
+
+  // Đồng bộ bật/tắt môi trường sân thượng & la bàn tương ứng
+  useEffect(() => {
+    targetAnglesRef.current.showEnvironment = showEnvironment;
+    const { rooftopEnvGroup, envCompassGroup, compactCompassGroup, gridHelper } = sceneObjectsRef.current;
+    if (rooftopEnvGroup) rooftopEnvGroup.visible = showEnvironment;
+    if (envCompassGroup) envCompassGroup.visible = showEnvironment;
+    if (compactCompassGroup) compactCompassGroup.visible = !showEnvironment;
+    if (gridHelper) gridHelper.visible = !showEnvironment;
+  }, [showEnvironment]);
 
   // Đồng bộ góc mở nắp hộp điện 3D
   useEffect(() => {
@@ -607,8 +649,20 @@ export default function CompactInteractiveTwin({
   const zoomBackToOverview = () => {
     setSelectedPanel(null);
     setIsBoxOpen(false);
+    setActiveViewPreset('overview');
     targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
     targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
+  };
+
+  // Chọn góc quan sát môi trường sân thượng theo preset
+  const handleSelectViewPreset = (presetKey) => {
+    const preset = CAMERA_PRESETS[presetKey];
+    if (!preset) return;
+    setSelectedPanel(null);
+    setIsBoxOpen(false);
+    setActiveViewPreset(presetKey);
+    targetAnglesRef.current.camTargetPos = preset.pos.clone();
+    targetAnglesRef.current.camLookAt = preset.lookAt.clone();
   };
 
   // Hiệu ứng Camera Fly-in mượt mà khi bật sang Mode Compact và Fly-out khi trở về Mode tiêu chuẩn
@@ -654,7 +708,7 @@ export default function CompactInteractiveTwin({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
 
@@ -670,30 +724,47 @@ export default function CompactInteractiveTwin({
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
     controls.minDistance = 1.3;
-    controls.maxDistance = 18;
+    controls.maxDistance = 28;
     controls.update();
 
-    // Đèn chiếu sáng kỹ thuật
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    // Đèn chiếu sáng kỹ thuật & ánh sáng bầu trời sân thượng
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.45);
-    keyLight.position.set(5.5, 9.5, 6.5);
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x64748b, 0.4);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.28);
+    keyLight.position.set(7.5, 13.5, 7.5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
-    keyLight.shadow.bias = -0.0005;
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 32;
+    keyLight.shadow.bias = -0.0004;
+    keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
 
     const fillLight = new THREE.DirectionalLight(0xe2e8f0, 0.6);
     fillLight.position.set(-6, 5, 4);
     scene.add(fillLight);
 
-    // Lưới tọa độ mặt sàn nhẹ và trong suốt trên nền thời tiết
+    // Môi trường sân thượng thực tế xung quanh hệ thống (Lan can inox, bình nước nóng Đông, cửa + giếng trời Tây, 2 cục nóng Bắc)
+    const rooftopEnv = createRooftopEnvironment();
+    const { rooftopEnvGroup, cutawayMaterials } = rooftopEnv;
+    rooftopEnvGroup.visible = targetAnglesRef.current.showEnvironment;
+    scene.add(rooftopEnvGroup);
+
+    // Lưới tọa độ mặt sàn nhẹ (chỉ bật khi ẩn môi trường)
     const gridHelper = new THREE.GridHelper(12, 24, 0x64748b, 0x94a3b8);
     gridHelper.position.y = 0;
     gridHelper.material.opacity = 0.16;
     gridHelper.material.transparent = true;
+    gridHelper.visible = !targetAnglesRef.current.showEnvironment;
     scene.add(gridHelper);
 
     // =========================================================================
@@ -703,9 +774,11 @@ export default function CompactInteractiveTwin({
     // - Dưới (+Z) = TÂY (270°)
     // - Trái (-X) = BẮC (0°)
     // =========================================================================
-    const compassGroup = new THREE.Group();
-    compassGroup.position.y = 0.01;
-    scene.add(compassGroup);
+    // 0a. La bàn thu gọn (khi ẩn môi trường)
+    const compactCompassGroup = new THREE.Group();
+    compactCompassGroup.position.y = 0.01;
+    compactCompassGroup.visible = !targetAnglesRef.current.showEnvironment;
+    scene.add(compactCompassGroup);
 
     const ringGeom = new THREE.RingGeometry(4.25, 4.32, 96);
     ringGeom.rotateX(-Math.PI / 2);
@@ -715,29 +788,55 @@ export default function CompactInteractiveTwin({
       opacity: 0.4,
       side: THREE.DoubleSide
     });
-    compassGroup.add(new THREE.Mesh(ringGeom, ringMat));
+    compactCompassGroup.add(new THREE.Mesh(ringGeom, ringMat));
 
     const axisLineMat = new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.35 });
     const nsPoints = [new THREE.Vector3(-4.25, 0.01, 0), new THREE.Vector3(4.25, 0.01, 0)];
     const ewPoints = [new THREE.Vector3(0, 0.01, -2.55), new THREE.Vector3(0, 0.01, 2.55)];
-    compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(nsPoints), axisLineMat));
-    compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ewPoints), axisLineMat));
+    compactCompassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(nsPoints), axisLineMat));
+    compactCompassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ewPoints), axisLineMat));
 
     const labelEast = createCompassFloorLabel('ĐÔNG', '90° (Bình minh)', '#f59e0b');
     labelEast.position.set(0, 0.015, -2.65);
-    compassGroup.add(labelEast);
+    compactCompassGroup.add(labelEast);
 
     const labelWest = createCompassFloorLabel('TÂY', '270° (Hoàng hôn)', '#fb923c');
     labelWest.position.set(0, 0.015, 2.65);
-    compassGroup.add(labelWest);
+    compactCompassGroup.add(labelWest);
 
     const labelSouth = createCompassFloorLabel('NAM', '180° (Hướng chuẩn)', '#38bdf8');
     labelSouth.position.set(4.35, 0.015, 0);
-    compassGroup.add(labelSouth);
+    compactCompassGroup.add(labelSouth);
 
     const labelNorth = createCompassFloorLabel('BẮC', '0° / 360°', '#94a3b8');
     labelNorth.position.set(-4.35, 0.015, 0);
-    compassGroup.add(labelNorth);
+    compactCompassGroup.add(labelNorth);
+
+    // 0b. La bàn vòng ngoài bao quanh mô hình sân thượng (khi bật môi trường)
+    const envCompassGroup = new THREE.Group();
+    envCompassGroup.position.y = 0.015;
+    envCompassGroup.visible = targetAnglesRef.current.showEnvironment;
+    scene.add(envCompassGroup);
+
+    const envRingGeom = new THREE.RingGeometry(6.95, 7.04, 128);
+    envRingGeom.rotateX(-Math.PI / 2);
+    envCompassGroup.add(new THREE.Mesh(envRingGeom, ringMat));
+
+    const envLabelEast = createCompassFloorLabel('ĐÔNG', '90° (Bình minh)', '#f59e0b');
+    envLabelEast.position.set(0, 0.04, -6.55);
+    envCompassGroup.add(envLabelEast);
+
+    const envLabelWest = createCompassFloorLabel('TÂY', '270° (Hoàng hôn)', '#fb923c');
+    envLabelWest.position.set(0, 0.04, 7.1);
+    envCompassGroup.add(envLabelWest);
+
+    const envLabelSouth = createCompassFloorLabel('NAM', '180° (Hướng chuẩn)', '#38bdf8');
+    envLabelSouth.position.set(5.35, 0.04, 0);
+    envCompassGroup.add(envLabelSouth);
+
+    const envLabelNorth = createCompassFloorLabel('BẮC', '0° / 360°', '#94a3b8');
+    envLabelNorth.position.set(-5.6, 0.04, 0);
+    envCompassGroup.add(envLabelNorth);
 
     // Quỹ đạo Mặt trời NOAA trong ngày (Từ Đông -> Nam -> Tây)
     const arcPoints = [];
@@ -748,7 +847,7 @@ export default function CompactInteractiveTwin({
       sampleDate.setHours(hh, mm, 0, 0);
       const p = calculateNoaaSolarPosition(sampleDate, siteLat, siteLon, 7);
       if (p.elevationDeg > 0) {
-        arcPoints.push(noaaTo3DPosition(p.azimuthDeg, p.elevationDeg, 4.5));
+        arcPoints.push(noaaTo3DPosition(p.azimuthDeg, p.elevationDeg, SUN_ORBIT_RADIUS));
       }
     }
     if (arcPoints.length >= 2) {
@@ -770,15 +869,15 @@ export default function CompactInteractiveTwin({
     const sunGroup = new THREE.Group();
     sunGroup.name = 'noaaSun';
     const sunSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 28, 28),
+      new THREE.SphereGeometry(0.26, 28, 28),
       new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
     );
     const sunHalo = new THREE.Mesh(
-      new THREE.SphereGeometry(0.36, 24, 24),
+      new THREE.SphereGeometry(0.39, 24, 24),
       new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.3 })
     );
     sunGroup.add(sunSphere, sunHalo);
-    const initSunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, 4.5);
+    const initSunPos = noaaTo3DPosition(noaaSun.azimuthDeg, noaaSun.elevationDeg, SUN_ORBIT_RADIUS);
     sunGroup.position.copy(initSunPos);
     scene.add(sunGroup);
 
@@ -2134,6 +2233,10 @@ export default function CompactInteractiveTwin({
       sunRayLine,
       sw1LedMat,
       sw2LedMat,
+      rooftopEnvGroup,
+      envCompassGroup,
+      compactCompassGroup,
+      gridHelper,
       camera,
       controls,
       scene
@@ -2153,7 +2256,10 @@ export default function CompactInteractiveTwin({
     };
 
     const handlePointerUp = (e) => {
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return;
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) {
+        setActiveViewPreset(null);
+        return;
+      }
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -2162,6 +2268,7 @@ export default function CompactInteractiveTwin({
       // 1. Nhấn vào Tấm Tracker -> Zoom cận cảnh vào Tấm Tracker & Hiện bảng thông số Tracker
       if (raycaster.intersectObjects(trackerRootGroup.children, true).length > 0) {
         setSelectedPanel('tracker');
+        setActiveViewPreset(null);
         targetAnglesRef.current.camTargetPos = new THREE.Vector3(-2.05, 2.55, 3.45);
         targetAnglesRef.current.camLookAt = new THREE.Vector3(-2.05, 1.55, 0);
         return;
@@ -2170,6 +2277,7 @@ export default function CompactInteractiveTwin({
       // 2. Nhấn vào Tấm Cố định -> Zoom cận cảnh vào Tấm Cố định & Hiện bảng thông số Cố định
       if (raycaster.intersectObjects(staticRootGroup.children, true).length > 0) {
         setSelectedPanel('static');
+        setActiveViewPreset(null);
         targetAnglesRef.current.camTargetPos = new THREE.Vector3(2.15, 2.55, 3.45);
         targetAnglesRef.current.camLookAt = new THREE.Vector3(2.15, 1.55, 0);
         return;
@@ -2183,6 +2291,7 @@ export default function CompactInteractiveTwin({
       ) {
         setIsBoxOpen(true);
         setSelectedPanel('box');
+        setActiveViewPreset(null);
         targetAnglesRef.current.camTargetPos = new THREE.Vector3(0.28, 3.25, 1.85);
         targetAnglesRef.current.camLookAt = new THREE.Vector3(0.25, 0.45, -0.05);
         return;
@@ -2191,6 +2300,7 @@ export default function CompactInteractiveTwin({
       // 4. Nhấn vào Trạm gió Anemometer -> Zoom cận cảnh vào Anemometer & Hiện thông số gió
       if (raycaster.intersectObjects(anemometerGroup.children, true).length > 0) {
         setSelectedPanel('anemometer');
+        setActiveViewPreset(null);
         targetAnglesRef.current.camTargetPos = new THREE.Vector3(anemoX + 0.45, 2.70, anemoZ + 1.85);
         targetAnglesRef.current.camLookAt = new THREE.Vector3(anemoX, 2.45, anemoZ);
         return;
@@ -2199,14 +2309,16 @@ export default function CompactInteractiveTwin({
       // 5. Nhấn vào Mặt trời NOAA -> Zoom nhìn Mặt trời & Hiện thông số NOAA
       if (raycaster.intersectObjects(sunGroup.children, true).length > 0) {
         setSelectedPanel('sun');
-        targetAnglesRef.current.camTargetPos = new THREE.Vector3(0, 4.5, 8.6);
-        targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 1.8, 0);
+        setActiveViewPreset(null);
+        targetAnglesRef.current.camTargetPos = new THREE.Vector3(-3.8, 7.8, 11.2);
+        targetAnglesRef.current.camLookAt = new THREE.Vector3(0, 2.0, 0);
         return;
       }
 
       // 6. Nhấn ra ngoài khoảng trống -> Thu phóng trở lại toàn cảnh & Đóng bảng thông số
       setSelectedPanel(null);
       setIsBoxOpen(false);
+      setActiveViewPreset('overview');
       targetAnglesRef.current.camTargetPos = DEFAULT_CAM_POS.clone();
       targetAnglesRef.current.camLookAt = DEFAULT_LOOK_AT.clone();
     };
@@ -2242,6 +2354,7 @@ export default function CompactInteractiveTwin({
     // Vòng lặp Render 3D
     let animId;
     let lastTime = performance.now();
+    let westOpacity = 1.0;
     const animate = () => {
       animId = requestAnimationFrame(animate);
       const now = performance.now();
@@ -2327,6 +2440,16 @@ export default function CompactInteractiveTwin({
         }
       }
 
+      // Làm mờ thông minh mảng tường hậu phía Tây khi người dùng xoay camera ra sau tường ở góc thấp
+      const shouldFadeWest = camera.position.z > 5.6 && camera.position.x > -5.1 && camera.position.y < 7.2;
+      westOpacity += ((shouldFadeWest ? 0.22 : 1.0) - westOpacity) * 0.14;
+      const isFadingWest = westOpacity < 0.99;
+      cutawayMaterials.forEach((mat) => {
+        mat.transparent = isFadingWest;
+        mat.depthWrite = !isFadingWest;
+        mat.opacity = isFadingWest ? westOpacity : 1.0;
+      });
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -2348,6 +2471,7 @@ export default function CompactInteractiveTwin({
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
       renderer.domElement.removeEventListener('wheel', handleWheel, { capture: true });
       cancelAnimationFrame(animId);
+      rooftopEnv.dispose();
       pmremGenerator.dispose();
       controls.dispose();
       renderer.dispose();
@@ -2368,6 +2492,36 @@ export default function CompactInteractiveTwin({
         ref={mountRef}
         className="w-full h-full cursor-grab active:cursor-grabbing"
       />
+
+      {/* THANH CHỌN GÓC QUAN SÁT & BẬT/TẮT MÔI TRƯỜNG SÂN THƯỢNG */}
+      <div className="absolute bottom-16 sm:bottom-3 left-3 z-20 flex flex-wrap items-center gap-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-zinc-300 dark:border-slate-700 rounded-md shadow-lg p-1.5">
+        {Object.entries(CAMERA_PRESETS).map(([key, preset]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => handleSelectViewPreset(key)}
+            className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors cursor-pointer ${
+              activeViewPreset === key
+                ? 'bg-blue-700 text-white'
+                : 'text-zinc-700 dark:text-slate-200 hover:bg-zinc-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            {preset.label}
+          </button>
+        ))}
+        <div className="w-px h-4 bg-zinc-300 dark:bg-slate-700 mx-0.5" />
+        <button
+          type="button"
+          onClick={() => setShowEnvironment((v) => !v)}
+          className={`px-2.5 py-1 text-xs font-semibold rounded border transition-colors cursor-pointer ${
+            showEnvironment
+              ? 'bg-emerald-600/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600/25'
+              : 'bg-zinc-100 dark:bg-slate-800 border-zinc-300 dark:border-slate-700 text-zinc-600 dark:text-slate-400'
+          }`}
+        >
+          Môi trường: {showEnvironment ? 'Bật' : 'Ẩn'}
+        </button>
+      </div>
 
       {/* BẢNG THÔNG SỐ NỔI KHI NHẤN VÀO TẤM PIN / HỘP ĐIỆN / MẶT TRỜI NOAA */}
       {selectedPanel && (
