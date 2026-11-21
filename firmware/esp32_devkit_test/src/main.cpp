@@ -27,7 +27,7 @@
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.3.6"
+#define CURRENT_FIRMWARE_VERSION "2.3.7"
 #define MANUAL_SERIAL_TEST_MODE 0
 
 #include <FastAccelStepper.h>
@@ -3982,20 +3982,17 @@ bool homeAxisToSwitch(int axis) {
   uint32_t &glitchGlobal = (axis == 1) ? homeGlitchCount1 : homeGlitchCount2;
   uint32_t localGlitches = 0;
 
-  // Dừng động cơ hoàn toàn rồi xác nhận lại switch lúc đứng yên (chống nhiễu EMI DM556 cho Trục 1)
-  // Riêng Trục 2 (Vít me): CTHT 2 đã lọc 3ms chuẩn xác; khi chạm tuyệt đối DỪNG NGAY không chạy ép tiếp vào công tắc!
+  // Dừng động cơ hoàn toàn rồi chờ RMT dừng hẳn (!s->isRunning()) trước khi setCurrentPosition(0)
+  // Riêng Trục 2 (Vít me): sau khi dừng luôn chốt chạm (không chạy ép tiếp vào công tắc nếu lẫy hơi đàn hồi)
   auto confirmStaticTouch = [&](uint32_t settleMs) -> bool {
     s->forceStop();
-    if (axis == 2) {
-      return true;
-    }
     uint32_t tSettle = millis();
-    while (millis() - tSettle < settleMs) {
+    while ((millis() - tSettle < settleMs) || (s->isRunning() && (millis() - tSettle < settleMs + 200))) {
       if (checkCancel())
         return false;
-      delay(10);
+      delay(5);
     }
-    if (isTriggered()) {
+    if (axis == 2 || isTriggered()) {
       return true;
     }
     localGlitches++;
@@ -4028,6 +4025,11 @@ bool homeAxisToSwitch(int axis) {
     while (isTriggered()) {
       if (checkCancel())
         return false;
+      if (!s->isRunning() && (millis() - tRetract0 > 100)) {
+        s->setSpeedInHz(retractSpd);
+        s->setAcceleration(homeAccel);
+        s->runForward();
+      }
       if (axis == 2 && (millis() - tRetract0 > 450) && (millis() - tStall0 >= 400)) {
         int32_t curSteps0 = s->getCurrentPosition();
         int32_t curEnc0 = getEncoderCount2();
@@ -4161,7 +4163,7 @@ bool homeAxisToSwitch(int axis) {
   if (axis == 1) homeErrorDeg1 = errDeg1;
   else homeErrorDeg2 = errDeg1;
 
-  s->forceStopAndNewPosition(0);
+  s->setCurrentPosition(0);
   Serial.printf(
       ">> [%s HOMING 1/3 OK] Da cham switch lan 1! home_error_deg = %+.3f° (%ld counts)\n",
       axisName, errDeg1, (long)touch1Enc);
@@ -4180,6 +4182,11 @@ bool homeAxisToSwitch(int axis) {
   while (isTriggered()) {
     if (checkCancel())
       return false;
+    if (!s->isRunning() && (millis() - tRetract1 > 100)) {
+      s->setSpeedInHz(retractSpd);
+      s->setAcceleration(homeAccel);
+      s->runForward();
+    }
     if (millis() - tRetract1 > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE;
@@ -4248,7 +4255,7 @@ bool homeAxisToSwitch(int axis) {
     }
     delay(1);
   }
-  s->forceStopAndNewPosition(0);
+  s->setCurrentPosition(0);
   Serial.printf(
       ">> [%s HOMING 2/3 OK] Da cham switch lan 2! Xac thuc thanh cong.\n",
       axisName);
@@ -4266,6 +4273,11 @@ bool homeAxisToSwitch(int axis) {
   while (isTriggered()) {
     if (checkCancel())
       return false;
+    if (!s->isRunning() && (millis() - tRetract2 > 100)) {
+      s->setSpeedInHz(retractSpd);
+      s->setAcceleration(homeAccel);
+      s->runForward();
+    }
     if (millis() - tRetract2 > 10000) {
       s->stopMove();
       stateM1 = STATE_IDLE;
@@ -4337,7 +4349,7 @@ bool homeAxisToSwitch(int axis) {
   }
   // Kiem chung lan cham 3 so voi lan cham 2 (Yeu cau 5)
   int32_t touch3StepPos = s->getCurrentPosition();
-  s->forceStopAndNewPosition(0);
+  s->setCurrentPosition(0);
 
   int32_t diffSteps23 = abs(touch3StepPos);
   float diffDeg23 = (float)diffSteps23 / getPulsesPerCount() * getDegPerCount();
@@ -4377,6 +4389,11 @@ bool homeAxisToSwitch(int axis) {
   uint32_t tPullOff = millis();
   while (isTriggered()) {
     if (checkCancel()) return false;
+    if (!s->isRunning() && (millis() - tPullOff > 100)) {
+      s->setSpeedInHz(retractSpd);
+      s->setAcceleration(homeAccel);
+      s->runForward();
+    }
     if (millis() - tPullOff > 6000) {
       s->stopMove();
       break;
@@ -4528,6 +4545,8 @@ bool runDualHomingToSwitches() {
   Serial.println("=======================================================");
 
   // 1. Trục 2 (Elevation) Home trước để nâng giàn pin an toàn, chống cấn khung
+  homingFault = false;
+  stallFaultM2 = false;
   homeGlitchCount1 = 0;
   homeGlitchCount2 = 0;
   m2StallRetryCount = 0;
