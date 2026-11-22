@@ -141,40 +141,45 @@ export default function Header({
       </div>
 
       {/* 2. DẢI TRẠNG THÁI MỘT DÒNG (STATUS BAR) */}
-      <div className="border-t border-zinc-200 dark:border-slate-800 bg-zinc-50/95 dark:bg-slate-950/90 text-xs text-zinc-600 dark:text-zinc-400 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-y-1 gap-x-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {/* Chế độ */}
-            <div>
-              <span>Chế độ: </span>
+      <div className="border-t border-zinc-200 dark:border-slate-800 bg-zinc-50/90 dark:bg-slate-950/85 text-xs text-zinc-600 dark:text-slate-400 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          {/* Cụm trái: Chế độ, Trạng thái, Kết nối ESP1/ESP2 & Ping */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {/* Chế độ vận hành */}
+            <div className="flex items-center gap-1">
+              <span className="text-zinc-500 dark:text-slate-400">Chế độ:</span>
               <span className="font-semibold text-zinc-900 dark:text-white">
                 {mode === 'AUTO' ? 'Tự động' : mode === 'MANUAL' ? 'Thủ công' : mode}
               </span>
             </div>
 
-            {/* Trạng thái máy & Đếm ngược thời gian xoay */}
-            <div className="flex items-center gap-1">
-              <span>Trạng thái: </span>
-              <span className={`font-semibold px-1.5 py-0.5 rounded-xs ${system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
-                  ? 'text-blue-700 dark:text-sky-300 bg-blue-50 dark:bg-sky-950/50 border border-blue-200/70 dark:border-sky-800/60 font-mono'
-                  : system?.displayState && system?.displayState.includes('ĐIỀU CHỈNH')
-                    ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-800/60 font-mono animate-pulse'
-                    : 'text-zinc-900 dark:text-white bg-zinc-200/50 dark:bg-slate-800/80'
-                }`}>
-                {system?.displayState || 'Bình thường'}
-              </span>
-            </div>
+            <span className="hidden md:block h-3.5 w-px bg-zinc-200 dark:bg-slate-800" aria-hidden="true" />
 
-            {/* Trạng thái kết nối & Đo Ping thời gian thực */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span>Kết nối:</span>
+            {/* Trạng thái vận hành */}
+            <span
+              title="Trạng thái vận hành hiện tại"
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                system?.displayState && system?.displayState.includes('GIỮ BƯỚC')
+                  ? 'text-blue-700 dark:text-sky-300 bg-blue-50 dark:bg-sky-950/60 border-blue-200/80 dark:border-sky-800/60 font-mono'
+                  : system?.displayState && system?.displayState.includes('ĐIỀU CHỈNH')
+                    ? 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border-amber-200/80 dark:border-amber-800/60 font-mono animate-pulse'
+                    : 'text-zinc-700 dark:text-slate-200 bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700'
+              }`}
+            >
+              {system?.displayState || 'Bình thường'}
+            </span>
+
+            <span className="hidden md:block h-3.5 w-px bg-zinc-200 dark:bg-slate-800" aria-hidden="true" />
+
+            {/* Kết nối, trạng thái ESP1/ESP2 & độ trễ Ping */}
+            <div className="flex flex-wrap items-center gap-2.5">
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xs font-bold border ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                   isOnline
                     ? system?.connStatus === 'STALE'
-                      ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
-                      : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40'
-                    : 'bg-red-100 text-red-800 border-red-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/35'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/35'
+                    : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/35'
                 }`}
               >
                 <span className="relative flex h-2 w-2">
@@ -191,38 +196,57 @@ export default function Header({
                         ? system?.connStatus === 'STALE'
                           ? 'bg-amber-500 dark:bg-amber-400'
                           : 'bg-emerald-600 dark:bg-emerald-400'
-                        : 'bg-red-600 dark:bg-rose-400'
+                        : 'bg-rose-600 dark:bg-rose-400'
                     }`}
                   />
                 </span>
                 <span>
                   {isOnline
                     ? system?.connStatus === 'STALE'
-                      ? 'TRỄ TÍN HIỆU'
-                      : 'TRỰC TUYẾN'
-                    : 'MẤT KẾT NỐI'}
+                      ? 'Trễ tín hiệu'
+                      : 'Trực tuyến'
+                    : 'Mất kết nối'}
                 </span>
-                {dataSource === 'firebase' && (
-                  <span className="font-mono font-semibold text-[11px] opacity-90">
-                    (ESP1:{system?.esp1Online !== false && isOnline ? 'ON' : 'OFF'} | ESP2:{system?.esp2Online ? 'ON' : 'OFF'})
-                  </span>
-                )}
               </span>
 
-              {/* Chỉ số Ping mạng thực tế */}
+              {dataSource === 'firebase' && (
+                <div className="inline-flex items-center gap-2 text-[11px] font-mono">
+                  <span className="inline-flex items-center gap-1 text-zinc-700 dark:text-slate-300">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        system?.esp1Online !== false && isOnline
+                          ? 'bg-emerald-500'
+                          : 'bg-zinc-400 dark:bg-slate-600'
+                      }`}
+                    />
+                    <span>ESP1</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-zinc-700 dark:text-slate-300">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        system?.esp2Online
+                          ? 'bg-emerald-500'
+                          : 'bg-zinc-400 dark:bg-slate-600'
+                      }`}
+                    />
+                    <span>ESP2</span>
+                  </span>
+                </div>
+              )}
+
               <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs font-mono font-bold border ${
+                className={`inline-flex items-center gap-1 text-[11px] font-mono tabular-nums font-semibold ${
                   !isOnline || system?.pingMs === null || system?.pingMs === undefined
-                    ? 'bg-zinc-100 text-zinc-500 border-zinc-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                    ? 'text-zinc-400 dark:text-slate-500'
                     : Number(system.pingMs) <= 80
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                      ? 'text-emerald-700 dark:text-emerald-400'
                       : Number(system.pingMs) <= 200
-                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
-                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60'
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : 'text-rose-700 dark:text-rose-400'
                 }`}
                 title="Độ trễ phản hồi thực tế (Ping RTT) giữa trình duyệt và hệ thống Cloud/ESP32"
               >
-                <span>Ping:</span>
+                <span className="font-sans font-normal text-zinc-500 dark:text-slate-400">Ping</span>
                 <span>
                   {isOnline && system?.pingMs !== null && system?.pingMs !== undefined
                     ? `${Math.round(Number(system.pingMs))} ms`
@@ -230,86 +254,65 @@ export default function Header({
                 </span>
               </span>
             </div>
+          </div>
+
+          {/* Cụm phải: Đèn, Lệch RTC & Đồng hồ */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 ml-auto">
+            {/* Trạng thái Đèn (Relay Kênh 5 - Relay E) */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                system?.lamp12vOn
+                  ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/35'
+                  : 'bg-white text-zinc-700 border-zinc-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+              }`}
+            >
+              <span
+                className={`inline-block w-1.5 h-1.5 rounded-full ${
+                  system?.lamp12vOn
+                    ? 'bg-amber-500 dark:bg-amber-400 animate-pulse'
+                    : 'bg-zinc-400 dark:bg-slate-500'
+                }`}
+              />
+              <span>Đèn: {system?.lamp12vOn ? 'Bật' : 'Tắt'}</span>
+              {system?.lampAutoDisabled ? (
+                <span className="font-normal opacity-75">(Thủ công)</span>
+              ) : (
+                system?.lampRemainSec !== null &&
+                system?.lampRemainSec !== undefined &&
+                system?.lampRemainSec > 0 && (
+                  <span className="font-mono font-medium opacity-85">
+                    ({Math.floor(Number(system.lampRemainSec) / 60).toString().padStart(2, '0')}:
+                    {(Number(system.lampRemainSec) % 60).toString().padStart(2, '0')})
+                  </span>
+                )
+              )}
+            </span>
+
+            <span className="hidden md:block h-3.5 w-px bg-zinc-200 dark:bg-slate-800" aria-hidden="true" />
 
             {/* Sai lệch RTC */}
-            <div>
-              <span>Lệch RTC: </span>
-              <span className="font-semibold text-zinc-900 dark:text-white">
+            <div className="flex items-center gap-1 text-[11px]">
+              <span className="text-zinc-500 dark:text-slate-400">Lệch RTC:</span>
+              <span className="font-mono tabular-nums font-medium text-zinc-800 dark:text-slate-200">
                 {system?.rtcOffsetMs !== null && system?.rtcOffsetMs !== undefined
                   ? formatSignedNumber(system.rtcOffsetMs, 0, 'ms')
                   : '--'}
               </span>
             </div>
 
+            <span className="hidden md:block h-3.5 w-px bg-zinc-200 dark:bg-slate-800" aria-hidden="true" />
+
             {/* Đồng hồ thực địa */}
-            <div className="text-zinc-600 dark:text-slate-300 font-medium">
-              <span>Đồng hồ: {formattedTime} ({formattedDate})</span>
-            </div>
-
-            {/* Trạng thái Đèn (Relay Kênh 5 - Relay E) đặt ngay cạnh Đồng hồ */}
-            <div className="flex items-center gap-1.5">
-              <span>Đèn:</span>
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-xs font-bold border ${
-                  system?.lamp12vOn
-                    ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
-                    : 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                }`}
-              >
-                <span
-                  className={`inline-block w-2 h-2 rounded-full ${
-                    system?.lamp12vOn
-                      ? 'bg-amber-500 dark:bg-amber-400 animate-pulse'
-                      : 'bg-zinc-400 dark:bg-slate-500'
-                  }`}
-                />
-                <span>{system?.lamp12vOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}</span>
-                {system?.lampAutoDisabled ? (
-                  <span className="font-normal text-[11px] opacity-85">(Thủ công)</span>
-                ) : (
-                  system?.lampRemainSec !== null &&
-                  system?.lampRemainSec !== undefined &&
-                  system?.lampRemainSec > 0 && (
-                    <span className="font-mono font-semibold text-[11px] opacity-90">
-                      ({Math.floor(Number(system.lampRemainSec) / 60).toString().padStart(2, '0')}:
-                      {(Number(system.lampRemainSec) % 60).toString().padStart(2, '0')})
-                    </span>
-                  )
-                )}
-              </span>
-            </div>
-
-            {/* Nhiệt độ RTC DS3231 */}
-            <div>
-              <span>Nhiệt độ RTC: </span>
-              <span className="font-semibold text-zinc-900 dark:text-white">
-                {system?.rtcTemp !== null && system?.rtcTemp !== undefined
-                  ? `${Number(system.rtcTemp).toFixed(1)}°C`
-                  : '--'}
-              </span>
-            </div>
-
-            {/* Nguồn dữ liệu */}
-            <div>
-              <span>Nguồn: </span>
-              <span className={`font-semibold ${system?.isMock || dataSource === 'mock'
-                  ? 'text-red-700 dark:text-rose-400'
-                  : system?.source === 'device'
-                    ? 'text-emerald-700 dark:text-emerald-400'
-                    : 'text-amber-700 dark:text-amber-300'
-                }`}>
-                {system?.isMock || dataSource === 'mock'
-                  ? 'Dữ liệu giả lập'
-                  : system?.source === 'device'
-                    ? 'Thiết bị thật'
-                    : 'Chưa xác thực nguồn'}
-              </span>
+            <div className="flex items-center gap-1.5 text-[11px] tabular-nums">
+              <span className="font-semibold text-zinc-900 dark:text-white">{formattedTime}</span>
+              <span className="text-zinc-300 dark:text-slate-700">·</span>
+              <span className="text-zinc-500 dark:text-slate-400">{formattedDate}</span>
             </div>
           </div>
 
-          {/* Cảnh báo sự cố nếu có (hiển thị trực tiếp dạng chữ có màu) */}
+          {/* Cảnh báo sự cố nếu có */}
           {hasAlarm && (
-            <div className="flex items-center gap-2 text-red-700 dark:text-rose-400 font-semibold">
+            <div className="w-full pt-1 mt-0.5 border-t border-red-200/70 dark:border-rose-900/50 flex flex-wrap items-center gap-2 text-[11px] text-red-700 dark:text-rose-400 font-semibold">
               <span>Sự cố:</span>
               {system?.estop && <span>[Dừng khẩn cấp]</span>}
               {system?.errors?.driverFault && <span>[Lỗi driver động cơ]</span>}
@@ -318,7 +321,7 @@ export default function Header({
               {system?.estop && onResetEstop && (
                 <button
                   onClick={onResetEstop}
-                  className="ml-1 text-[11px] underline hover:text-red-900 dark:hover:text-rose-200 cursor-pointer"
+                  className="ml-1 underline hover:text-red-900 dark:hover:text-rose-200 cursor-pointer"
                 >
                   Reset
                 </button>
