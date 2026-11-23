@@ -30,7 +30,7 @@
 #include <esp_system.h>
 #include <float.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.3.8"
+#define CURRENT_FIRMWARE_VERSION "2.3.9"
 #define MANUAL_SERIAL_TEST_MODE 0
 
 #include <FastAccelStepper.h>
@@ -2499,34 +2499,105 @@ struct FuzzyOutput {
   float deltaKp;
   float deltaKi;
   float deltaKd;
-  const char *activeRule;
+  char activeRule[48];
 };
 
-FuzzyOutput computeFuzzyAdjustment(float e, float de) {
+FuzzyOutput computeFuzzyAdjustment(float eNorm, float deNorm) {
   FuzzyOutput out;
-  float absE = fabs(e);
-  float absDe = fabs(de);
+  if (!isfinite(eNorm)) eNorm = 0.0f;
+  if (!isfinite(deNorm)) deNorm = 0.0f;
+  eNorm = clampVal(eNorm, -1.0f, 1.0f);
+  deNorm = clampVal(deNorm, -1.0f, 1.0f);
 
-  if (absE >= 0.40f) {
-    out.deltaKp = 0.85f;
-    out.deltaKi = -0.040f;
-    out.deltaKd = 0.25f;
-    out.activeRule = "R12: PB x ZE -> PB (Fast Slew)";
-  } else if (absE >= 0.12f) {
-    out.deltaKp = 0.35f;
-    out.deltaKi = 0.010f;
-    out.deltaKd = 0.15f;
-    out.activeRule = "R08: PS x NS -> PS (Fine Slew)";
+  enum FuzzySet : uint8_t {
+    FZ_NB = 0, FZ_NM = 1, FZ_NS = 2, FZ_ZE = 3, FZ_PS = 4, FZ_PM = 5, FZ_PB = 6
+  };
+  static const char *const LBL[7] = {"NB", "NM", "NS", "ZE", "PS", "PM", "PB"};
+  static const float CENTERS[7] = {
+      -1.0f, -2.0f / 3.0f, -1.0f / 3.0f, 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f
+  };
+  static const float OUT_DKP[7] = {-0.85f, -0.55f, -0.30f, 0.00f, 0.35f, 0.60f, 0.85f};
+  static const float OUT_DKI[7] = {-0.040f, -0.025f, -0.010f, 0.000f, 0.010f, 0.022f, 0.035f};
+  static const float OUT_DKD[7] = {-0.30f, -0.20f, -0.10f, 0.00f, 0.15f, 0.25f, 0.30f};
+
+  static const uint8_t RULE_KP[7][7] = {
+      {FZ_PB, FZ_PB, FZ_PB, FZ_PM, FZ_PM, FZ_PS, FZ_PS},
+      {FZ_PB, FZ_PM, FZ_PM, FZ_PM, FZ_PS, FZ_PS, FZ_ZE},
+      {FZ_PM, FZ_PM, FZ_PS, FZ_PS, FZ_ZE, FZ_ZE, FZ_NS},
+      {FZ_PS, FZ_PS, FZ_ZE, FZ_NS, FZ_ZE, FZ_PS, FZ_PS},
+      {FZ_NS, FZ_ZE, FZ_ZE, FZ_PS, FZ_PS, FZ_PM, FZ_PM},
+      {FZ_ZE, FZ_PS, FZ_PS, FZ_PM, FZ_PM, FZ_PM, FZ_PB},
+      {FZ_PS, FZ_PS, FZ_PM, FZ_PM, FZ_PB, FZ_PB, FZ_PB}
+  };
+  static const uint8_t RULE_KI[7][7] = {
+      {FZ_NB, FZ_NB, FZ_NB, FZ_NM, FZ_NM, FZ_NS, FZ_NS},
+      {FZ_NB, FZ_NB, FZ_NM, FZ_NM, FZ_NS, FZ_NS, FZ_ZE},
+      {FZ_NM, FZ_NM, FZ_NS, FZ_NS, FZ_ZE, FZ_ZE, FZ_PS},
+      {FZ_NS, FZ_NS, FZ_ZE, FZ_PB, FZ_ZE, FZ_NS, FZ_NS},
+      {FZ_PS, FZ_ZE, FZ_ZE, FZ_NS, FZ_NS, FZ_NM, FZ_NM},
+      {FZ_ZE, FZ_NS, FZ_NS, FZ_NM, FZ_NM, FZ_NB, FZ_NB},
+      {FZ_NS, FZ_NS, FZ_NM, FZ_NM, FZ_NB, FZ_NB, FZ_NB}
+  };
+  static const uint8_t RULE_KD[7][7] = {
+      {FZ_PS, FZ_PS, FZ_ZE, FZ_ZE, FZ_ZE, FZ_NS, FZ_NS},
+      {FZ_PS, FZ_PS, FZ_ZE, FZ_ZE, FZ_NS, FZ_NS, FZ_NS},
+      {FZ_ZE, FZ_ZE, FZ_NS, FZ_NS, FZ_NS, FZ_NS, FZ_ZE},
+      {FZ_NS, FZ_NS, FZ_NS, FZ_PB, FZ_NS, FZ_NS, FZ_NS},
+      {FZ_ZE, FZ_NS, FZ_NS, FZ_NS, FZ_NS, FZ_ZE, FZ_ZE},
+      {FZ_NS, FZ_NS, FZ_NS, FZ_ZE, FZ_ZE, FZ_PS, FZ_PS},
+      {FZ_NS, FZ_NS, FZ_ZE, FZ_ZE, FZ_ZE, FZ_PS, FZ_PS}
+  };
+
+  float muE[7];
+  float muDe[7];
+  const float invH = 3.0f;
+  for (int k = 0; k < 7; k++) {
+    float dE = fabsf(eNorm - CENTERS[k]) * invH;
+    muE[k] = (dE < 1.0f) ? (1.0f - dE) : 0.0f;
+    float dDe = fabsf(deNorm - CENTERS[k]) * invH;
+    muDe[k] = (dDe < 1.0f) ? (1.0f - dDe) : 0.0f;
+  }
+
+  float wSum = 0.0f;
+  float sumKp = 0.0f;
+  float sumKi = 0.0f;
+  float sumKd = 0.0f;
+  float bestW = -1.0f;
+  int bestI = FZ_ZE;
+  int bestJ = FZ_ZE;
+
+  for (int i = 0; i < 7; i++) {
+    if (muE[i] <= 0.0f) continue;
+    for (int j = 0; j < 7; j++) {
+      if (muDe[j] <= 0.0f) continue;
+      float w = fminf(muE[i], muDe[j]);
+      wSum += w;
+      sumKp += w * OUT_DKP[RULE_KP[i][j]];
+      sumKi += w * OUT_DKI[RULE_KI[i][j]];
+      sumKd += w * OUT_DKD[RULE_KD[i][j]];
+      if (w > bestW) {
+        bestW = w;
+        bestI = i;
+        bestJ = j;
+      }
+    }
+  }
+
+  if (wSum > 1e-6f) {
+    float invW = 1.0f / wSum;
+    out.deltaKp = sumKp * invW;
+    out.deltaKi = sumKi * invW;
+    out.deltaKd = sumKd * invW;
   } else {
     out.deltaKp = -0.30f;
     out.deltaKi = 0.035f;
     out.deltaKd = 0.30f;
-    out.activeRule = "R01: ZE x ZE -> ZE (Steady Deadband)";
   }
 
-  if (absDe > 0.8f) {
-    out.deltaKd += 0.25f;
-  }
+  snprintf(out.activeRule, sizeof(out.activeRule), "R%02d: %s x %s -> %s/%s/%s",
+           bestI * 7 + bestJ + 1, LBL[bestI], LBL[bestJ],
+           LBL[RULE_KP[bestI][bestJ]], LBL[RULE_KI[bestI][bestJ]],
+           LBL[RULE_KD[bestI][bestJ]]);
   return out;
 }
 
@@ -2557,8 +2628,10 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
     static float prevErrDeg1 = 0.0f;
     float dErr1 = errDeg - prevErrDeg1;
     prevErrDeg1 = errDeg;
-    FuzzyOutput fz1 = computeFuzzyAdjustment(errDeg, dErr1);
-    float kpEff1 = gBestAz.kp + fz1.deltaKp;
+    float eNorm1 = clampVal(errDeg / 6.0f, -1.0f, 1.0f);
+    float deNorm1 = clampVal(dErr1 / 3.0f, -1.0f, 1.0f);
+    FuzzyOutput fz1 = computeFuzzyAdjustment(eNorm1, deNorm1);
+    float kpEff1 = fmaxf(1.0f, gBestAz.kp + fz1.deltaKp);
     if (speedHz == 0) {
       float baseSpd = ParamRegistry.get("POS_STEP_SPEED_HZ", 2000.0f);
       float kpBase1 = (gBestAz.kp > 1.0f) ? gBestAz.kp : 3.05f;
@@ -2619,8 +2692,10 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
     static float prevErrDeg2 = 0.0f;
     float dErr2 = errDeg - prevErrDeg2;
     prevErrDeg2 = errDeg;
-    FuzzyOutput fz2 = computeFuzzyAdjustment(errDeg, dErr2);
-    float kpEff2 = gBestEl.kp + fz2.deltaKp;
+    float eNorm2 = clampVal(errDeg / 6.0f, -1.0f, 1.0f);
+    float deNorm2 = clampVal(dErr2 / 3.0f, -1.0f, 1.0f);
+    FuzzyOutput fz2 = computeFuzzyAdjustment(eNorm2, deNorm2);
+    float kpEff2 = fmaxf(1.0f, gBestEl.kp + fz2.deltaKp);
     if (speedHz == 0) {
       float kpBase2 = (gBestEl.kp > 1.0f) ? gBestEl.kp : 3.51f;
       speedHz = (uint32_t)constrain(
@@ -3136,8 +3211,14 @@ void pushTelemetryToFirebase() {
   algoJson.set("status", algoStateStr);
   algoJson.set("psoTimeout", psoTimedOut);
 
-  FuzzyOutput fzAz = computeFuzzyAdjustment(opt.normDiffAz, 0.0f);
-  FuzzyOutput fzEl = computeFuzzyAdjustment(opt.normDiffEl, 0.0f);
+  static float prevOptNormAz = 0.0f;
+  static float prevOptNormEl = 0.0f;
+  float dOptAz = clampVal((opt.normDiffAz - prevOptNormAz) / 0.25f, -1.0f, 1.0f);
+  float dOptEl = clampVal((opt.normDiffEl - prevOptNormEl) / 0.25f, -1.0f, 1.0f);
+  prevOptNormAz = opt.normDiffAz;
+  prevOptNormEl = opt.normDiffEl;
+  FuzzyOutput fzAz = computeFuzzyAdjustment(opt.normDiffAz, dOptAz);
+  FuzzyOutput fzEl = computeFuzzyAdjustment(opt.normDiffEl, dOptEl);
 
   algoJson.set("kp_az", gBestAz.kp + fzAz.deltaKp);
   algoJson.set("ki_az", gBestAz.ki + fzAz.deltaKi);
