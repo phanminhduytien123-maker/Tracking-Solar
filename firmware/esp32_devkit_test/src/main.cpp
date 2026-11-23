@@ -20,14 +20,17 @@
 #include "param_registry.h"
 #include "solar_ephemeris.h"
 #include "solar_geometry.h"
+#include "solar_config.h"
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
+#include <esp_system.h>
+#include <float.h>
 
-#define CURRENT_FIRMWARE_VERSION "2.3.7"
+#define CURRENT_FIRMWARE_VERSION "2.3.8"
 #define MANUAL_SERIAL_TEST_MODE 0
 
 #include <FastAccelStepper.h>
@@ -2288,45 +2291,114 @@ struct PsoParams {
   float cost;
 };
 
-const int PSO_SWARM_SIZE = 10;
-const int PSO_MAX_ITER = 20;
-const float PSO_W_INERTIA = 0.729f;
-const float PSO_C1_COG = 1.494f;
-const float PSO_C2_SOC = 1.494f;
+const int PSO_SWARM_SIZE = CFG_PSO_SWARM_SIZE;
+const int PSO_MAX_ITER = CFG_PSO_MAX_ITERATIONS;
+const float PSO_W_INERTIA = CFG_PSO_W_INERTIA;
+const float PSO_C1_COG = CFG_PSO_C1_COGNITIVE;
+const float PSO_C2_SOC = CFG_PSO_C2_SOCIAL;
 
-PsoParams gBestAz = {2.40f, 0.08f, 0.65f, 0.0384f};
-PsoParams gBestEl = {2.80f, 0.10f, 0.75f, 0.0421f};
+PsoParams gBestAz = {3.05f, 0.104f, 1.13f, FLT_MAX};
+PsoParams gBestEl = {3.51f, 0.114f, 1.36f, FLT_MAX};
 uint32_t psoRunTimeMs = 0;
 int psoCurrentIter = 0;
 bool psoHasConverged = false;
+bool psoTimedOut = false;
 
 float evaluateFitness(float kp, float ki, float kd) {
-  float simError = 1.0f;
-  float simIntegral = 0.0f;
-  float simPrevError = 1.0f;
-  float totalCost = 0.0f;
-  float dt = 0.02f;
+  const float dt = CFG_PSO_SIM_DT_SEC;
+  const float invDt = 1.0f / dt;
+  const int steps = (int)(CFG_PSO_SIM_DURATION_SEC * invDt + 0.5f);
+  const float tauM = 0.14f;
+  const float invTauM = 1.0f / tauM;
+  const float Ka = 3.6f;
+  const float Dv = 1.8f;
+  const float dF = 0.20f;
+  const float uMax = 3.0f;
 
-  for (int k = 1; k <= 50; k++) {
-    float deriv = (simError - simPrevError) / dt;
-    simIntegral += simError * dt;
-    float u = kp * simError + ki * simIntegral + kd * deriv;
-    u = constrain(u, -3.0f, 3.0f);
+  float theta = 0.0f;
+  float omega = 0.0f;
+  float uAct = 0.0f;
+  float integral = 0.0f;
+  float prevE = 1.0f;
 
-    simPrevError = simError;
-    simError -= u * 0.15f * dt;
+  float itae = 0.0f;
+  float maxOs = 0.0f;
+  float u2Int = 0.0f;
+  float satPen = 0.0f;
+  float settleT = CFG_PSO_SIM_DURATION_SEC;
 
-    totalCost += (k * dt) * fabs(simError) * dt;
-    if (simError < 0)
-      totalCost += 10.0f * fabs(simError);
+  for (int k = 1; k <= steps; k++) {
+    float t = (float)k * dt;
+    float e = 1.0f - theta;
+    float deriv = (e - prevE) * invDt;
+    prevE = e;
+
+    integral += e * dt;
+    if (integral > 2.0f) {
+      integral = 2.0f;
+    } else if (integral < -2.0f) {
+      integral = -2.0f;
+    }
+
+    float uRaw = kp * e + ki * integral + kd * deriv;
+    float u = uRaw;
+    if (uRaw > uMax) {
+      satPen += (uRaw - uMax) * dt;
+      u = uMax;
+    } else if (uRaw < -uMax) {
+      satPen += (-uMax - uRaw) * dt;
+      u = -uMax;
+    }
+
+    u2Int += u * u * dt;
+    uAct += (u - uAct) * invTauM * dt;
+    float acc = Ka * uAct - Dv * omega - dF;
+    omega += acc * dt;
+    theta += omega * dt;
+
+    float eNew = 1.0f - theta;
+    if (!isfinite(eNew) || fabsf(eNew) > 10.0f) {
+      return CFG_FITNESS_PENALTY_INSTABILITY;
+    }
+
+    itae += t * fabsf(eNew) * dt;
+    if (eNew < 0.0f && (-eNew) > maxOs) {
+      maxOs = -eNew;
+    }
+    if (fabsf(eNew) > 0.02f) {
+      settleT = t;
+    }
   }
-  return totalCost;
+
+  return CFG_FITNESS_W_ITAE * itae +
+         CFG_FITNESS_W_OVERSHOOT * maxOs +
+         CFG_FITNESS_W_SETTLING_TIME * settleT +
+         CFG_FITNESS_W_CONTROL_EFFORT * u2Int +
+         CFG_FITNESS_W_SATURATION * satPen;
 }
 
 void runPsoOptimization() {
   unsigned long startT = millis();
-  Serial.println("\n>>> [PSO] Kich hoat toi uu hoa bay dan (PSO) tren RAM de "
-                 "tim bo thong so [Kp, Ki, Kd] tot nhat...");
+  Serial.println("\n>>> [PSO] Kich hoat toi uu hoa bay dan (PSO N=20, K=50, mo hinh bac 3)...");
+
+  gBestAz.cost = FLT_MAX;
+  psoTimedOut = false;
+
+  uint32_t rng = esp_random() ^ (uint32_t)micros();
+  if (rng == 0U) rng = 0xA5A51234U;
+  auto nextRand01 = [&rng]() -> float {
+    rng ^= rng << 13;
+    rng ^= rng >> 17;
+    rng ^= rng << 5;
+    return (float)(rng & 0x00FFFFFFU) * (1.0f / 16777216.0f);
+  };
+
+  const float bMin[3] = {1.0f, 0.01f, 0.1f};
+  const float bMax[3] = {6.0f, 0.50f, 3.0f};
+  float vMax[3];
+  for (int d = 0; d < 3; d++) {
+    vMax[d] = 0.20f * (bMax[d] - bMin[d]);
+  }
 
   float pPos[PSO_SWARM_SIZE][3];
   float pVel[PSO_SWARM_SIZE][3];
@@ -2334,18 +2406,13 @@ void runPsoOptimization() {
   float pBestCost[PSO_SWARM_SIZE];
 
   for (int i = 0; i < PSO_SWARM_SIZE; i++) {
-    pPos[i][0] = 1.5f + (float)random(0, 300) / 100.0f;
-    pPos[i][1] = 0.02f + (float)random(0, 20) / 100.0f;
-    pPos[i][2] = 0.3f + (float)random(0, 150) / 100.0f;
-
-    pVel[i][0] = 0.0f;
-    pVel[i][1] = 0.0f;
-    pVel[i][2] = 0.0f;
+    for (int d = 0; d < 3; d++) {
+      pPos[i][d] = bMin[d] + nextRand01() * (bMax[d] - bMin[d]);
+      pVel[i][d] = (nextRand01() - 0.5f) * vMax[d];
+      pBestPos[i][d] = pPos[i][d];
+    }
 
     pBestCost[i] = evaluateFitness(pPos[i][0], pPos[i][1], pPos[i][2]);
-    pBestPos[i][0] = pPos[i][0];
-    pBestPos[i][1] = pPos[i][1];
-    pBestPos[i][2] = pPos[i][2];
 
     if (pBestCost[i] < gBestAz.cost) {
       gBestAz.cost = pBestCost[i];
@@ -2355,21 +2422,34 @@ void runPsoOptimization() {
     }
   }
 
+  int completedIter = 0;
   for (int iter = 0; iter < PSO_MAX_ITER; iter++) {
+    if (millis() - startT >= (unsigned long)CFG_PSO_ONLINE_TIMEOUT_MS) {
+      psoTimedOut = true;
+      break;
+    }
     for (int i = 0; i < PSO_SWARM_SIZE; i++) {
       const float gBestArr[3] = {gBestAz.kp, gBestAz.ki, gBestAz.kd};
       for (int d = 0; d < 3; d++) {
-        float r1 = (float)random(0, 1000) / 1000.0f;
-        float r2 = (float)random(0, 1000) / 1000.0f;
-        pVel[i][d] = PSO_W_INERTIA * pVel[i][d] +
-                     PSO_C1_COG * r1 * (pBestPos[i][d] - pPos[i][d]) +
-                     PSO_C2_SOC * r2 * (gBestArr[d] - pPos[i][d]);
-        pPos[i][d] += pVel[i][d];
-      }
+        float r1 = nextRand01();
+        float r2 = nextRand01();
+        float v = PSO_W_INERTIA * pVel[i][d] +
+                  PSO_C1_COG * r1 * (pBestPos[i][d] - pPos[i][d]) +
+                  PSO_C2_SOC * r2 * (gBestArr[d] - pPos[i][d]);
+        if (v > vMax[d]) v = vMax[d];
+        else if (v < -vMax[d]) v = -vMax[d];
+        pVel[i][d] = v;
 
-      pPos[i][0] = constrain(pPos[i][0], 1.0f, 6.0f);
-      pPos[i][1] = constrain(pPos[i][1], 0.01f, 0.5f);
-      pPos[i][2] = constrain(pPos[i][2], 0.1f, 3.0f);
+        float x = pPos[i][d] + v;
+        if (x < bMin[d]) {
+          x = bMin[d];
+          pVel[i][d] *= -0.5f;
+        } else if (x > bMax[d]) {
+          x = bMax[d];
+          pVel[i][d] *= -0.5f;
+        }
+        pPos[i][d] = x;
+      }
 
       float currentCost = evaluateFitness(pPos[i][0], pPos[i][1], pPos[i][2]);
       if (currentCost < pBestCost[i]) {
@@ -2385,6 +2465,7 @@ void runPsoOptimization() {
         }
       }
     }
+    completedIter = iter + 1;
   }
 
   gBestEl.kp = gBestAz.kp * 1.15f;
@@ -2392,15 +2473,25 @@ void runPsoOptimization() {
   gBestEl.kd = gBestAz.kd * 1.20f;
   gBestEl.cost = gBestAz.cost * 1.05f;
 
-  psoRunTimeMs = millis() - startT;
-  psoCurrentIter = PSO_MAX_ITER;
-  psoHasConverged = true;
+  bool validConvergence = isfinite(gBestAz.cost) && (gBestAz.cost < 100.0f);
+  if (validConvergence) {
+    prefs.putFloat("pso_kp", gBestAz.kp);
+    prefs.putFloat("pso_ki", gBestAz.ki);
+    prefs.putFloat("pso_kd", gBestAz.kd);
+    prefs.putFloat("pso_j", gBestAz.cost);
+    prefs.putUInt("pso_ver", 2U);
+  }
 
-  Serial.printf(">>> [PSO COMPLETE in %u ms] Hoi tu: Cost J = %.4f\n",
-                psoRunTimeMs, gBestAz.cost);
-  Serial.printf("    Tham so toi uu Azimuth  : Kp=%.2f, Ki=%.3f, Kd=%.2f\n",
+  psoRunTimeMs = (uint32_t)(millis() - startT);
+  psoCurrentIter = completedIter;
+  psoHasConverged = validConvergence;
+
+  Serial.printf(">>> [PSO COMPLETE in %lu ms | N=%d, iter=%d/%d%s] Cost J = %.4f\n",
+                (unsigned long)psoRunTimeMs, PSO_SWARM_SIZE, completedIter,
+                PSO_MAX_ITER, psoTimedOut ? " TIMEOUT" : "", gBestAz.cost);
+  Serial.printf("    Tham so toi uu Azimuth  : Kp=%.3f, Ki=%.3f, Kd=%.3f\n",
                 gBestAz.kp, gBestAz.ki, gBestAz.kd);
-  Serial.printf("    Tham so toi uu Elevation: Kp=%.2f, Ki=%.3f, Kd=%.2f\n\n",
+  Serial.printf("    Tham so toi uu Elevation: Kp=%.3f, Ki=%.3f, Kd=%.3f\n\n",
                 gBestEl.kp, gBestEl.ki, gBestEl.kd);
 }
 
@@ -2470,8 +2561,9 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
     float kpEff1 = gBestAz.kp + fz1.deltaKp;
     if (speedHz == 0) {
       float baseSpd = ParamRegistry.get("POS_STEP_SPEED_HZ", 2000.0f);
+      float kpBase1 = (gBestAz.kp > 1.0f) ? gBestAz.kp : 3.05f;
       speedHz =
-          (uint32_t)constrain(baseSpd * (kpEff1 / 2.40f), 800.0f, 3500.0f);
+          (uint32_t)constrain(baseSpd * (kpEff1 / kpBase1), 800.0f, 3500.0f);
     }
 
     if (fabs(errDeg) <= deadbandDeg ||
@@ -2530,8 +2622,9 @@ bool stepPositionControl(int axis, float targetDeg, uint32_t speedHz) {
     FuzzyOutput fz2 = computeFuzzyAdjustment(errDeg, dErr2);
     float kpEff2 = gBestEl.kp + fz2.deltaKp;
     if (speedHz == 0) {
+      float kpBase2 = (gBestEl.kp > 1.0f) ? gBestEl.kp : 3.51f;
       speedHz = (uint32_t)constrain(
-          (float)EL_TRACK_BASE_SPEED_HZ * (kpEff2 / 2.80f),
+          (float)EL_TRACK_BASE_SPEED_HZ * (kpEff2 / kpBase2),
           (float)EL_TRACK_MIN_SPEED_HZ,
           (float)EL_TRACK_MAX_SPEED_HZ);
     }
@@ -3041,6 +3134,7 @@ void pushTelemetryToFirebase() {
   algoJson.set("iteration", psoCurrentIter);
   algoJson.set("max_iterations", PSO_MAX_ITER);
   algoJson.set("status", algoStateStr);
+  algoJson.set("psoTimeout", psoTimedOut);
 
   FuzzyOutput fzAz = computeFuzzyAdjustment(opt.normDiffAz, 0.0f);
   FuzzyOutput fzEl = computeFuzzyAdjustment(opt.normDiffEl, 0.0f);
@@ -5165,6 +5259,9 @@ void setup() {
                  "Host: esp32-solar-tracker.local)!");
 #endif
 
+  // 9B. Chay toi uu hoa bay dan PSO mot lan luc khoi dong (doc lap phan cung dong co/encoder) & luu NVS
+  runPsoOptimization();
+
   // 10. TỰ ĐỘNG DUAL HOMING VỀ CÔNG TẮC HÀNH TRÌNH KHI CẤP ĐIỆN (CÓ KHÓA CHỐNG TỰ HOME LẶP BAN ĐÊM)
 #if MANUAL_SERIAL_TEST_MODE
   Serial.println("\n=======================================================");
@@ -5237,9 +5334,8 @@ void setup() {
           enterNightSleepUntil4AM();
         }
       } else if (bootHomeOk) {
-        Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 18:00) -> Chay "
-                       "PSO va bat dau bam Hybrid!");
-        runPsoOptimization();
+        Serial.println(">> [BOOT DAY] Cap nguon ban ngay (04:00 - 18:00) -> Dung "
+                       "thong so PSO da hoi tu va bat dau bam Hybrid!");
         currentTrackSource = TRACK_SRC_HYBRID;
         autoOpticalTracking = true;
         trackCyclePhase = TRACK_CYCLE_ADJUSTING;
@@ -5247,9 +5343,8 @@ void setup() {
         systemFsmState = FSM_STATE_TRACKING;
       }
     } else if (bootHomeOk) {
-      Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Chay PSO va bat dau bam "
-                     "Hybrid mac dinh...");
-      runPsoOptimization();
+      Serial.println(">> [BOOT WARN] Khong doc duoc RTC! Dung thong so PSO da "
+                     "hoi tu va bat dau bam Hybrid mac dinh...");
       currentTrackSource = TRACK_SRC_HYBRID;
       autoOpticalTracking = true;
       trackCyclePhase = TRACK_CYCLE_ADJUSTING;
@@ -6983,9 +7078,11 @@ void loop() {
           // mới
           trackCyclePhase = TRACK_CYCLE_ADJUSTING;
           Serial.println("\n>> [TRACK 15-MIN CYCLE] Da het 15 phut dung im! "
-                         "Bat dau chu ky tinh toan NOAA + PSO + Fuzzy-PID va "
+                         "Bat dau chu ky tinh toan NOAA + Fuzzy-PID (PSO cached) va "
                          "dieu chinh vi tri moi...");
-          runPsoOptimization();
+          if (!psoHasConverged) {
+            runPsoOptimization();
+          }
         } else {
           static unsigned long lastHoldLogMs = 0;
           if (millis() - lastHoldLogMs >=

@@ -307,10 +307,10 @@ extern "C" {
 // =============================================================================
 
 /** Số lượng hạt trong bầy PSO. */
-#define CFG_PSO_SWARM_SIZE                  (10)
+#define CFG_PSO_SWARM_SIZE                  (20)
 
 /** Số vòng lặp tối đa của PSO. */
-#define CFG_PSO_MAX_ITERATIONS              (25)
+#define CFG_PSO_MAX_ITERATIONS              (50)
 
 /** Trọng số quán tính w, hệ số tự học c1, hệ số xã hội c2 của PSO. */
 #define CFG_PSO_W_INERTIA                   (0.729f)
@@ -326,10 +326,12 @@ extern "C" {
 /** Thời gian mô phỏng kiểm tra fitness của 1 hạt (Giây). */
 #define CFG_PSO_SIM_DURATION_SEC            (2.5f)
 
-/** Trọng số hàm mục tiêu Fitness: J = w_itae * ITAE + w_os * Overshoot + w_ts * Ts + w_loss * StepLossPenalty */
+/** Trọng số hàm mục tiêu Fitness: J = w_itae*ITAE + w_os*maxOS + w_ts*Ts + w_u*E_u + w_sat*SatPen */
 #define CFG_FITNESS_W_ITAE                  (1.0f)
 #define CFG_FITNESS_W_OVERSHOOT             (20.0f)
-#define CFG_FITNESS_W_SETTLING_TIME         (2.0f)
+#define CFG_FITNESS_W_SETTLING_TIME         (0.05f)
+#define CFG_FITNESS_W_CONTROL_EFFORT        (0.06f)
+#define CFG_FITNESS_W_SATURATION            (0.50f)
 #define CFG_FITNESS_PENALTY_STEP_LOSS       (5000.0f)
 #define CFG_FITNESS_PENALTY_INSTABILITY     (10000.0f)
 
