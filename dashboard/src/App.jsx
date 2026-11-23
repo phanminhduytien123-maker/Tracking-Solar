@@ -305,6 +305,10 @@ export default function App() {
     const now = new Date();
     return `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
   });
+  const selectedIntradayDateRef = useRef(selectedIntradayDate);
+  useEffect(() => {
+    selectedIntradayDateRef.current = selectedIntradayDate;
+  }, [selectedIntradayDate]);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -476,10 +480,11 @@ export default function App() {
             }
             setTelemetry(nextTelemetry);
 
-            // Update real-time intraday curve with live data
+            // Update real-time intraday curve with live data (chỉ cập nhật khi đang xem đúng ngày hôm nay)
             const now = new Date();
+            const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
             const currentHour = now.getHours();
-            if (currentHour >= 5 && currentHour <= 19) {
+            if (currentHour >= 5 && currentHour <= 19 && selectedIntradayDateRef.current === todayStr) {
               const timeSlot = `${currentHour.toString().padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
               setIntradayData((prev) => {
                 return prev.map((item) => {
@@ -544,13 +549,13 @@ export default function App() {
             }
             if (allProfiles && typeof allProfiles === 'object') {
               setAllIntradayProfiles(allProfiles);
-              if (dates && dates.length > 0) {
-                setAvailableHistoryDates(dates);
-              }
-              // Chọn ngày hiển thị: ngày đang chọn hoặc ngày đầu tiên có sẵn
               const now = new Date();
               const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-              const activeDate = selectedIntradayDate || todayStr;
+              const activeDate = selectedIntradayDateRef.current || todayStr;
+              if (dates && dates.length > 0) {
+                setAvailableHistoryDates(dates.includes(activeDate) ? dates : [activeDate, ...dates]);
+              }
+              // Giữ nguyên ngày người dùng đang chọn khi Firebase cập nhật định kỳ
               if (allProfiles[activeDate]) {
                 setIntradayData(allProfiles[activeDate]);
               }
@@ -578,10 +583,11 @@ export default function App() {
         const nextState = mockEngineRef.current.getNextState();
         setTelemetry(nextState);
 
-        // Update real-time intraday curve
+        // Update real-time intraday curve (chỉ cập nhật khi đang xem đúng ngày hôm nay)
         const now = new Date();
+        const todayStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}`;
         const currentHour = now.getHours();
-        if (currentHour >= 5 && currentHour <= 19) {
+        if (currentHour >= 5 && currentHour <= 19 && selectedIntradayDateRef.current === todayStr) {
           const timeSlot = `${currentHour.toString().padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
           setIntradayData((prev) => {
             return prev.map((item) => {
@@ -1152,9 +1158,12 @@ export default function App() {
               availableDates={availableHistoryDates}
               selectedIntradayDate={selectedIntradayDate}
               onSelectIntradayDate={(dateStr) => {
+                selectedIntradayDateRef.current = dateStr;
                 setSelectedIntradayDate(dateStr);
                 if (allIntradayProfiles[dateStr]) {
                   setIntradayData(allIntradayProfiles[dateStr]);
+                } else {
+                  setIntradayData(generateIntradayProfile());
                 }
               }}
               onOpenDataSettings={handleOpenDataSettings}

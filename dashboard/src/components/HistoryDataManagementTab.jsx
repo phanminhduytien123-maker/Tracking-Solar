@@ -24,6 +24,7 @@ export default function HistoryDataManagementTab({
   const [newDateInput, setNewDateInput] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const lastLoadedDateRef = React.useRef(null);
+  const lastAppliedInitialTargetRef = React.useRef(null);
 
   // Form values state for the selected day
   const [formData, setFormData] = useState({
@@ -43,14 +44,19 @@ export default function HistoryDataManagementTab({
     weather_note: ''
   });
 
-  // When initialTargetDate or history30Days changes, sync selectedDateStr
+  // When initialTargetDate or history30Days changes, sync selectedDateStr once per initialTargetDate
   useEffect(() => {
-    if (initialTargetDate && history30Days.some(d => d.date === initialTargetDate)) {
+    if (
+      initialTargetDate &&
+      initialTargetDate !== lastAppliedInitialTargetRef.current &&
+      history30Days.some(d => d.date === initialTargetDate)
+    ) {
+      lastAppliedInitialTargetRef.current = initialTargetDate;
       setSelectedDateStr(initialTargetDate);
     } else if (!selectedDateStr && history30Days.length > 0) {
       setSelectedDateStr(history30Days[history30Days.length - 1].date);
     }
-  }, [initialTargetDate, history30Days]);
+  }, [initialTargetDate, history30Days, selectedDateStr]);
 
   // Load selected day's data into formData (chỉ nạp lại khi chuyển ngày hoặc chưa nạp)
   useEffect(() => {
