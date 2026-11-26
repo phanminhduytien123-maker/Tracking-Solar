@@ -9,6 +9,40 @@ export const STALE_THRESHOLD_MS = 25000; // 25 giây (chống chập chờn khi 
 export const DISCONNECT_THRESHOLD_MS = 60000; // 60 giây không có gói tin mới -> MẤT KẾT NỐI
 
 /**
+ * Quy đổi điện áp ắc quy chì 12V sang phần trăm dung lượng (%) theo đường cong nội suy từng đoạn.
+ */
+function computeBattery12vSoc(voltage) {
+  if (voltage === null || voltage === undefined || Number.isNaN(Number(voltage))) return null;
+  const v = Number(voltage);
+  if (v <= 10.8) return 0;
+  if (v >= 12.7) return 100;
+  const pts = [
+    [10.8, 0],
+    [11.6, 15],
+    [11.9, 30],
+    [12.1, 50],
+    [12.3, 70],
+    [12.5, 85],
+    [12.7, 100]
+  ];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [v0, p0] = pts[i];
+    const [v1, p1] = pts[i + 1];
+    if (v <= v1) {
+      return Math.round(p0 + ((v - v0) / (v1 - v0)) * (p1 - p0));
+    }
+  }
+  return 100;
+}
+
+function computeBatteryLevels(percent) {
+  if (percent === null || percent === undefined || Number.isNaN(Number(percent))) return 0;
+  const p = Number(percent);
+  if (p <= 0) return 0;
+  return Math.min(5, Math.ceil(p / 20));
+}
+
+/**
  * Ước lượng nhiệt độ bề mặt tấm pin (°C) theo mô hình Ross/NOCT kết hợp tham chiếu
  * MDPI Sustainability 2022, 14(3), 1696 (10.3390/su14031696) khi chưa gắn cảm biến nhiệt trực tiếp.
  */
@@ -54,6 +88,13 @@ export function getCleanZeroTelemetry() {
       esp2PowerOn: true,
       esp2AutoCutoff: true,
       esp2RelayState: 'ON',
+      battery: {
+        voltage: null,
+        percent: null,
+        levels: 0,
+        valid: false,
+        charging: false
+      },
       mode: '--',
       state: 'DISCONNECTED',
       displayState: 'MẤT KẾT NỐI',
@@ -1195,6 +1236,34 @@ export class FirebaseSolarService {
     }
     const esp2Online = esp2PowerOn && Boolean(vocIscNode.online && vocNodeAgeMs <= 50000);
 
+    // Trạng thái ắc quy 12V từ FZ0430 #3 (ESP32 #2 GPIO 8)
+    const hasRecentBatNode = esp2Online || (vocNodeAgeMs <= 120000);
+    const rawBatValid = vocIscNode.bat_valid !== undefined
+      ? Boolean(vocIscNode.bat_valid)
+      : (tracking.bat_valid !== undefined ? Boolean(tracking.bat_valid) : null);
+    const rawBatV = vocIscNode.bat_v !== undefined
+      ? Number(vocIscNode.bat_v)
+      : (tracking.bat_v !== undefined ? Number(tracking.bat_v) : null);
+    const rawBatPct = vocIscNode.bat_pct !== undefined
+      ? Number(vocIscNode.bat_pct)
+      : (tracking.bat_pct !== undefined ? Number(tracking.bat_pct) : null);
+    const batValid = Boolean(
+      hasRecentBatNode &&
+      rawBatValid !== false &&
+      rawBatV !== null &&
+      !Number.isNaN(rawBatV) &&
+      rawBatV >= 6.0 &&
+      rawBatV <= 18.0
+    );
+    const batVolt = batValid ? Number(rawBatV.toFixed(2)) : null;
+    const batPct = batValid
+      ? (rawBatPct !== null && !Number.isNaN(rawBatPct) && rawBatPct >= 0 && rawBatPct <= 100
+        ? Math.round(rawBatPct)
+        : computeBattery12vSoc(batVolt))
+      : null;
+    const batLevels = batValid && batPct !== null ? computeBatteryLevels(batPct) : 0;
+    const batCharging = Boolean(batValid && batVolt >= 13.15);
+
     const computedPingMs = isSystemOnline
       ? (this.livePingMs !== null ? this.livePingMs : 22)
       : null;
@@ -1234,6 +1303,13 @@ export class FirebaseSolarService {
         esp2PowerOn,
         esp2AutoCutoff,
         esp2RelayState,
+        battery: {
+          voltage: batVolt,
+          percent: batPct,
+          levels: batLevels,
+          valid: batValid,
+          charging: batCharging
+        },
         packetAgeMs: Number.isFinite(trkAgeMs) ? Math.round(trkAgeMs) : null,
         mode: tracking.mode || '--',
         state: rawState,

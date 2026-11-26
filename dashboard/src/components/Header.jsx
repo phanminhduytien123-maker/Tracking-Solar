@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CloudSun } from 'lucide-react';
 import { formatSignedNumber } from '../utils/formatters';
+import BatteryLevelIcon from './BatteryLevelIcon';
 
 export default function Header({
   system = {},
@@ -256,8 +257,44 @@ export default function Header({
             </div>
           </div>
 
-          {/* Cụm phải: Đèn, Lệch RTC & Đồng hồ */}
+          {/* Cụm phải: Ắc quy, Đèn, Lệch RTC & Đồng hồ */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 ml-auto">
+            {/* Dung lượng Ắc quy 12V (FZ0430 #3 - ESP2 GPIO 8) */}
+            {(() => {
+              const bat = system?.battery || {};
+              const hasBat = Boolean(bat.valid && bat.percent !== null && bat.percent !== undefined);
+              const batLevels = hasBat
+                ? (bat.levels ?? (bat.percent <= 0 ? 0 : Math.min(5, Math.ceil(bat.percent / 20))))
+                : 0;
+              const batToneClass = !hasBat
+                ? 'bg-white text-zinc-500 border-zinc-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700'
+                : batLevels <= 1
+                  ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/35'
+                  : batLevels === 2
+                    ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/35'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/35';
+              const batTooltip = hasBat
+                ? `Ắc quy 12V: ${bat.voltage !== null && bat.voltage !== undefined ? `${String(bat.voltage.toFixed(2)).replace('.', ',')} V` : '-- V'} (${bat.percent}%, ${batLevels}/5 nấc)${bat.charging ? ' · Đang sạc' : ''}`
+                : 'Chưa có dữ liệu ắc quy (FZ0430 #3 - ESP2 GPIO 8)';
+
+              return (
+                <span
+                  title={batTooltip}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${batToneClass}`}
+                >
+                  <BatteryLevelIcon levels={batLevels} className="w-3.5 h-4 shrink-0" />
+                  <span>Ắc quy: {hasBat ? `${bat.percent}%` : '--%'}</span>
+                  {hasBat && bat.voltage !== null && bat.voltage !== undefined && (
+                    <span className="font-mono font-medium opacity-85">
+                      ({String(bat.voltage.toFixed(1)).replace('.', ',')}V)
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
+
+            <span className="hidden md:block h-3.5 w-px bg-zinc-200 dark:bg-slate-800" aria-hidden="true" />
+
             {/* Trạng thái Đèn (Relay Kênh 5 - Relay E) */}
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${

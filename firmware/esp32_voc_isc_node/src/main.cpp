@@ -6,6 +6,7 @@
 //   - GPIO 5  (ADC1_CH4) : ACS712 #1 -> Đo dòng ngắn mạch Isc Tấm Xoay (qua cầu 10k/20k)
 //   - GPIO 6  (ADC1_CH5) : FZ0430 #2 -> Đo áp hở mạch Voc Tấm Cố Định (Static)
 //   - GPIO 7  (ADC1_CH6) : ACS712 #2 -> Đo dòng ngắn mạch Isc Tấm Cố Định (Static - qua cầu 10k/20k)
+//   - GPIO 8  (ADC1_CH7) : FZ0430 #3 (nguyên bản 5:1) -> Đo điện áp ắc quy 12V trực tiếp
 //   - GPIO 14 (kèm G40)  : Relay A + Relay C (Ngắt tải Sạc Tấm Xoay & Cố Định)
 //   - GPIO 41 (kèm G39)  : Relay B + Relay D (Đóng ngắn mạch qua ACS712 #1 & #2)
 //   - GPIO 42            : Relay E (Kênh 5 - Đèn 12V: Khi ngủ sẽ 15 phút BẬT / 15 phút TẮT luân phiên tới sáng)
@@ -30,7 +31,7 @@
 
 #include "config.h"
 
-#define VOC_ISC_FIRMWARE_VERSION "1.2.1"
+#define VOC_ISC_FIRMWARE_VERSION "1.2.2"
 
 // -------------------------------------------------------------------------
 // 1. ĐỊNH NGHĨA CHÂN PHẦN CỨNG (PINOUT ESP32-S3 #2)
@@ -39,6 +40,7 @@
 #define PIN_ADC_ISC_TRK     7   // ADC1_CH6: ACS712 #2 (Tấm Xoay - qua cầu 10k/20k)
 #define PIN_ADC_VOC_STA     4   // ADC1_CH3: FZ0430 #1 (Tấm Cố Định)
 #define PIN_ADC_ISC_STA     5   // ADC1_CH4: ACS712 #1 (Tấm Cố Định - qua cầu 10k/20k)
+#define PIN_ADC_BAT_VOLT    8   // ADC1_CH7 (J1-12): FZ0430 #3 nguyên bản 5:1 -> Đo điện áp ắc quy 12V
 
 // Cảm biến nhiệt độ bề mặt 2 tấm pin DS18B20 (đúng PCB Board 2: trở kéo 4.7k lên +3.3V_ESP2)
 #define PIN_TEMP_TRK        15  // J_TEMP_TRK1 (Pad 8 ESP2): DS18B20 #1 - Nhiệt độ Tấm Xoay (Tracker)
@@ -73,6 +75,7 @@ uint64_t lastLampConfigApplyTs = 0; // Timestamp lần cuối bấm "OK" áp d�
 // Hệ số nhân ngược = 1 / 0.10164 = 9.8386
 float calVocScaleTrk = 9.8386f;
 float calVocScaleSta = 9.8386f;
+float calBatScale    = 5.0000f; // FZ0430 #3 nguyên bản (30kΩ / 7.5kΩ -> tỉ lệ 5:1)
 
 // ACS712ELC-05B (Độ nhạy chuẩn 185 mV/A tại ngõ ra 5V, đi qua cầu chia áp 10kΩ/20kΩ -> nhân 1.5)
 float calAcsDividerGain = 1.500f;    // (10k + 20k) / 20k = 1.5
@@ -120,6 +123,13 @@ float rawVocStaMv = 0.0f;
 float rawIscTrkMv = 0.0f;
 float rawIscStaMv = 0.0f;
 uint32_t totalMeasureCycles = 0;
+
+// Điện áp ắc quy 12V trực tiếp (FZ0430 #3 - GPIO 8)
+float liveBatVolt = 0.0f;
+float rawBatMv    = 0.0f;
+int liveBatPct    = -1;
+bool batSensorValid = false;
+unsigned long lastBatPollMs = 0;
 
 // Cảm biến nhiệt độ bề mặt 2 tấm pin DS18B20 (1-Wire độc lập, chỉ đọc & gửi ban ngày khi thức)
 OneWire oneWireTrk(PIN_TEMP_TRK);
@@ -221,6 +231,56 @@ float readAdcMilliVoltsFiltered(uint8_t pin) {
   sum -= minV;
   sum -= maxV;
   return (float)sum / (float)(N - 2);
+}
+
+// -------------------------------------------------------------------------
+// 5B. ĐO ĐIỆN ÁP & TÍNH % DUNG LƯỢNG ẮC QUY CHÌ 12V (FZ0430 #3 - GPIO 8)
+// -------------------------------------------------------------------------
+int computeLeadAcid12vSoc(float v) {
+  if (v <= 10.80f) return 0;
+  if (v >= 12.70f) return 100;
+  struct SocPt {
+    float v;
+    float pct;
+  };
+  static const SocPt kSocLut[] = {
+    {10.80f, 0.0f},
+    {11.60f, 15.0f},
+    {11.90f, 30.0f},
+    {12.10f, 50.0f},
+    {12.30f, 70.0f},
+    {12.50f, 85.0f},
+    {12.70f, 100.0f}
+  };
+  const int n = (int)(sizeof(kSocLut) / sizeof(kSocLut[0]));
+  for (int i = 0; i < n - 1; i++) {
+    if (v <= kSocLut[i + 1].v) {
+      float t = (v - kSocLut[i].v) / (kSocLut[i + 1].v - kSocLut[i].v);
+      return (int)roundf(kSocLut[i].pct + t * (kSocLut[i + 1].pct - kSocLut[i].pct));
+    }
+  }
+  return 100;
+}
+
+void updateBatteryVoltage(bool forceNow = false) {
+  unsigned long now = millis();
+  if (!forceNow && lastBatPollMs > 0 && (now - lastBatPollMs < 5000UL)) {
+    return;
+  }
+  lastBatPollMs = now;
+
+  float mv = readAdcMilliVoltsFiltered(PIN_ADC_BAT_VOLT);
+  rawBatMv = mv;
+  float v = (mv / 1000.0f) * calBatScale;
+  if (v >= 6.0f && v <= 18.0f) {
+    liveBatVolt = batSensorValid ? (0.7f * liveBatVolt + 0.3f * v) : v;
+    batSensorValid = true;
+    liveBatPct = computeLeadAcid12vSoc(liveBatVolt);
+  } else {
+    batSensorValid = false;
+    liveBatVolt = 0.0f;
+    liveBatPct = -1;
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -533,6 +593,8 @@ void pollSystemStateAndConfig() {
 void pushVocIscToFirebase(bool writeHistory) {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
 
+  updateBatteryVoltage(true);
+
   unsigned long lampRemainSec = 0;
   if (!lampAutoDisabled && wasSleepingForLamp) {
     unsigned long currentTargetMs = (lampAutoPhase ? lampOnSec : lampOffSec) * 1000UL;
@@ -550,6 +612,11 @@ void pushVocIscToFirebase(bool writeHistory) {
   trkPatch.set("isc_trk", liveIscTrk);
   if (!sleeping && tempTrkValid) {
     trkPatch.set("temp_trk", liveTempTrk);
+  }
+  trkPatch.set("bat_valid", batSensorValid);
+  if (batSensorValid) {
+    trkPatch.set("bat_v", roundf(liveBatVolt * 100.0f) / 100.0f);
+    trkPatch.set("bat_pct", liveBatPct);
   }
   trkPatch.set("relayIntervalSec", (int)relayIntervalSec);
   trkPatch.set("lamp12vOn", lamp12vState);
@@ -586,6 +653,13 @@ void pushVocIscToFirebase(bool writeHistory) {
   }
   nodeJson.set("temp_trk_connected", !sleeping && tempTrkValid);
   nodeJson.set("temp_sta_connected", !sleeping && tempStaValid);
+  nodeJson.set("bat_valid", batSensorValid);
+  if (batSensorValid) {
+    nodeJson.set("bat_v", roundf(liveBatVolt * 100.0f) / 100.0f);
+    nodeJson.set("bat_pct", liveBatPct);
+  }
+  nodeJson.set("raw_bat_mv", rawBatMv);
+  nodeJson.set("bat_scale", calBatScale);
   nodeJson.set("raw_voc_trk_mv", rawVocTrkMv);
   nodeJson.set("raw_voc_sta_mv", rawVocStaMv);
   nodeJson.set("raw_isc_trk_mv", rawIscTrkMv);
@@ -636,6 +710,10 @@ void pushVocIscToFirebase(bool writeHistory) {
       hVocJson.set("isc_sta", liveIscSta);
       if (tempTrkValid) hVocJson.set("temp_trk", liveTempTrk);
       if (tempStaValid) hVocJson.set("temp_sta", liveTempSta);
+      if (batSensorValid) {
+        hVocJson.set("bat_v", roundf(liveBatVolt * 100.0f) / 100.0f);
+        hVocJson.set("bat_pct", liveBatPct);
+      }
       hVocJson.set("source", "device");
       Firebase.RTDB.updateNode(&fbdo, histPath, &hVocJson);
     }
@@ -645,6 +723,8 @@ void pushVocIscToFirebase(bool writeHistory) {
 
 void pushHeartbeatToFirebase() {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) return;
+
+  updateBatteryVoltage(true);
 
   bool sleeping = isSystemCurrentlySleeping();
   unsigned long lampRemainSec = 0;
@@ -668,6 +748,12 @@ void pushHeartbeatToFirebase() {
   hbJson.set("temp_sta_connected", !sleeping && tempStaValid);
   if (!sleeping && tempTrkValid) hbJson.set("temp_trk", liveTempTrk);
   if (!sleeping && tempStaValid) hbJson.set("temp_sta", liveTempSta);
+  hbJson.set("bat_valid", batSensorValid);
+  if (batSensorValid) {
+    hbJson.set("bat_v", roundf(liveBatVolt * 100.0f) / 100.0f);
+    hbJson.set("bat_pct", liveBatPct);
+  }
+  hbJson.set("raw_bat_mv", rawBatMv);
   hbJson.set("firmware", VOC_ISC_FIRMWARE_VERSION);
   hbJson.set("fota_ready", true);
   hbJson.set("ota_node", "/solar/ota_esp2");
@@ -1398,7 +1484,31 @@ void handleSerialCommands() {
     Serial.printf(" Tam Co Dinh (STA) : Voc = %.2f V | Isc = %.3f A | Temp (G%d) = %s\n",
                   liveVocSta, liveIscSta, PIN_TEMP_STA,
                   tempStaValid ? (String(liveTempSta, 1) + " C").c_str() : "CHUA GAN");
+    if (batSensorValid) {
+      Serial.printf(" Ac Quy 12V (G%d)   : %.2f V (%d%%) | raw=%.0fmV | k=%.4f\n",
+                    PIN_ADC_BAT_VOLT, liveBatVolt, liveBatPct, rawBatMv, calBatScale);
+    } else {
+      Serial.printf(" Ac Quy 12V (G%d)   : CHUA GAN (raw=%.0fmV)\n",
+                    PIN_ADC_BAT_VOLT, rawBatMv);
+    }
     Serial.println("==============================================================\n");
+  } else if (cmd.startsWith("calbat ")) {
+    float refV = cmd.substring(7).toFloat();
+    if (refV >= 6.0f && refV <= 18.0f) {
+      float mv = readAdcMilliVoltsFiltered(PIN_ADC_BAT_VOLT);
+      if (mv > 200.0f) {
+        calBatScale = refV / (mv / 1000.0f);
+        prefs.putFloat("bat_k", calBatScale);
+        updateBatteryVoltage(true);
+        Serial.printf(">> [CALBAT] Da luu calBatScale = %.4f (ref=%.2fV, raw=%.0fmV) -> Vbat=%.2fV (%d%%)\n",
+                      calBatScale, refV, mv, liveBatVolt, liveBatPct);
+      } else {
+        Serial.printf(">> [CALBAT ERR] Tin hieu ADC GPIO %d qua thap (%.0fmV), kiem tra lai day noi!\n",
+                      PIN_ADC_BAT_VOLT, mv);
+      }
+    } else {
+      Serial.println(">> [CALBAT ERR] Gia tri tham chieu phai nam trong 6.0..18.0 V (vd: calbat 12.65)");
+    }
   } else if (cmd.startsWith("fota ")) {
     String url = cmd.substring(5);
     url.trim();
@@ -1432,16 +1542,18 @@ void setup() {
   Serial.println("  ESP32-S3 #2: NODE DO VOC, ISC & DEN 12V (RELAY E)");
   Serial.println("=======================================================");
 
-  // BƯỚC 2: Cấu hình 4 kênh ADC1 với suy hao 11dB (đo chuẩn dải 0..3100mV)
+  // BƯỚC 2: Cấu hình 5 kênh ADC1 với suy hao 11dB (đo chuẩn dải 0..3100mV)
   analogReadResolution(12);
   pinMode(PIN_ADC_VOC_TRK, INPUT);
   pinMode(PIN_ADC_ISC_TRK, INPUT);
   pinMode(PIN_ADC_VOC_STA, INPUT);
   pinMode(PIN_ADC_ISC_STA, INPUT);
+  pinMode(PIN_ADC_BAT_VOLT, INPUT);
   analogSetPinAttenuation(PIN_ADC_VOC_TRK, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_ISC_TRK, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_VOC_STA, ADC_11db);
   analogSetPinAttenuation(PIN_ADC_ISC_STA, ADC_11db);
+  analogSetPinAttenuation(PIN_ADC_BAT_VOLT, ADC_11db);
 
   // BƯỚC 2B: Khởi tạo 2 cảm biến nhiệt độ DS18B20 độc lập (GPIO 15 TRK, GPIO 16 STA)
   initTempSensors();
@@ -1462,6 +1574,11 @@ void setup() {
   }
   calVocScaleTrk = prefs.getFloat("voc_k_trk", 9.8386f);
   calVocScaleSta = prefs.getFloat("voc_k_sta", 9.8386f);
+  calBatScale = prefs.getFloat("bat_k", 5.0000f);
+  if (isnan(calBatScale) || calBatScale < 2.0f || calBatScale > 12.0f) {
+    calBatScale = 5.0000f;
+  }
+  updateBatteryVoltage(true);
   Serial.printf(">> [NVS] Chu ky nhay Relay A-D: %lu giay | Relay E (Den 12V): BAT %lu phut / TAT %lu phut (GPIO %d)\n",
                 (unsigned long)relayIntervalSec, (unsigned long)(lampOnSec / 60), (unsigned long)(lampOffSec / 60), PIN_RELAY_E_LAMP12V);
 
@@ -1591,6 +1708,9 @@ void loop() {
   // Cập nhật chu trình Đèn 12V qua Relay Kênh 5 (Relay E):
   // Khi hệ thống ngủ -> 15 phút BẬT / 15 phút TẮT luân phiên cho tới sáng
   if (!otaInProgress) {
+    if (measState == MEAS_IDLE) {
+      updateBatteryVoltage(false);
+    }
     updateNightLamp12vCycle();
   }
 

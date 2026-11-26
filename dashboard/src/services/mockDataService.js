@@ -416,6 +416,9 @@ export class MockTelemetryEngine {
         firmware: 'v2.4-FuzzyPSO-ESP32S3',
         uptimeSeconds: Math.floor((Date.now() - 1700000000000) / 1000) % 86400,
         rtcOffsetMs: 120, // Độ lệch RTC so với server
+        battery: isDaytime
+          ? { voltage: 13.25, percent: 96, levels: 5, valid: true, charging: true }
+          : { voltage: 12.38, percent: 76, levels: 4, valid: true, charging: false },
         errors: {
           sensorLost: false,
           driverFault: this.estop,
