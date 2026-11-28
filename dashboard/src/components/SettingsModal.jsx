@@ -171,7 +171,8 @@ export default function SettingsModal({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-zinc-200 bg-zinc-50 px-4 pt-1 gap-1 text-xs overflow-x-auto">
+        <div className="border-b border-zinc-200 bg-zinc-50 px-4 pt-1 overflow-x-auto">
+          <div className="flex items-center justify-center gap-1 text-xs min-w-max mx-auto">
           <button
             onClick={() => setActiveTab('config')}
             className={`py-2 px-3 border-b-2 font-semibold cursor-pointer whitespace-nowrap transition-colors ${activeTab === 'config'
@@ -225,6 +226,7 @@ export default function SettingsModal({
           >
             Dữ liệu thô (JSON)
           </button>
+          </div>
         </div>
 
         {/* Body Content */}
